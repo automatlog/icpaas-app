@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model ChannelConfig {
+  id             Int      @id @default(autoincrement())
+  label          String?
+  wabaNumber     String?
+  phoneNumberId  String?  @unique
+  wabaBusinessId String?
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Contact {
+  id            Int      @id @default(autoincrement())
+  externalId    String?  @unique
+  name          String
+  phone         String   @unique
+  company       String?
+  email         String?
+  leadStatus    String   @default("new")
+  channelOptIns String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model TemplateCache {
+  id         Int      @id @default(autoincrement())
+  externalId String?  @unique
+  name       String
+  channel    String
+  status     String
+  category   String?
+  language   String?
+  body       String
+  rawJson    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model CampaignDraft {
+  id          Int      @id @default(autoincrement())
+  externalId  String?  @unique
+  name        String
+  channel     String
+  status      String   @default("draft")
+  message     String
+  contactsRaw String?
+  scheduledAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Conversation {
+  id           Int            @id @default(autoincrement())
+  externalId   String?        @unique
+  channel      String
+  name         String?
+  phone        String?
+  lastMessage  String?
+  unreadCount  Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  messageDrafts MessageDraft[]
+}
+
+model MessageDraft {
+  id             Int           @id @default(autoincrement())
+  conversationId Int?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  channel        String
+  phone          String?
+  text           String
+  status         String        @default("draft")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model VoiceMediaFile {
+  id            Int             @id @default(autoincrement())
+  fileId        String          @unique
+  fileName      String?
+  sizeBytes     Int?
+  bitrateKbps   Int?
+  status        String          @default("Pending")
+  errorCode     String?
+  messageStatus String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  campaigns     VoiceCampaign[]
+
+  @@index([status])
+}
+
+model VoiceBotFlow {
+  id        Int             @id @default(autoincrement())
+  botFlowId Int             @unique
+  name      String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  campaigns VoiceCampaign[]
+}
+
+model VoiceCampaign {
+  id              Int                  @id @default(autoincrement())
+  callerId        String
+  numbersCsv      String?
+  numbersCount    Int                  @default(0)
+  mediaFileRefId  Int?
+  mediaFile       VoiceMediaFile?      @relation(fields: [mediaFileRefId], references: [id], onDelete: SetNull)
+  botFlowRefId    Int?
+  botFlow         VoiceBotFlow?        @relation(fields: [botFlowRefId], references: [id], onDelete: SetNull)
+  isDtmfFile      Int                  @default(0)
+  schedTime       DateTime?
+  removeDuplicate Boolean              @default(false)
+  uploadFilesJson String?
+  status          String               @default("submitted")
+  errorCode       String?
+  statusMessage   String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  recipients      VoiceCallRecipient[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model VoiceCallRecipient {
+  id         Int                  @id @default(autoincrement())
+  campaignId Int
+  campaign   VoiceCampaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  number     String
+  messageId  String               @unique
+  createdAt  DateTime             @default(now())
+  report     VoiceDeliveryReport?
+
+  @@index([number])
+  @@index([campaignId])
+}
+
+model VoiceDeliveryReport {
+  id                     Int                 @id @default(autoincrement())
+  messageId              String              @unique
+  recipientId            Int?                @unique
+  recipient              VoiceCallRecipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  number                 String
+  callerId               String?
+  callStatus             String?
+  callInitDate           DateTime?
+  callAnsDate            DateTime?
+  callEndDate            DateTime?
+  extensionKey           String?
+  interface              String?
+  errorDetails           String?
+  botFlowId              Int?
+  ibdCallAnsDate         DateTime?
+  ibdCallEndDate         DateTime?
+  ibdCallStatus          String?
+  ibdActionType          String?
+  ibdInputCaptured       String?
+  ibdDestination         String?
+  ibdCallRecordingFileId String?
+  callDuration           Int?
+  cost                   Float?
+  ibdBillSec             Int?
+  ibdCost                Float?
+  billingUnits           Int?
+  finalCost              Float?
+  fetchedAt              DateTime            @default(now())
+
+  @@index([number])
+  @@index([callStatus])
+  @@index([callInitDate])
+}
+
+model IvrInboundCdr {
+  id                  Int       @id @default(autoincrement())
+  cdrId               Int       @unique
+  uniqueId            String?
+  callDateTime        DateTime?
+  caller              String?
+  duration            Float?
+  actionType          String?
+  billedPulses        Int?
+  billedSeconds       Int?
+  destination         String?
+  userId              Int?
+  isIvrUnlimitedUser  Boolean   @default(false)
+  cost                Float?
+  startTime           DateTime?
+  answeredTime        DateTime?
+  endTime             DateTime?
+  ivrChannel          String?
+  disposition         String?
+  callRecordingFileId String?
+  reason              String?
+  operator            String?
+  circle              String?
+  beforeCredit        Float?
+  afterCredit         Float?
+  inputValue          String?
+  channel             String?
+  fetchedAt           DateTime  @default(now())
+
+  @@index([caller])
+  @@index([callDateTime])
+  @@index([disposition])
+  @@index([ivrChannel])
+}
+
+model WalletBalanceSnapshot {
+  id            Int      @id @default(autoincrement())
+  walletBalance Float
+  capturedAt    DateTime @default(now())
+
+  @@index([capturedAt])
+}

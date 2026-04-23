@@ -1,0 +1,35 @@
+{
+  "name": "icpaasOmniApp",
+  "displayName": "icpaas Omni App",
+  "expo": {
+    "name": "icpaas Omni App",
+    "slug": "icpaas-omni-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./logo-icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./logo-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF",
+      "dark": {
+        "image": "./logo-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#0A0A0D"
+      }
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.icpaas.omniapp",
+      "adaptiveIcon": {
+        "foregroundImage": "./logo-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.icpaas.omniapp"
+    }
+  }
+}
