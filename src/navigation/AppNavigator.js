@@ -1,8 +1,8 @@
-// src/navigation/AppNavigator.js — editorial stack flow (adaptive theme)
+// src/navigation/AppNavigator.js — Feed-themed stack flow
 import React, { useMemo } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useEditorial } from '../theme';
+import { useFeed } from '../theme';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import ProductIconsScreen from '../screens/ProductIconsScreen';
@@ -10,12 +10,14 @@ import ReportScreen from '../screens/ReportScreen';
 import AgentScreen from '../screens/AgentScreen';
 import InboxScreen from '../screens/InboxScreen';
 import ChatScreen from '../screens/ChatScreen';
-import CampaignsScreen from '../screens/CampaignsScreen';
-import ContactsScreen from '../screens/ContactsScreen';
 import TemplatesScreen from '../screens/TemplatesScreen';
-import IVRScreen from '../screens/IVRScreen';
 import ConfigScreen from '../screens/ConfigScreen';
 import SendMessageScreen from '../screens/SendMessageScreen';
+import WabaChannelScreen from '../screens/WabaChannelScreen';
+import MediaLibraryScreen from '../screens/MediaLibraryScreen';
+import CampaignStep1Screen from '../screens/CampaignStep1Screen';
+import CampaignStep2Screen from '../screens/CampaignStep2Screen';
+import CampaignStep3Screen from '../screens/CampaignStep3Screen';
 
 const Stack = createNativeStackNavigator();
 
@@ -27,26 +29,26 @@ const NAV_FONTS = {
 };
 
 export default function AppNavigator() {
-  const ed = useEditorial();
+  const c = useFeed();
 
   const theme = useMemo(() => ({
-    dark: ed.scheme === 'dark',
+    dark: c.scheme === 'dark',
     colors: {
-      primary: ed.oxblood,
-      background: ed.paper,
-      card: ed.paper,
-      text: ed.ink,
-      border: ed.rule,
-      notification: ed.oxblood,
+      primary: c.accentPink,
+      background: c.bg,
+      card: c.bgCard || c.bgSoft,
+      text: c.text,
+      border: c.border,
+      notification: c.accentPink,
     },
     fonts: NAV_FONTS,
-  }), [ed]);
+  }), [c]);
 
   const screenOptions = useMemo(() => ({
     headerShown: false,
-    contentStyle: { backgroundColor: ed.paper },
+    contentStyle: { backgroundColor: c.bg },
     animation: 'fade',
-  }), [ed]);
+  }), [c]);
 
   return (
     <NavigationContainer theme={theme}>
@@ -56,13 +58,15 @@ export default function AppNavigator() {
         <Stack.Screen name="Report" component={ReportScreen} />
         <Stack.Screen name="Agent" component={AgentScreen} />
         <Stack.Screen name="Templates" component={TemplatesScreen} />
-        <Stack.Screen name="Campaigns" component={CampaignsScreen} />
-        <Stack.Screen name="Contacts" component={ContactsScreen} />
         <Stack.Screen name="Inbox" component={InboxScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
-        <Stack.Screen name="IVR" component={IVRScreen} />
         <Stack.Screen name="Config" component={ConfigScreen} />
         <Stack.Screen name="Send" component={SendMessageScreen} />
+        <Stack.Screen name="WabaChannels" component={WabaChannelScreen} />
+        <Stack.Screen name="MediaLibrary" component={MediaLibraryScreen} />
+        <Stack.Screen name="CampaignStep1" component={CampaignStep1Screen} />
+        <Stack.Screen name="CampaignStep2" component={CampaignStep2Screen} />
+        <Stack.Screen name="CampaignStep3" component={CampaignStep3Screen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -14,8 +14,8 @@ const PRODUCTS = [
   { n: '02', icon: 'chatbubble-outline',  title: 'SMS',       tag: 'Shortcode',  tint: 'tintRose',     route: 'Send', params: { channel: 'sms' },      meta: '9.8M' },
   { n: '03', icon: 'card-outline',        title: 'RCS',       tag: 'Cards',      tint: 'tintMint',     route: 'Send', params: { channel: 'rcs' },      meta: '7.4M' },
   { n: '04', icon: 'call-outline',        title: 'Voice',     tag: 'Outbound',   tint: 'tintYellow',   route: 'Send', params: { channel: 'voice' },    meta: '5.1M' },
-  { n: '05', icon: 'keypad-outline',      title: 'IVR',       tag: 'Inbound',    tint: 'tintClay',     route: 'IVR',                                    meta: '4.2M' },
-  { n: '06', icon: 'megaphone-outline',   title: 'Campaigns', tag: 'Planner',    tint: 'tintLavender', route: 'Campaigns',                              meta: '3.6M' },
+  { n: '05', icon: 'keypad-outline',      title: 'IVR',       tag: 'Inbound',    tint: 'tintClay',     route: 'Report',                                 meta: '4.2M' },
+  { n: '06', icon: 'megaphone-outline',   title: 'Campaigns', tag: 'Planner',    tint: 'tintLavender', route: 'CampaignStep1',                          meta: '3.6M' },
 ];
 
 const makeStyles = (c) => StyleSheet.create({

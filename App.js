@@ -1,4 +1,5 @@
-// App.js — icpaas.ai Studio-Editorial Flow Root (Redux)
+// App.js — icpaas.ai root (Redux + NativeWind)
+import './global.css';
 import React, { useEffect, useMemo, useState } from 'react';
 import { StatusBar, View, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,11 +12,11 @@ import LoginScreen from './src/screens/LoginScreen';
 import LoadingScreen from './src/screens/LoadingScreen';
 import { store, persistor } from './src/store';
 import { setHydrated } from './src/store/slices/hydratedSlice';
-import { LightEditorial, DarkEditorial } from './src/theme';
+import { Feed, LightFeed } from './src/theme';
 
 function AppInner() {
   const scheme = useColorScheme();
-  const ed = useMemo(() => (scheme === 'dark' ? DarkEditorial : LightEditorial), [scheme]);
+  const c = useMemo(() => (scheme === 'dark' ? Feed : LightFeed), [scheme]);
 
   const isHydrated = useSelector((s) => s.hydrated);
   const isLoggedIn = useSelector((s) => s.auth.isAuthenticated);
@@ -30,13 +31,13 @@ function AppInner() {
     return () => clearTimeout(t);
   }, [dispatch]);
 
-  const rootStyle = useMemo(() => ({ flex: 1, backgroundColor: ed.paper }), [ed]);
+  const rootStyle = useMemo(() => ({ flex: 1, backgroundColor: c.bg }), [c]);
   const barStyle = scheme === 'dark' ? 'light-content' : 'dark-content';
 
   if (!bootDone) {
     return (
       <SafeAreaProvider>
-        <StatusBar barStyle={barStyle} backgroundColor={ed.paper} />
+        <StatusBar barStyle={barStyle} backgroundColor={c.bg} />
         <View style={rootStyle}>
           <LoadingScreen onFinish={() => setBootDone(true)} />
         </View>
@@ -46,7 +47,7 @@ function AppInner() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={barStyle} backgroundColor={ed.paper} />
+      <StatusBar barStyle={barStyle} backgroundColor={c.bg} />
       <View style={rootStyle}>
         {isLoggedIn && isHydrated ? <AppNavigator /> : <LoginScreen />}
       </View>

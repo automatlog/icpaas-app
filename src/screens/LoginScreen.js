@@ -10,24 +10,14 @@ import { useDispatch } from 'react-redux';
 import { useFeed, Fonts } from '../theme';
 import { login as loginThunk } from '../store/slices/authSlice';
 
-const LOGO = require('../../logo-icon.png');
+const LOGO = require('../../logo-main.png');
 
 const makeStyles = (c) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg },
   scroll: { flexGrow: 1, paddingTop: Platform.OS === 'ios' ? 64 : 48, paddingHorizontal: 28, paddingBottom: 40 },
 
-  brandBlock: { alignItems: 'center', marginTop: 8, marginBottom: 24 },
-  logoRing: {
-    width: 88, height: 88, borderRadius: 44,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
-  },
-  logoImage: { width: 88, height: 88, borderRadius: 44 },
-  brandName: { color: c.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.4, fontFamily: Fonts.sans },
+  brandBlock: { alignItems: 'center', marginTop: 8, marginBottom: 20 },
+  logoImage: { width: 260, height: 110, marginBottom: 4 },
   brandTag: { color: c.textMuted, fontSize: 12, marginTop: 4, fontFamily: Fonts.sans },
 
   heroBlock: { alignItems: 'center', marginBottom: 28 },
@@ -98,10 +88,7 @@ export default function LoginScreen() {
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.brandBlock}>
-          <View style={styles.logoRing}>
-            <Image source={LOGO} style={styles.logoImage} resizeMode="cover" />
-          </View>
-          <Text style={styles.brandName}>icpaas.ai</Text>
+          <Image source={LOGO} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.brandTag}>Omnichannel Communication</Text>
         </View>
 

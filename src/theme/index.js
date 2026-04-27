@@ -1,66 +1,11 @@
-// src/theme/index.js
-// icpaas.ai Brand Theme — Studio-Editorial flow overlay
+// src/theme/index.js — icpaas.ai theme tokens (Feed palette only).
+// NativeWind handles utility classes; runtime code imports Feed/LightFeed + useFeed.
 
 import { Platform, useColorScheme } from 'react-native';
 
-// Studio-editorial palette — light (paper) variant
-export const LightEditorial = {
-  scheme: 'light',
-  paper: '#F4EFE6',
-  paperWarm: '#EAE2D2',
-  paperSoft: '#FBF7EE',
-  ink: '#0E0D0C',
-  inkSoft: '#3C3A36',
-  inkMute: '#8A867E',
-  rule: 'rgba(14,13,12,0.12)',
-  ruleSoft: 'rgba(14,13,12,0.06)',
-  oxblood: '#7A2129',
-  oxbloodDeep: '#4E161B',
-  sage: '#748B7A',
-  umber: '#A15E2A',
-  gold: '#B08839',
-  sky: '#2F5D62',
-  press: 'rgba(122,33,41,0.08)',
-  gradA: '#7A2129',
-  gradB: '#B08839',
-  gradC: '#2F5D62',
-  barTrack: 'rgba(14,13,12,0.08)',
-};
-
-// Studio-editorial palette — dark (charcoal) variant
-export const DarkEditorial = {
-  scheme: 'dark',
-  paper: '#14120E',
-  paperWarm: '#1F1C16',
-  paperSoft: '#201C16',
-  ink: '#F5EDD9',
-  inkSoft: '#C4B994',
-  inkMute: '#8A836E',
-  rule: 'rgba(245,237,217,0.14)',
-  ruleSoft: 'rgba(245,237,217,0.06)',
-  oxblood: '#E08A7F',
-  oxbloodDeep: '#F0B5AB',
-  sage: '#A1B79F',
-  umber: '#D99263',
-  gold: '#D9B65C',
-  sky: '#7DA8AE',
-  press: 'rgba(224,138,127,0.14)',
-  gradA: '#E08A7F',
-  gradB: '#D9B65C',
-  gradC: '#7DA8AE',
-  barTrack: 'rgba(245,237,217,0.12)',
-};
-
-// Back-compat static export — light palette. Prefer useEditorial() for adaptive.
-export const Editorial = LightEditorial;
-
-export const useEditorial = () => {
-  const scheme = useColorScheme();
-  return scheme === 'dark' ? DarkEditorial : LightEditorial;
-};
-
 // Feed (dark social) palette — oversize typography, vibrant card tints, gradient CTA
 export const Feed = {
+  scheme: 'dark',
   bg: '#0A0A0D',
   bgSoft: '#141418',
   bgInput: '#1C1C22',
@@ -92,6 +37,7 @@ export const Feed = {
 };
 
 export const LightFeed = {
+  scheme: 'light',
   bg: '#FAFAFB',
   bgSoft: '#F2F2F5',
   bgInput: '#ECECEF',
@@ -187,7 +133,7 @@ export const Fonts = {
   bold: 'DMSans-Bold',
   mono: 'DMMono-Regular',
   monoMedium: 'DMMono-Medium',
-  // Editorial additions — platform-safe serif/sans stacks for Studio aesthetic
+  // Platform-safe font stacks for cross-platform rendering
   display: Platform.select({
     ios: 'Georgia',
     android: 'serif',

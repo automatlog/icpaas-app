@@ -19,6 +19,7 @@ import messagesReducer from './slices/messagesSlice';
 import contactsReducer from './slices/contactsSlice';
 import campaignsReducer from './slices/campaignsSlice';
 import templatesReducer from './slices/templatesSlice';
+import mediaReducer from './slices/mediaSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -28,6 +29,7 @@ const rootReducer = combineReducers({
   contacts: contactsReducer,
   campaigns: campaignsReducer,
   templates: templatesReducer,
+  media: mediaReducer,
 });
 
 const persistConfig = {

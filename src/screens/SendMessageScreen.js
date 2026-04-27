@@ -1,11 +1,10 @@
-// src/screens/SendMessageScreen.js — Compose + variable mapping + live payload preview
+// src/screens/SendMessageScreen.js — Unified WA/SMS/RCS/Voice composer (NativeWind)
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Platform, Alert,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  ActivityIndicator, Platform, Alert, useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFeed, Fonts } from '../theme';
 import {
   WhatsAppAPI, SMSAPI, RCSAPI, VoiceAPI, TemplatesAPI,
 } from '../services/api';
@@ -20,36 +19,33 @@ import {
 } from '../services/rcsHelpers';
 
 const CHANNELS = [
-  { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp',      tint: 'tintMint' },
-  { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline', tint: 'tintRose' },
-  { id: 'rcs',      label: 'RCS',      icon: 'card-outline',       tint: 'tintLavender' },
-  { id: 'voice',    label: 'Voice',    icon: 'call-outline',       tint: 'tintYellow' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp',      tint: '#8FCFBD' },
+  { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline', tint: '#F2A8B3' },
+  { id: 'rcs',      label: 'RCS',      icon: 'card-outline',       tint: '#D4B3E8' },
+  { id: 'voice',    label: 'Voice',    icon: 'call-outline',       tint: '#E8D080' },
 ];
 
-// Build label + preset key for each WhatsApp variable slot
+const C = {
+  dark: { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0' },
+  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', pink: '#E6428A', cyan: '#2FB8C4' },
+};
+
 const waVarSpec = (extracted) => {
   const spec = [];
   (extracted.header || []).forEach((h, i) => {
-    if (h.type === 'text') {
-      spec.push({ key: `header_text_${i}`, label: `Header text ${i + 1}`, group: 'headerText', index: i });
-    }
+    if (h.type === 'text') spec.push({ key: `header_text_${i}`, label: `Header text ${i + 1}`, group: 'headerText', index: i });
   });
-  (extracted.body || []).forEach((b, i) => {
-    spec.push({ key: `body_${i}`, label: `Body ${b.placeholder || `{{${i + 1}}}`}`, group: 'body', index: i });
-  });
+  (extracted.body || []).forEach((b, i) =>
+    spec.push({ key: `body_${i}`, label: `Body ${b.placeholder || `{{${i + 1}}}`}`, group: 'body', index: i }),
+  );
   (extracted.buttons || []).forEach((btn, i) => {
-    if (btn.type === 'url') {
-      spec.push({ key: `button_url_${i}`, label: `Button URL ${i + 1}`, group: 'buttonUrl', index: i });
-    } else if (btn.type === 'copy_code') {
-      spec.push({ key: `button_coupon_${i}`, label: `Button coupon ${i + 1}`, group: 'buttonCoupon', index: i });
-    } else if (btn.type === 'quick_reply') {
-      spec.push({ key: `button_payload_${i}`, label: `Quick reply payload ${i + 1}`, group: 'buttonPayload', index: i });
-    }
+    if (btn.type === 'url') spec.push({ key: `button_url_${i}`, label: `Button URL ${i + 1}`, group: 'buttonUrl', index: i });
+    else if (btn.type === 'copy_code') spec.push({ key: `button_coupon_${i}`, label: `Button coupon ${i + 1}`, group: 'buttonCoupon', index: i });
+    else if (btn.type === 'quick_reply') spec.push({ key: `button_payload_${i}`, label: `Quick reply ${i + 1}`, group: 'buttonPayload', index: i });
   });
   return spec;
 };
 
-// Convert flat {key:value} map into the shape buildInputData expects
 const waToTemplateVariables = (values, spec) => {
   const tv = { headerText: [], body: [], buttonUrl: [], buttonCoupon: [], buttonPayload: [] };
   spec.forEach((s) => {
@@ -60,64 +56,10 @@ const waToTemplateVariables = (values, spec) => {
   return tv;
 };
 
-const makeStyles = (c) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: c.bg },
-  scroll: { paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 140 },
-
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 },
-  backBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: c.bgSoft, alignItems: 'center', justifyContent: 'center' },
-  title: { color: c.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.6, flex: 1, fontFamily: Fonts.sans },
-
-  sectionLabel: { color: c.textMuted, fontSize: 11, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, marginTop: 8 },
-
-  channelRow: { flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
-  channelChip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 18, backgroundColor: c.bgSoft },
-  channelChipLabel: { color: c.textMuted, fontSize: 13, fontWeight: '500' },
-  channelChipLabelActive: { color: '#0A0A0D', fontSize: 13, fontWeight: '700' },
-
-  inputWrap: { backgroundColor: c.bgSoft, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 4, marginBottom: 10 },
-  input: {
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    color: c.text, fontSize: 14, fontFamily: Fonts.sans,
-    ...Platform.select({ web: { outlineStyle: 'none' } }),
-  },
-  inputArea: { minHeight: 90, textAlignVertical: 'top' },
-
-  templatePill: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14, backgroundColor: c.bgSoft, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  templatePillActive: { backgroundColor: c.text },
-  templatePillText: { color: c.textMuted, fontSize: 12, fontWeight: '500' },
-  templatePillTextActive: { color: c.bg, fontSize: 12, fontWeight: '600' },
-
-  templateBody: { backgroundColor: c.bgInput, borderRadius: 14, padding: 12, marginBottom: 12 },
-  templateBodyText: { color: c.text, fontSize: 13, lineHeight: 19 },
-  templateMeta: { color: c.textDim, fontSize: 11, marginTop: 6, fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) },
-
-  varBlock: { marginBottom: 10 },
-  varLabel: { color: c.textMuted, fontSize: 11, fontWeight: '500', marginBottom: 4, marginLeft: 2 },
-
-  previewCard: { backgroundColor: c.bgSoft, borderRadius: 16, marginBottom: 14, overflow: 'hidden' },
-  previewHead: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8 },
-  previewLabel: { color: c.text, fontSize: 13, fontWeight: '600', flex: 1 },
-  previewBody: { padding: 12, paddingTop: 0, borderTopWidth: 1, borderTopColor: c.rule },
-  previewJson: { color: c.accentCyan, fontSize: 11, fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), lineHeight: 16 },
-  previewHint: { color: c.textDim, fontSize: 11, fontStyle: 'italic' },
-
-  cta: { marginTop: 8, borderRadius: 28, overflow: 'hidden', backgroundColor: c.text },
-  ctaInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-  ctaLabel: { color: c.bg, fontSize: 15, fontWeight: '700' },
-
-  hint: { color: c.textDim, fontSize: 11, textAlign: 'center', marginTop: 14 },
-
-  templatesLoading: { paddingVertical: 12, alignItems: 'center' },
-  templatesEmpty: { color: c.textDim, fontSize: 12, fontStyle: 'italic' },
-
-  errBlock: { backgroundColor: c.bgSoft, borderRadius: 14, padding: 12, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: c.accentPink },
-  errText: { color: c.text, fontSize: 12 },
-});
-
 export default function SendMessageScreen({ navigation, route }) {
-  const c = useFeed();
-  const styles = useMemo(() => makeStyles(c), [c]);
+  const scheme = useColorScheme();
+  const dark = scheme === 'dark';
+  const c = dark ? C.dark : C.light;
 
   const [channel, setChannel] = useState(route?.params?.channel || 'whatsapp');
   const [to, setTo] = useState('');
@@ -127,12 +69,11 @@ export default function SendMessageScreen({ navigation, route }) {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [templateErr, setTemplateErr] = useState(null);
   const [sending, setSending] = useState(false);
-  const [values, setValues] = useState({});      // variable values: { key: string }
-  const [rcsValues, setRcsValues] = useState({}); // {varName: string} for RCS
-  const [smsValues, setSmsValues] = useState([]); // ['v1','v2'] for SMS
+  const [values, setValues] = useState({});
+  const [rcsValues, setRcsValues] = useState({});
+  const [smsValues, setSmsValues] = useState([]);
   const [showPayload, setShowPayload] = useState(true);
 
-  // Reset vars when channel or template changes
   useEffect(() => {
     setTemplateName((prev) => (channel === 'voice' ? '' : prev));
     setValues({});
@@ -162,38 +103,30 @@ export default function SendMessageScreen({ navigation, route }) {
     [templates, templateName],
   );
 
-  // --- Variable spec per channel ---
   const waSpec = useMemo(() => {
     if (channel !== 'whatsapp' || !template?.components) return [];
-    const extracted = extractWhatsAppVariables(template.components);
-    return waVarSpec(extracted);
+    return waVarSpec(extractWhatsAppVariables(template.components));
   }, [channel, template]);
 
   const smsVarCount = useMemo(() => {
     if (channel !== 'sms' || !template) return 0;
-    const text = template.body || getSmsTemplateText(template.raw || {});
-    return countSmsVariables(text);
+    return countSmsVariables(template.body || getSmsTemplateText(template.raw || {}));
   }, [channel, template]);
 
   const rcsVarNames = useMemo(() => {
     if (channel !== 'rcs' || !template) return [];
-    const comp = template.component || getRcsComponent(template.raw || {});
-    return extractRcsVariables(comp);
+    return extractRcsVariables(template.component || getRcsComponent(template.raw || {}));
   }, [channel, template]);
 
-  // --- Payload builder (live) ---
   const payload = useMemo(() => {
     try {
-      if (channel === 'whatsapp') {
-        if (!template) return null;
+      if (channel === 'whatsapp' && template) {
         const phone = normalizeForMessaging(to || '', 'IN') || to || '{{recipient}}';
         const extracted = extractWhatsAppVariables(template.components || []);
-        const tv = waToTemplateVariables(values, waSpec);
-        const inputData = buildInputData(tv);
+        const inputData = buildInputData(waToTemplateVariables(values, waSpec));
         return buildWhatsAppSendPayload(template, inputData, extracted, phone);
       }
-      if (channel === 'sms') {
-        if (!template) return null;
+      if (channel === 'sms' && template) {
         return buildSmsTemplatePayload({
           template: template.raw || template,
           senderId: template.senderId,
@@ -201,8 +134,7 @@ export default function SendMessageScreen({ navigation, route }) {
           variables: smsValues,
         });
       }
-      if (channel === 'rcs') {
-        if (!template) return null;
+      if (channel === 'rcs' && template) {
         return buildRcsPayload(template.raw || template, to || '{{recipient}}', {
           botId: template.botId,
           templateName: template.name,
@@ -210,55 +142,32 @@ export default function SendMessageScreen({ navigation, route }) {
         });
       }
       if (channel === 'voice') {
-        return {
-          Number: to || '{{recipient}}',
-          CallerId: text || 'TEST',
-          MediaFileId: 1,
-        };
+        return { Number: to || '{{recipient}}', CallerId: text || 'TEST', MediaFileId: 1 };
       }
-    } catch {
-      return null;
-    }
+    } catch { return null; }
     return null;
   }, [channel, template, to, values, waSpec, smsValues, rcsValues, text]);
 
-  // --- Send ---
   const handleSend = async () => {
     const toNum = to.trim();
     if (!toNum) { Alert.alert('Required', 'Enter a recipient number.'); return; }
-
     setSending(true);
     try {
       if (channel === 'whatsapp') {
         if (templateName) {
-          const tv = waToTemplateVariables(values, waSpec);
           await WhatsAppAPI.sendTemplateAuto({
-            to: toNum,
-            templateName,
-            template,
-            templateVariables: tv,
+            to: toNum, templateName, template,
+            templateVariables: waToTemplateVariables(values, waSpec),
           });
         } else if (text.trim()) {
           await WhatsAppAPI.sendText(toNum, text.trim());
-        } else {
-          throw { message: 'Pick a template or type freeform text.' };
-        }
+        } else throw { message: 'Pick a template or type freeform text.' };
       } else if (channel === 'sms') {
         if (!templateName) throw { message: 'Pick an SMS template.' };
-        await SMSAPI.sendTemplateAuto({
-          senderId: template?.senderId,
-          phone: toNum,
-          templateName,
-          variables: smsValues,
-        });
+        await SMSAPI.sendTemplateAuto({ senderId: template?.senderId, phone: toNum, templateName, variables: smsValues });
       } else if (channel === 'rcs') {
         if (!templateName) throw { message: 'Pick an RCS template.' };
-        await RCSAPI.sendTemplateAuto({
-          botId: template?.botId,
-          templateName,
-          destination: toNum,
-          values: rcsValues,
-        });
+        await RCSAPI.sendTemplateAuto({ botId: template?.botId, templateName, destination: toNum, values: rcsValues });
       } else if (channel === 'voice') {
         await VoiceAPI.makeCall({ number: toNum, callerId: text.trim() || 'TEST', mediaFileId: 1 });
       }
@@ -271,19 +180,30 @@ export default function SendMessageScreen({ navigation, route }) {
   };
 
   const chTint = CHANNELS.find((x) => x.id === channel)?.tint;
+  const rootBg = dark ? 'bg-bg' : 'bg-white';
+  const softBg = dark ? 'bg-bgSoft' : 'bg-[#F2F2F5]';
+  const inputBg = dark ? 'bg-bgInput' : 'bg-[#ECECEF]';
+  const textInk = dark ? 'text-ink' : 'text-[#0A0A0D]';
+  const textMuted = dark ? 'text-textMuted' : 'text-[#5C5C63]';
+  const textDim = dark ? 'text-textDim' : 'text-[#9A9AA2]';
 
   return (
-    <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.text} />
+    <View className={`flex-1 ${rootBg}`}>
+      <ScrollView
+        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 140 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
+          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={20} color={c.ink} />
           </TouchableOpacity>
-          <Text style={styles.title}>Send</Text>
+          <Text className={`text-[28px] font-bold tracking-tight flex-1 ${textInk}`}>Send</Text>
         </View>
 
-        <Text style={styles.sectionLabel}>Channel</Text>
-        <View style={styles.channelRow}>
+        {/* Channel chips */}
+        <Label cls={textMuted}>Channel</Label>
+        <View className="flex-row flex-wrap mb-3.5" style={{ gap: 8 }}>
           {CHANNELS.map((ch) => {
             const active = channel === ch.id;
             return (
@@ -291,41 +211,48 @@ export default function SendMessageScreen({ navigation, route }) {
                 key={ch.id}
                 onPress={() => setChannel(ch.id)}
                 activeOpacity={0.8}
-                style={[styles.channelChip, active && { backgroundColor: c[ch.tint] }]}
+                className="flex-row items-center py-2.5 px-3.5 rounded-[18px]"
+                style={{ backgroundColor: active ? ch.tint : (dark ? '#141418' : '#F2F2F5'), gap: 8 }}
               >
-                <Ionicons name={ch.icon} size={14} color={active ? '#0A0A0D' : c.textMuted} />
-                <Text style={active ? styles.channelChipLabelActive : styles.channelChipLabel}>{ch.label}</Text>
+                <Ionicons name={ch.icon} size={14} color={active ? '#0A0A0D' : c.muted} />
+                <Text
+                  className="text-sm"
+                  style={{ color: active ? '#0A0A0D' : c.muted, fontWeight: active ? '700' : '500' }}
+                >
+                  {ch.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <Text style={styles.sectionLabel}>Recipient</Text>
-        <View style={styles.inputWrap}>
+        {/* Recipient */}
+        <Label cls={textMuted}>Recipient</Label>
+        <View className={`rounded-[18px] px-4 py-1 mb-2.5 ${softBg}`}>
           <TextInput
             value={to}
             onChangeText={setTo}
             placeholder="919876543210"
-            placeholderTextColor={c.textMuted}
-            style={styles.input}
+            placeholderTextColor={c.muted}
+            className={`py-3 text-sm ${textInk}`}
             keyboardType="phone-pad"
             autoCapitalize="none"
+            style={Platform.select({ web: { outlineStyle: 'none' } })}
           />
         </View>
 
+        {/* Template picker */}
         {channel !== 'voice' && (
           <>
-            <Text style={styles.sectionLabel}>Template {templates.length ? `(${templates.length})` : ''}</Text>
+            <Label cls={textMuted}>Template {templates.length ? `(${templates.length})` : ''}</Label>
             {loadingTemplates ? (
-              <View style={styles.templatesLoading}>
-                <ActivityIndicator color={c.accentPink} />
-              </View>
+              <View className="py-3 items-center"><ActivityIndicator color={c.pink} /></View>
             ) : templateErr ? (
-              <View style={styles.errBlock}>
-                <Text style={styles.errText}>{templateErr}</Text>
+              <View className={`rounded-[14px] p-3 mb-2.5 border-l-[3px] ${softBg}`} style={{ borderLeftColor: c.pink }}>
+                <Text className={`text-xs ${textInk}`}>{templateErr}</Text>
               </View>
             ) : templates.length === 0 ? (
-              <Text style={styles.templatesEmpty}>No templates available for this channel.</Text>
+              <Text className={`text-xs italic ${textDim}`}>No templates available.</Text>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 10 }}>
                 {templates.map((t) => {
@@ -336,142 +263,155 @@ export default function SendMessageScreen({ navigation, route }) {
                       key={t.id || name}
                       onPress={() => setTemplateName(active ? '' : name)}
                       activeOpacity={0.8}
-                      style={active ? [styles.templatePill, styles.templatePillActive] : styles.templatePill}
+                      className="flex-row items-center py-2 px-3 rounded-[14px]"
+                      style={{ backgroundColor: active ? c.ink : (dark ? '#141418' : '#F2F2F5'), gap: 8 }}
                     >
-                      <Ionicons name="document-text-outline" size={12} color={active ? c.bg : c.textMuted} />
-                      <Text style={active ? styles.templatePillTextActive : styles.templatePillText}>{name}</Text>
+                      <Ionicons name="document-text-outline" size={12} color={active ? c.bg : c.muted} />
+                      <Text className="text-xs" style={{ color: active ? c.bg : c.muted, fontWeight: active ? '600' : '500' }}>{name}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </ScrollView>
             )}
 
-            {template ? (
-              <View style={styles.templateBody}>
-                <Text style={styles.templateBodyText}>{template.body || '—'}</Text>
-                <Text style={styles.templateMeta}>
+            {template && (
+              <View className={`rounded-[14px] p-3 mb-3 ${inputBg}`}>
+                <Text className={`text-[13px] leading-5 ${textInk}`}>{template.body || '—'}</Text>
+                <Text className={`text-[11px] mt-1.5 font-mono ${textDim}`}>
                   {String(template.channel || '').toUpperCase()} · {template.status || '—'}
                   {template.language ? ` · ${template.language}` : ''}
                 </Text>
               </View>
-            ) : null}
+            )}
           </>
         )}
 
-        {/* Variable mapping */}
+        {/* Variables — WhatsApp */}
         {channel === 'whatsapp' && template && waSpec.length > 0 && (
           <>
-            <Text style={styles.sectionLabel}>Variables ({waSpec.length})</Text>
+            <Label cls={textMuted}>Variables ({waSpec.length})</Label>
             {waSpec.map((s) => (
-              <View key={s.key} style={styles.varBlock}>
-                <Text style={styles.varLabel}>{s.label}</Text>
-                <View style={styles.inputWrap}>
-                  <TextInput
-                    value={values[s.key] || ''}
-                    onChangeText={(v) => setValues((prev) => ({ ...prev, [s.key]: v }))}
-                    placeholder={`Value for ${s.label}`}
-                    placeholderTextColor={c.textMuted}
-                    style={styles.input}
-                  />
-                </View>
-              </View>
+              <VarInput
+                key={s.key}
+                label={s.label}
+                value={values[s.key] || ''}
+                onChange={(v) => setValues((prev) => ({ ...prev, [s.key]: v }))}
+                softBg={softBg} textInk={textInk} textMuted={textMuted} mutedColor={c.muted}
+              />
             ))}
           </>
         )}
 
+        {/* Variables — SMS */}
         {channel === 'sms' && smsVarCount > 0 && (
           <>
-            <Text style={styles.sectionLabel}>Variables ({smsVarCount})</Text>
+            <Label cls={textMuted}>Variables ({smsVarCount})</Label>
             {Array.from({ length: smsVarCount }).map((_, i) => (
-              <View key={i} style={styles.varBlock}>
-                <Text style={styles.varLabel}>{`{#var#} ${i + 1}`}</Text>
-                <View style={styles.inputWrap}>
-                  <TextInput
-                    value={smsValues[i] || ''}
-                    onChangeText={(v) => {
-                      setSmsValues((prev) => {
-                        const next = prev.slice();
-                        next[i] = v;
-                        return next;
-                      });
-                    }}
-                    placeholder={`Value ${i + 1}`}
-                    placeholderTextColor={c.textMuted}
-                    style={styles.input}
-                  />
-                </View>
-              </View>
+              <VarInput
+                key={i}
+                label={`{#var#} ${i + 1}`}
+                value={smsValues[i] || ''}
+                onChange={(v) => setSmsValues((prev) => { const n = prev.slice(); n[i] = v; return n; })}
+                softBg={softBg} textInk={textInk} textMuted={textMuted} mutedColor={c.muted}
+              />
             ))}
           </>
         )}
 
+        {/* Variables — RCS */}
         {channel === 'rcs' && rcsVarNames.length > 0 && (
           <>
-            <Text style={styles.sectionLabel}>Variables ({rcsVarNames.length})</Text>
+            <Label cls={textMuted}>Variables ({rcsVarNames.length})</Label>
             {rcsVarNames.map((name) => (
-              <View key={name} style={styles.varBlock}>
-                <Text style={styles.varLabel}>{name}</Text>
-                <View style={styles.inputWrap}>
-                  <TextInput
-                    value={rcsValues[name] || ''}
-                    onChangeText={(v) => setRcsValues((prev) => ({ ...prev, [name]: v }))}
-                    placeholder={`Value for ${name}`}
-                    placeholderTextColor={c.textMuted}
-                    style={styles.input}
-                  />
-                </View>
-              </View>
+              <VarInput
+                key={name}
+                label={name}
+                value={rcsValues[name] || ''}
+                onChange={(v) => setRcsValues((prev) => ({ ...prev, [name]: v }))}
+                softBg={softBg} textInk={textInk} textMuted={textMuted} mutedColor={c.muted}
+              />
             ))}
           </>
         )}
 
-        <Text style={styles.sectionLabel}>{channel === 'voice' ? 'Caller ID' : 'Freeform text (WhatsApp only — overrides template)'}</Text>
-        <View style={styles.inputWrap}>
+        {/* Freeform / Caller ID */}
+        <Label cls={textMuted}>{channel === 'voice' ? 'Caller ID' : 'Freeform text (WhatsApp only)'}</Label>
+        <View className={`rounded-[18px] px-4 py-1 mb-2.5 ${softBg}`}>
           <TextInput
             value={text}
             onChangeText={setText}
-            placeholder={channel === 'voice' ? 'CALLER_ID' : 'Plain message (leave empty to use template)'}
-            placeholderTextColor={c.textMuted}
-            style={[styles.input, channel !== 'voice' && styles.inputArea]}
+            placeholder={channel === 'voice' ? 'CALLER_ID' : 'Plain message (leave empty for template)'}
+            placeholderTextColor={c.muted}
+            className={`py-3 text-sm ${textInk}`}
             multiline={channel !== 'voice'}
+            style={[
+              channel !== 'voice' ? { minHeight: 90, textAlignVertical: 'top' } : {},
+              Platform.select({ web: { outlineStyle: 'none' } }),
+            ]}
           />
         </View>
 
         {/* Payload preview */}
-        <TouchableOpacity onPress={() => setShowPayload((v) => !v)} activeOpacity={0.85} style={styles.previewCard}>
-          <View style={styles.previewHead}>
-            <Ionicons name="code-slash-outline" size={16} color={c.textMuted} />
-            <Text style={styles.previewLabel}>Payload preview</Text>
-            <Ionicons name={showPayload ? 'chevron-up' : 'chevron-down'} size={16} color={c.textMuted} />
+        <TouchableOpacity onPress={() => setShowPayload((v) => !v)} activeOpacity={0.85} className={`rounded-[16px] mb-3.5 overflow-hidden ${softBg}`}>
+          <View className="flex-row items-center p-3" style={{ gap: 8 }}>
+            <Ionicons name="code-slash-outline" size={16} color={c.muted} />
+            <Text className={`text-[13px] font-semibold flex-1 ${textInk}`}>Payload preview</Text>
+            <Ionicons name={showPayload ? 'chevron-up' : 'chevron-down'} size={16} color={c.muted} />
           </View>
           {showPayload && (
-            <View style={styles.previewBody}>
+            <View className="px-3 pb-3 pt-0" style={{ borderTopWidth: 1, borderTopColor: c.bgInput }}>
               {payload ? (
-                <Text style={styles.previewJson}>{JSON.stringify(payload, null, 2)}</Text>
+                <Text className="text-[11px] leading-4 font-mono" style={{ color: c.cyan }}>
+                  {JSON.stringify(payload, null, 2)}
+                </Text>
               ) : (
-                <Text style={styles.previewHint}>Pick a template and fill values to see the built payload.</Text>
+                <Text className={`text-[11px] italic ${textDim}`}>Pick a template and fill values to see payload.</Text>
               )}
             </View>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.cta} activeOpacity={0.88} disabled={sending} onPress={handleSend}>
-          <View style={[styles.ctaInner, chTint && { backgroundColor: c[chTint] }]}>
+        {/* CTA */}
+        <TouchableOpacity className="rounded-[28px] overflow-hidden mt-2" activeOpacity={0.88} disabled={sending} onPress={handleSend}>
+          <View
+            className="flex-row items-center justify-center py-4"
+            style={{ backgroundColor: chTint, gap: 10 }}
+          >
             {sending ? (
               <ActivityIndicator color="#0A0A0D" />
             ) : (
               <>
                 <Ionicons name="send" size={15} color="#0A0A0D" />
-                <Text style={styles.ctaLabel}>Send via {channel.toUpperCase()}</Text>
+                <Text className="text-[15px] font-bold" style={{ color: '#0A0A0D' }}>Send via {channel.toUpperCase()}</Text>
               </>
             )}
           </View>
         </TouchableOpacity>
 
-        <Text style={styles.hint}>
-          Variables are substituted server-side. Preview shows the exact JSON body sent to gsauth / icpaas.
+        <Text className={`text-[11px] text-center mt-3.5 ${textDim}`}>
+          Variables are substituted server-side. Preview is the exact JSON body.
         </Text>
       </ScrollView>
     </View>
   );
 }
+
+const Label = ({ cls, children }) => (
+  <Text className={`text-[11px] font-semibold tracking-widest uppercase mb-2 mt-2 ${cls}`}>{children}</Text>
+);
+
+const VarInput = ({ label, value, onChange, softBg, textInk, textMuted, mutedColor }) => (
+  <View className="mb-2.5">
+    <Text className={`text-[11px] mb-1 ml-0.5 font-medium ${textMuted}`}>{label}</Text>
+    <View className={`rounded-[18px] px-4 py-1 ${softBg}`}>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder={`Value for ${label}`}
+        placeholderTextColor={mutedColor}
+        className={`py-3 text-sm ${textInk}`}
+        style={Platform.select({ web: { outlineStyle: 'none' } })}
+      />
+    </View>
+  </View>
+);

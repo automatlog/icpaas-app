@@ -1,13 +1,12 @@
-// src/screens/DashboardScreen.js — Feed (dark social) dashboard / front
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+// src/screens/DashboardScreen.js — Home (NativeWind)
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Platform, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity,
+  ActivityIndicator, Platform, RefreshControl, useColorScheme,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { useFeed, Fonts } from '../theme';
 import { BalanceAPI, VoiceAPI, IVRAPI } from '../services/api';
 import { logout as logoutAction } from '../store/slices/authSlice';
 
@@ -26,112 +25,34 @@ const greet = () => {
   return 'Good night';
 };
 
-const makeStyles = (c) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: c.bg },
-  scroll: { paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingBottom: 160 },
+// Color tokens — inline for dynamic icons / gradients (NativeWind handles className)
+const C = {
+  dark: {
+    bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22',
+    ink: '#FFFFFF', muted: '#9A9AA2',
+    gradA: '#FF4D7E', gradB: '#FF8A3D', gradC: '#B765E8',
+    peach: '#E8B799', mint: '#8FCFBD', lavender: '#D4B3E8', yellow: '#E8D080', rose: '#F2A8B3', sage: '#9CB89A', clay: '#CB8A75',
+    pink: '#FF4D7E',
+  },
+  light: {
+    bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF',
+    ink: '#0A0A0D', muted: '#5C5C63',
+    gradA: '#E6428A', gradB: '#FF7A22', gradC: '#9A47D4',
+    peach: '#E8B799', mint: '#8FCFBD', lavender: '#D4B3E8', yellow: '#E8D080', rose: '#F2A8B3', sage: '#9CB89A', clay: '#CB8A75',
+    pink: '#E6428A',
+  },
+};
 
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, marginBottom: 20 },
-  logoDot: { width: 46, height: 46, borderRadius: 23, backgroundColor: c.text, alignItems: 'center', justifyContent: 'center' },
-  logoGlyph: { color: c.bg, fontSize: 18, fontWeight: '700' },
-  circleBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: c.bgSoft, alignItems: 'center', justifyContent: 'center' },
-  circleBtnGlyph: { color: c.text, fontSize: 16 },
-  grow: { flex: 1 },
-  bellWrap: { position: 'relative' },
-  bellBadge: {
-    position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9,
-    backgroundColor: c.accentPink, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 4, borderWidth: 2, borderColor: c.bg,
-  },
-  bellBadgeText: { color: c.text, fontSize: 10, fontWeight: '700' },
-
-  greetingBlock: { paddingHorizontal: 22, marginBottom: 16 },
-  greetLabel: { color: c.textMuted, fontSize: 14, fontFamily: Fonts.sans, fontWeight: '400' },
-  greetName: { color: c.text, fontSize: 32, fontWeight: '700', letterSpacing: -0.8, fontFamily: Fonts.sans, marginTop: 2 },
-
-  wallet: {
-    marginHorizontal: 20,
-    borderRadius: 28,
-    padding: 22,
-    minHeight: 190,
-    overflow: 'hidden',
-    position: 'relative',
-    marginBottom: 12,
-  },
-  walletKicker: { color: 'rgba(0,0,0,0.55)', fontSize: 12, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase' },
-  walletLabel: { color: 'rgba(0,0,0,0.65)', fontSize: 12, marginTop: 8, fontWeight: '500' },
-  walletAmount: { color: '#0A0A0D', fontSize: 46, fontWeight: '700', letterSpacing: -1, marginTop: 2, fontFamily: Fonts.sans },
-  walletHint: { color: 'rgba(0,0,0,0.55)', fontSize: 12, marginTop: 6, fontWeight: '500' },
-  walletCta: {
-    marginTop: 16, alignSelf: 'flex-start',
-    backgroundColor: '#0A0A0D',
-    borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10,
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-  },
-  walletCtaText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-
-  statsRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 12, marginBottom: 12 },
-  statCard: {
-    flex: 1,
-    borderRadius: 22,
-    padding: 16,
-    minHeight: 120,
-    justifyContent: 'space-between',
-  },
-  statKicker: { color: 'rgba(0,0,0,0.55)', fontSize: 10, fontWeight: '700', letterSpacing: 1.8, textTransform: 'uppercase' },
-  statValue: { color: '#0A0A0D', fontSize: 32, fontWeight: '700', letterSpacing: -0.6, fontFamily: Fonts.sans },
-  statFoot: { color: 'rgba(0,0,0,0.6)', fontSize: 11, fontWeight: '500' },
-
-  ctaBlock: { paddingHorizontal: 20, marginTop: 4, marginBottom: 20 },
-  openBtn: { borderRadius: 32, overflow: 'hidden' },
-  openBtnInner: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12,
-    paddingVertical: 18,
-  },
-  openBtnArrow: {
-    width: 26, height: 26, borderRadius: 13,
-    borderWidth: 1.2, borderColor: c.text,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  openBtnArrowGlyph: { color: c.text, fontSize: 14, fontWeight: '600' },
-  openBtnLabel: { color: c.text, fontSize: 16, fontWeight: '600' },
-
-  feedSection: { paddingHorizontal: 22, marginTop: 8 },
-  sectionTitle: { color: c.text, fontSize: 18, fontWeight: '600', marginBottom: 10, fontFamily: Fonts.sans },
-  feedRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: c.bgSoft, borderRadius: 20, padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: c.border,
-  },
-  feedIcon: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  feedIconGlyph: { fontSize: 18, color: '#0A0A0D', fontWeight: '700' },
-  feedName: { color: c.text, fontSize: 15, fontWeight: '600' },
-  feedMeta: { color: c.textMuted, fontSize: 12, marginTop: 2 },
-  feedArrow: { color: c.textMuted, fontSize: 16 },
-
-  loadingBlock: { paddingTop: 80, alignItems: 'center' },
-  loadingText: { color: c.textMuted, fontSize: 12, marginTop: 12, letterSpacing: 1.6, textTransform: 'uppercase' },
-
-  dock: {
-    position: 'absolute', bottom: 24, left: 16, right: 16,
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: c.bgSoft, borderRadius: 32,
-    paddingVertical: 8, paddingHorizontal: 8,
-    borderWidth: 1, borderColor: c.border, gap: 6,
-  },
-  dockPlus: { width: 48, height: 48, borderRadius: 24, padding: 2 },
-  dockPlusInner: { flex: 1, borderRadius: 22, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
-  dockPlusGlyph: { color: c.text, fontSize: 24, fontWeight: '300' },
-  dockLabel: { color: c.text, fontSize: 14, fontWeight: '500', paddingHorizontal: 10 },
-  dockAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: c.tintPeach, alignItems: 'center', justifyContent: 'center' },
-  dockAvatarLetter: { color: '#0A0A0D', fontSize: 20, fontWeight: '700', fontFamily: Fonts.display },
-});
+const HEADLINES = [
+  { n: '01', kicker: 'VOICE · OBD',   title: 'Outbound dispatch holds steady through the night.', body: 'Campaigns cleared through the OGCall queue with low drop rates.', cta: 'Read ledger',   route: 'Report' },
+  { n: '02', kicker: 'IVR · INBOUND', title: 'Inbound lines answered faster than last week.',    body: 'Answer rate improved versus prior period.',                         cta: 'View floor',    route: 'Agent'  },
+  { n: '03', kicker: 'PRODUCT DECK',  title: 'Six channels, one bound edition.',                 body: 'WhatsApp, SMS, RCS, Voice, IVR and Campaigns.',                     cta: 'Press room',    route: 'ProductIcons' },
+];
 
 export default function DashboardScreen({ navigation }) {
-  const c = useFeed();
-  const styles = useMemo(() => makeStyles(c), [c]);
+  const scheme = useColorScheme();
+  const dark = scheme === 'dark';
+  const c = dark ? C.dark : C.light;
 
   const user = useSelector((s) => s.auth.user);
   const dispatch = useDispatch();
@@ -164,167 +85,172 @@ export default function DashboardScreen({ navigation }) {
 
   useEffect(() => { fetchFront(); }, [fetchFront]);
 
+  const rootBg = dark ? 'bg-bg' : 'bg-white';
+  const softBg = dark ? 'bg-bgSoft' : 'bg-[#F2F2F5]';
+  const textInk = dark ? 'text-ink' : 'text-[#0A0A0D]';
+  const textMuted = dark ? 'text-textMuted' : 'text-[#5C5C63]';
+
+  if (loading) {
+    return (
+      <View className={`flex-1 items-center justify-center ${rootBg}`}>
+        <ActivityIndicator color={c.pink} />
+        <Text className={`mt-3 text-xs tracking-widest uppercase ${textMuted}`}>loading feed</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.root}>
+    <View className={`flex-1 ${rootBg}`}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchFront(); }} tintColor={c.accentPink} />}
+        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingBottom: 160 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchFront(); }} tintColor={c.pink} />}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.topBar}>
-          <View style={styles.logoDot}><Ionicons name="infinite" size={20} color={c.bg} /></View>
-          <TouchableOpacity style={styles.circleBtn} activeOpacity={0.7}>
-            <Ionicons name="search" size={18} color={c.text} />
+        {/* Top bar */}
+        <View className="flex-row items-center gap-2.5 px-5 mb-5">
+          <View className="w-[46px] h-[46px] rounded-full items-center justify-center" style={{ backgroundColor: c.ink }}>
+            <Ionicons name="infinite" size={20} color={c.bg} />
+          </View>
+          <TouchableOpacity className={`w-[46px] h-[46px] rounded-full items-center justify-center ${softBg}`} activeOpacity={0.7}>
+            <Ionicons name="search" size={18} color={c.ink} />
           </TouchableOpacity>
-          <View style={styles.grow} />
-          <View style={styles.bellWrap}>
-            <TouchableOpacity style={styles.circleBtn} activeOpacity={0.7} onPress={logout}>
-              <Ionicons name="log-out-outline" size={18} color={c.text} />
+          <View className="flex-1" />
+          <View className="relative">
+            <TouchableOpacity className={`w-[46px] h-[46px] rounded-full items-center justify-center ${softBg}`} activeOpacity={0.7} onPress={logout}>
+              <Ionicons name="log-out-outline" size={18} color={c.ink} />
             </TouchableOpacity>
-            <View style={styles.bellBadge}><Text style={styles.bellBadgeText}>9</Text></View>
+            <View
+              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full items-center justify-center border-2"
+              style={{ backgroundColor: c.pink, borderColor: c.bg, paddingHorizontal: 4 }}
+            >
+              <Text className="text-[10px] font-bold" style={{ color: c.ink }}>9</Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.greetingBlock}>
-          <Text style={styles.greetLabel}>{greet()},</Text>
-          <Text style={styles.greetName}>{user?.name || user?.username || 'Editor'}.</Text>
+        {/* Greeting */}
+        <View className="px-5 mb-4">
+          <Text className={`text-sm font-normal ${textMuted}`}>{greet()},</Text>
+          <Text className={`text-3xl font-bold tracking-tight mt-0.5 ${textInk}`}>
+            {user?.name || user?.username || 'Editor'}.
+          </Text>
         </View>
 
-        <View style={[styles.wallet, { backgroundColor: c.tintPeach }]}>
-          <Text style={styles.walletKicker}>№ 01 · Wallet</Text>
-          <Text style={styles.walletLabel}>Live balance · gsauth ledger</Text>
-          <Text style={styles.walletAmount}>
+        {/* Wallet hero card */}
+        <View className="mx-5 rounded-[28px] p-5 mb-3 min-h-[170px]" style={{ backgroundColor: c.peach }}>
+          <Text className="text-[11px] font-bold tracking-[2px] uppercase" style={{ color: 'rgba(0,0,0,0.55)' }}>№ 01 · Wallet</Text>
+          <Text className="text-xs mt-2 font-medium" style={{ color: 'rgba(0,0,0,0.65)' }}>Live balance · gsauth ledger</Text>
+          <Text className="text-[46px] font-bold tracking-tight mt-0.5" style={{ color: '#0A0A0D' }}>
             ₹{balance !== null ? Number(balance).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—'}
           </Text>
-          <Text style={styles.walletHint}>Across six channels · updated now</Text>
-          <TouchableOpacity style={styles.walletCta} activeOpacity={0.8} onPress={() => navigation.navigate('ProductIcons')}>
-            <Text style={styles.walletCtaText}>Open press room</Text>
+          <Text className="text-xs mt-1.5 font-medium" style={{ color: 'rgba(0,0,0,0.55)' }}>Across six channels · updated now</Text>
+          <TouchableOpacity
+            className="mt-4 self-start rounded-[22px] px-4 py-2.5 flex-row items-center"
+            style={{ backgroundColor: '#0A0A0D', gap: 8 }}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('ProductIcons')}
+          >
+            <Text className="text-white text-[13px] font-semibold">Open press room</Text>
             <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: c.tintMint }]}>
-            <Text style={styles.statKicker}>Voice · 7d</Text>
-            <View>
-              <Text style={styles.statValue}>{loading ? '—' : voiceRows}</Text>
-              <Text style={styles.statFoot}>dispatches</Text>
-            </View>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: c.tintLavender }]}>
-            <Text style={styles.statKicker}>IVR · 7d</Text>
-            <View>
-              <Text style={styles.statValue}>{loading ? '—' : ivrRows}</Text>
-              <Text style={styles.statFoot}>inbound calls</Text>
-            </View>
-          </View>
+        {/* Stat tiles */}
+        <View className="flex-row px-5 mb-3" style={{ gap: 12 }}>
+          <StatTile bg={c.mint} label="Voice · 7d" value={voiceRows} foot="dispatches" />
+          <StatTile bg={c.lavender} label="IVR · 7d" value={ivrRows} foot="inbound calls" />
+        </View>
+        <View className="flex-row px-5 mb-4" style={{ gap: 12 }}>
+          <StatTile bg={c.yellow} label="Channels" value="06" foot="live desks" />
+          <StatTile bg={c.rose} label="Agents" value="08" foot="on floor" />
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: c.tintYellow }]}>
-            <Text style={styles.statKicker}>Channels</Text>
-            <View>
-              <Text style={styles.statValue}>06</Text>
-              <Text style={styles.statFoot}>live desks</Text>
-            </View>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: c.tintRose }]}>
-            <Text style={styles.statKicker}>Agents</Text>
-            <View>
-              <Text style={styles.statValue}>08</Text>
-              <Text style={styles.statFoot}>on floor</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.ctaBlock}>
-          <TouchableOpacity style={styles.openBtn} activeOpacity={0.9} onPress={() => navigation.navigate('ProductIcons')}>
-            <LinearGradient colors={[c.gradA, c.gradB, c.gradC]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.openBtnInner}>
-              <View style={styles.openBtnArrow}><Ionicons name="arrow-forward" size={14} color={c.text} /></View>
-              <Text style={styles.openBtnLabel}>Open Press Room</Text>
+        {/* CTA — gradient pill */}
+        <View className="px-5 mb-5">
+          <TouchableOpacity className="rounded-[32px] overflow-hidden" activeOpacity={0.9} onPress={() => navigation.navigate('ProductIcons')}>
+            <LinearGradient
+              colors={[c.gradA, c.gradB, c.gradC]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, gap: 12 }}
+            >
+              <View className="w-[26px] h-[26px] rounded-full items-center justify-center" style={{ borderWidth: 1.2, borderColor: c.ink }}>
+                <Ionicons name="arrow-forward" size={14} color={c.ink} />
+              </View>
+              <Text className="text-base font-semibold" style={{ color: c.ink }}>Open Press Room</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.feedSection}>
-          <Text style={styles.sectionTitle}>Quick feed</Text>
+        {/* Feed rows */}
+        <View className="px-5 mt-2">
+          <Text className={`text-lg font-semibold mb-2.5 ${textInk}`}>Quick feed</Text>
 
-          <TouchableOpacity style={styles.feedRow} activeOpacity={0.8} onPress={() => navigation.navigate('Send')}>
-            <View style={[styles.feedIcon, { backgroundColor: c.tintPeach }]}><Ionicons name="send" size={18} color="#0A0A0D" /></View>
-            <View style={styles.grow}>
-              <Text style={styles.feedName}>Send Message</Text>
-              <Text style={styles.feedMeta}>WhatsApp · SMS · RCS · Voice</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.feedRow} activeOpacity={0.8} onPress={() => navigation.navigate('Templates')}>
-            <View style={[styles.feedIcon, { backgroundColor: c.tintRose }]}><Ionicons name="document-text" size={18} color="#0A0A0D" /></View>
-            <View style={styles.grow}>
-              <Text style={styles.feedName}>Templates</Text>
-              <Text style={styles.feedMeta}>WhatsApp · SMS · RCS catalogue</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.feedRow} activeOpacity={0.8} onPress={() => navigation.navigate('Config')}>
-            <View style={[styles.feedIcon, { backgroundColor: c.tintLavender }]}><Ionicons name="settings" size={18} color="#0A0A0D" /></View>
-            <View style={styles.grow}>
-              <Text style={styles.feedName}>Config &amp; Channels</Text>
-              <Text style={styles.feedMeta}>gsauth token · WA · SMS · RCS</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.feedRow} activeOpacity={0.8} onPress={() => navigation.navigate('Report')}>
-            <View style={[styles.feedIcon, { backgroundColor: c.tintMint }]}><Ionicons name="stats-chart" size={18} color="#0A0A0D" /></View>
-            <View style={styles.grow}>
-              <Text style={styles.feedName}>Voice Ledger</Text>
-              <Text style={styles.feedMeta}>OBD + IBD reports · 14-day window</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.feedRow} activeOpacity={0.8} onPress={() => navigation.navigate('Agent')}>
-            <View style={[styles.feedIcon, { backgroundColor: c.tintYellow }]}><Ionicons name="people" size={18} color="#0A0A0D" /></View>
-            <View style={styles.grow}>
-              <Text style={styles.feedName}>Agent Floor</Text>
-              <Text style={styles.feedMeta}>Roster · availability · queue</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.feedRow} activeOpacity={0.8} onPress={() => navigation.navigate('Campaigns')}>
-            <View style={[styles.feedIcon, { backgroundColor: c.tintSage }]}><Ionicons name="megaphone" size={18} color="#0A0A0D" /></View>
-            <View style={styles.grow}>
-              <Text style={styles.feedName}>Campaigns</Text>
-              <Text style={styles.feedMeta}>Plan, segment, launch</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-          </TouchableOpacity>
+          <FeedRow c={c} softBg={softBg} textInk={textInk} textMuted={textMuted} tint={c.peach} icon="send" name="Send Message" meta="WhatsApp · SMS · RCS · Voice" onPress={() => navigation.navigate('Send')} />
+          <FeedRow c={c} softBg={softBg} textInk={textInk} textMuted={textMuted} tint={c.rose} icon="document-text" name="Templates" meta="WhatsApp · SMS · RCS catalogue" onPress={() => navigation.navigate('Templates')} />
+          <FeedRow c={c} softBg={softBg} textInk={textInk} textMuted={textMuted} tint={c.lavender} icon="settings" name="Config & Channels" meta="gsauth token · WA · SMS · RCS" onPress={() => navigation.navigate('Config')} />
+          <FeedRow c={c} softBg={softBg} textInk={textInk} textMuted={textMuted} tint={c.mint} icon="stats-chart" name="Voice Ledger" meta="OBD + IBD reports · 14-day window" onPress={() => navigation.navigate('Report')} />
+          <FeedRow c={c} softBg={softBg} textInk={textInk} textMuted={textMuted} tint={c.yellow} icon="people" name="Agent Floor" meta="Roster · availability · queue" onPress={() => navigation.navigate('Agent')} />
+          <FeedRow c={c} softBg={softBg} textInk={textInk} textMuted={textMuted} tint={c.sage} icon="megaphone" name="Campaigns" meta="Plan, segment, launch" onPress={() => navigation.navigate('CampaignStep1')} />
         </View>
-
-        {loading && (
-          <View style={styles.loadingBlock}>
-            <ActivityIndicator color={c.accentPink} />
-            <Text style={styles.loadingText}>Loading feed…</Text>
-          </View>
-        )}
       </ScrollView>
 
-      <View style={styles.dock}>
-        <TouchableOpacity style={styles.dockPlus} activeOpacity={0.8} onPress={() => navigation.navigate('Send')}>
+      {/* Floating dock */}
+      <View
+        className={`absolute bottom-6 left-4 right-4 flex-row items-center rounded-[32px] py-2 px-2 ${softBg}`}
+        style={{ gap: 6, borderWidth: 1, borderColor: c.bgInput }}
+      >
+        <TouchableOpacity className="w-12 h-12 rounded-full p-0.5" activeOpacity={0.8} onPress={() => navigation.navigate('Send')}>
           <LinearGradient colors={[c.gradA, c.gradB, c.gradC]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1, borderRadius: 24 }}>
-            <View style={styles.dockPlusInner}><Ionicons name="send" size={18} color={c.text} /></View>
+            <View className="flex-1 rounded-[22px] items-center justify-center" style={{ backgroundColor: c.bg }}>
+              <Ionicons name="send" size={18} color={c.ink} />
+            </View>
           </LinearGradient>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Templates')} activeOpacity={0.7}><Text style={styles.dockLabel}>Templates</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Config')} activeOpacity={0.7}><Text style={styles.dockLabel}>Config</Text></TouchableOpacity>
-        <View style={styles.grow} />
-        <TouchableOpacity onPress={() => navigation.navigate('ProductIcons')} activeOpacity={0.7} style={styles.dockAvatar}>
+        <TouchableOpacity onPress={() => navigation.navigate('Templates')} activeOpacity={0.7}>
+          <Text className={`text-sm font-medium px-2.5 ${textInk}`}>Templates</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Config')} activeOpacity={0.7}>
+          <Text className={`text-sm font-medium px-2.5 ${textInk}`}>Config</Text>
+        </TouchableOpacity>
+        <View className="flex-1" />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ProductIcons')}
+          activeOpacity={0.7}
+          className="w-12 h-12 rounded-full items-center justify-center"
+          style={{ backgroundColor: c.peach }}
+        >
           <Ionicons name="grid" size={20} color="#0A0A0D" />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
+
+const StatTile = ({ bg, label, value, foot }) => (
+  <View className="flex-1 rounded-[22px] p-4 min-h-[120px] justify-between" style={{ backgroundColor: bg }}>
+    <Text className="text-[10px] font-bold tracking-[1.8px] uppercase" style={{ color: 'rgba(0,0,0,0.55)' }}>{label}</Text>
+    <View>
+      <Text className="text-[32px] font-bold tracking-tight" style={{ color: '#0A0A0D' }}>{value}</Text>
+      <Text className="text-[11px] font-medium" style={{ color: 'rgba(0,0,0,0.6)' }}>{foot}</Text>
+    </View>
+  </View>
+);
+
+const FeedRow = ({ c, softBg, textInk, textMuted, tint, icon, name, meta, onPress }) => (
+  <TouchableOpacity
+    className={`flex-row items-center rounded-[20px] p-3.5 mb-2.5 ${softBg}`}
+    style={{ gap: 12, borderWidth: 1, borderColor: c.bgInput }}
+    activeOpacity={0.8}
+    onPress={onPress}
+  >
+    <View className="w-11 h-11 rounded-full items-center justify-center" style={{ backgroundColor: tint }}>
+      <Ionicons name={icon} size={18} color="#0A0A0D" />
+    </View>
+    <View className="flex-1">
+      <Text className={`text-[15px] font-semibold ${textInk}`}>{name}</Text>
+      <Text className={`text-xs mt-0.5 ${textMuted}`}>{meta}</Text>
+    </View>
+    <Ionicons name="chevron-forward" size={16} color={c.muted} />
+  </TouchableOpacity>
+);

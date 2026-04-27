@@ -1,12 +1,10 @@
-// src/screens/ChatScreen.js
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// src/screens/ChatScreen.js — Single-conversation chat (NativeWind)
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, TouchableOpacity,
-  TextInput, KeyboardAvoidingView, Platform, ScrollView,
-  Alert,
+  View, Text, FlatList, TouchableOpacity, TextInput,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, useColorScheme,
 } from 'react-native';
-import { Colors, Fonts, FontSizes, Spacing, Radii, Shadows } from '../theme';
-import { Avatar, ChannelTag, LoadingSpinner } from '../components';
+import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { WhatsAppAPI } from '../services/api';
 import {
@@ -19,61 +17,50 @@ import moment from 'moment';
 
 const MOCK_MESSAGES = [
   { id: '1', text: 'Hi! We want to upgrade our WhatsApp Business API plan to the Enterprise tier.', fromMe: false, time: '2025-03-29T09:14:00Z', status: 'read' },
-  { id: '2', text: 'Hello! Great to hear. Our Enterprise plan includes unlimited templates, shared inbox with 10 agents and priority support. I\'ll send you the details now.', fromMe: true, time: '2025-03-29T09:15:00Z', status: 'read' },
+  { id: '2', text: 'Hello! Great to hear. Our Enterprise plan includes unlimited templates, shared inbox with 10 agents and priority support.', fromMe: true, time: '2025-03-29T09:15:00Z', status: 'read' },
   { id: '3', text: 'Can you also include RCS messaging in the package?', fromMe: false, time: '2025-03-29T09:16:00Z', status: 'read' },
-  { id: '4', text: 'Absolutely! RCS is available as an add-on. I\'ll prepare a combined proposal with WA Enterprise + RCS and send over the pricing. 📄', fromMe: true, time: '2025-03-29T09:17:00Z', status: 'read' },
-  { id: '5', text: 'Hi, we need to renew our WhatsApp API plan and also check on the missed call alert setup for our Gujarat region.', fromMe: false, time: '2025-03-29T09:32:00Z', status: 'delivered' },
+  { id: '4', text: "Absolutely! RCS is available as an add-on. I'll prepare a combined proposal with WA Enterprise + RCS and send pricing.", fromMe: true, time: '2025-03-29T09:17:00Z', status: 'read' },
+  { id: '5', text: 'Hi, we need to renew our WhatsApp API plan and also check on missed-call alerts for Gujarat.', fromMe: false, time: '2025-03-29T09:32:00Z', status: 'delivered' },
 ];
 
 const QUICK_TEMPLATES = [
-  { id: '1', label: '📄 Send Proposal', text: 'Hi! Here is our proposal document for your review. Please let me know if you have any questions.' },
-  { id: '2', label: '💰 Pricing', text: 'Here are our latest pricing details. Would you like me to schedule a call to discuss?' },
-  { id: '3', label: '📅 Schedule Demo', text: 'I\'d love to schedule a demo for you! Are you available for a 30-min call this week?' },
-  { id: '4', label: '✅ Confirm Order', text: 'Your order has been confirmed. Our team will reach out within 24 hours to get you set up.' },
+  { id: '1', label: 'Send Proposal', text: 'Hi! Here is our proposal document for your review.' },
+  { id: '2', label: 'Pricing',       text: 'Here are our latest pricing details. Can I schedule a call?' },
+  { id: '3', label: 'Schedule Demo', text: "I'd love to schedule a demo. Are you free for 30 min this week?" },
+  { id: '4', label: 'Confirm Order', text: 'Your order has been confirmed. Team will reach out in 24 hours.' },
 ];
 
-// ── Message Bubble ─────────────────────────────────────────
-const MessageBubble = ({ item }) => (
-  <View style={[styles.msgWrap, item.fromMe ? styles.msgWrapOut : styles.msgWrapIn]}>
-    <View style={[styles.bubble, item.fromMe ? styles.bubbleOut : styles.bubbleIn]}>
-      <Text style={[styles.bubbleText, item.fromMe ? styles.bubbleTextOut : styles.bubbleTextIn]}>
-        {item.text}
-      </Text>
-    </View>
-    <View style={[styles.msgMeta, item.fromMe && { flexDirection: 'row-reverse' }]}>
-      <Text style={styles.msgTime}>{moment(item.time).format('h:mm A')}</Text>
-      {item.fromMe && (
-        <Text style={[styles.msgStatus, item.status === 'read' && { color: Colors.info }]}>
-          {item.status === 'read' ? ' ✓✓' : item.status === 'delivered' ? ' ✓✓' : ' ✓'}
-        </Text>
-      )}
-    </View>
-  </View>
-);
+const C = {
+  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', green: '#4BD08D', pink: '#FF4D7E', cyan: '#5CD4E0', bubbleMe: '#8FCFBD' },
+  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', green: '#22C55E', pink: '#E6428A', cyan: '#2FB8C4', bubbleMe: '#8FCFBD' },
+};
 
-// ── Date Separator ─────────────────────────────────────────
-const DateSep = ({ date }) => (
-  <View style={styles.dateSep}>
-    <View style={styles.dateLine} />
-    <View style={styles.datePill}><Text style={styles.datePillText}>{date}</Text></View>
-    <View style={styles.dateLine} />
-  </View>
-);
+const CHANNEL_ICON = {
+  whatsapp: 'logo-whatsapp',
+  sms: 'chatbubble-outline',
+  rcs: 'card-outline',
+  ivr: 'call-outline',
+};
+
+const initialsOf = (name = '') =>
+  name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
 
 const EMPTY_MESSAGES = [];
 
-// ── Main Chat Screen ───────────────────────────────────────
 export default function ChatScreen({ route, navigation }) {
-  const { conversation = MOCK_CONVERSATIONS[0] } = route?.params || {};
+  const scheme = useColorScheme();
+  const dark = scheme === 'dark';
+  const c = dark ? C.dark : C.light;
+
+  const conversation = route?.params?.conversation || { id: 'new', name: 'New Chat', channel: 'whatsapp', online: false };
   const dispatch = useDispatch();
   const messages = useSelector((s) => s.messages[conversation.id]) || EMPTY_MESSAGES;
-  const setConvMessages = (conversationId, msgs) =>
-    dispatch(setConversationMessages({ conversationId, messages: msgs }));
-  const appendMessage = (conversationId, message) =>
-    dispatch(appendConversationMessage({ conversationId, message }));
-  const updateMessage = (conversationId, messageId, updates) =>
-    dispatch(updateConversationMessage({ conversationId, messageId, updates }));
-  const upsertConv = (c) => dispatch(upsertConversation(c));
+
+  const setConvMessages = (id, msgs) => dispatch(setConversationMessages({ conversationId: id, messages: msgs }));
+  const appendMessage = (id, message) => dispatch(appendConversationMessage({ conversationId: id, message }));
+  const updateMessage = (id, messageId, updates) => dispatch(updateConversationMessage({ conversationId: id, messageId, updates }));
+  const upsertConv = (cv) => dispatch(upsertConversation(cv));
+
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(messages.length === 0);
@@ -97,164 +84,196 @@ export default function ChatScreen({ route, navigation }) {
     const msg = msgText || text.trim();
     if (!msg || sending) return;
     setSending(true);
-    const tempMsg = {
-      id: Date.now().toString(), text: msg,
-      fromMe: true, time: new Date().toISOString(), status: 'sent',
-    };
+    const tempMsg = { id: Date.now().toString(), text: msg, fromMe: true, time: new Date().toISOString(), status: 'sent' };
     appendMessage(conversation.id, tempMsg);
-    upsertConv({
-      ...conversation,
-      lastMsg: msg,
-      time: 'Just now',
-    });
+    upsertConv({ ...conversation, lastMsg: msg, time: 'Just now' });
     setText('');
+    setShowTemplates(false);
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
     try {
       await WhatsAppAPI.sendReply({ to: conversation.phone, message: msg, type: 'text' });
       updateMessage(conversation.id, tempMsg.id, { status: 'delivered' });
     } catch (e) {
-      Alert.alert('Send failed', e.message || 'Please try again');
+      Alert.alert('Send failed', e?.message || 'Please try again');
     } finally {
       setSending(false);
     }
   };
 
-  if (loading) return <LoadingSpinner />;
+  const rootBg = dark ? 'bg-bg' : 'bg-white';
+  const softBg = dark ? 'bg-bgSoft' : 'bg-[#F2F2F5]';
+  const inputBg = dark ? 'bg-bgInput' : 'bg-[#ECECEF]';
+  const textInk = dark ? 'text-ink' : 'text-[#0A0A0D]';
+  const textMuted = dark ? 'text-textMuted' : 'text-[#5C5C63]';
+  const chIcon = CHANNEL_ICON[String(conversation.channel || 'whatsapp').toLowerCase()] || 'chatbubble-outline';
+
+  const grouped = useMemo(() => {
+    const out = [];
+    let lastDay = null;
+    messages.forEach((m) => {
+      const day = moment(m.time).format('MMM D');
+      if (day !== lastDay) {
+        out.push({ type: 'sep', id: `sep_${day}`, label: day });
+        lastDay = day;
+      }
+      out.push({ type: 'msg', ...m });
+    });
+    return out;
+  }, [messages]);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView className={`flex-1 ${rootBg}`} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={{ fontSize: 22, color: Colors.primary }}>←</Text>
-        </TouchableOpacity>
-        <Avatar emoji={conversation.emoji} color={conversation.avatarColor} size={42} radius={13} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerName}>{conversation.name}</Text>
-          <Text style={[styles.headerStatus, conversation.online && { color: Colors.success }]}>
-            {conversation.online ? '● Online' : '● Offline'} · {conversation.channel?.toUpperCase()}
-          </Text>
+      <View style={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 18 }}>
+        <View className="flex-row items-center pb-3" style={{ gap: 10 }}>
+          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={20} color={c.ink} />
+          </TouchableOpacity>
+          <View className="relative">
+            <View className="w-11 h-11 rounded-full items-center justify-center" style={{ backgroundColor: c.bubbleMe }}>
+              <Text className="text-sm font-bold" style={{ color: '#0A0A0D' }}>{initialsOf(conversation.name)}</Text>
+            </View>
+            {conversation.online && (
+              <View
+                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full"
+                style={{ backgroundColor: c.green, borderWidth: 2, borderColor: c.bg }}
+              />
+            )}
+          </View>
+          <View className="flex-1">
+            <Text className={`text-[16px] font-semibold ${textInk}`} numberOfLines={1}>{conversation.name}</Text>
+            <View className="flex-row items-center mt-0.5" style={{ gap: 6 }}>
+              <Ionicons name={chIcon} size={11} color={c.muted} />
+              <Text className={`text-[11px] ${textMuted}`}>
+                {conversation.online ? 'Online · ' : 'Offline · '}
+                {String(conversation.channel || 'WhatsApp').toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} activeOpacity={0.7}>
+            <Ionicons name="call-outline" size={18} color={c.ink} />
+          </TouchableOpacity>
+          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} activeOpacity={0.7}>
+            <Ionicons name="ellipsis-horizontal" size={18} color={c.ink} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.headerIcon}><Text style={{ fontSize: 16 }}>📋</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.headerIcon}><Text style={{ fontSize: 16 }}>⋯</Text></TouchableOpacity>
-      </View>
-
-      {/* Contact info bar */}
-      <View style={styles.infoBar}>
-        <ChannelTag channel={conversation.channel} />
-        <Text style={styles.infoPhone}>{conversation.phone || '+91 98765 43210'}</Text>
-        <View style={{ flex: 1 }} />
-        <TouchableOpacity style={styles.infoAction}><Text style={{ fontSize: 13 }}>📞 Call</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.infoAction}><Text style={{ fontSize: 13 }}>👤 Profile</Text></TouchableOpacity>
       </View>
 
       {/* Messages */}
-      <FlatList
-        ref={flatRef}
-        data={messages}
-        keyExtractor={i => i.id}
-        renderItem={({ item, index }) => {
-          const showDate = index === 0 || moment(item.time).format('D MMM') !== moment(messages[index - 1]?.time).format('D MMM');
-          return (
-            <>
-              {showDate && <DateSep date={moment(item.time).format('D MMMM YYYY')} />}
-              <MessageBubble item={item} />
-            </>
-          );
-        }}
-        contentContainerStyle={styles.messageList}
-        style={styles.messagesFlatList}
-        onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View className="flex-1 items-center justify-center" style={{ gap: 10 }}>
+          <ActivityIndicator color={c.pink} />
+          <Text className={`text-xs tracking-widest uppercase ${textMuted}`}>loading thread</Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatRef}
+          data={grouped}
+          keyExtractor={(i) => i.id}
+          contentContainerStyle={{ padding: 18, paddingBottom: 12 }}
+          renderItem={({ item }) => {
+            if (item.type === 'sep') {
+              return (
+                <View className="flex-row items-center my-3" style={{ gap: 10 }}>
+                  <View className="flex-1 h-px" style={{ backgroundColor: c.bgInput }} />
+                  <View className={`rounded-full px-3 py-1 ${softBg}`}>
+                    <Text className={`text-[10px] font-semibold tracking-wider uppercase ${textMuted}`}>{item.label}</Text>
+                  </View>
+                  <View className="flex-1 h-px" style={{ backgroundColor: c.bgInput }} />
+                </View>
+              );
+            }
+            const me = item.fromMe;
+            return (
+              <View className={`mb-2 ${me ? 'items-end' : 'items-start'}`}>
+                <View
+                  className="rounded-[18px] px-3.5 py-2.5 max-w-[82%]"
+                  style={{ backgroundColor: me ? c.bubbleMe : (dark ? '#141418' : '#F2F2F5') }}
+                >
+                  <Text
+                    className="text-[14px] leading-5"
+                    style={{ color: me ? '#0A0A0D' : c.ink }}
+                  >
+                    {item.text}
+                  </Text>
+                </View>
+                <View className={`flex-row mt-1 px-1 items-center ${me ? 'flex-row-reverse' : ''}`} style={{ gap: 4 }}>
+                  <Text className={`text-[10px] ${textMuted}`}>{moment(item.time).format('h:mm A')}</Text>
+                  {me && (
+                    <Ionicons
+                      name={item.status === 'read' ? 'checkmark-done' : item.status === 'delivered' ? 'checkmark-done' : 'checkmark'}
+                      size={12}
+                      color={item.status === 'read' ? c.cyan : c.muted}
+                    />
+                  )}
+                </View>
+              </View>
+            );
+          }}
+        />
+      )}
 
       {/* Quick templates */}
       {showTemplates && (
-        <View style={styles.templatesWrap}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: Spacing.base }}>
-            {QUICK_TEMPLATES.map(t => (
+        <View className={`px-4 pb-2 ${rootBg}`}>
+          <FlatList
+            data={QUICK_TEMPLATES}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(i) => i.id}
+            contentContainerStyle={{ gap: 8 }}
+            renderItem={({ item }) => (
               <TouchableOpacity
-                key={t.id}
-                style={styles.templateChip}
-                onPress={() => { sendMessage(t.text); setShowTemplates(false); }}
-                activeOpacity={0.7}
+                onPress={() => sendMessage(item.text)}
+                activeOpacity={0.8}
+                className={`rounded-[14px] px-3 py-2 flex-row items-center ${softBg}`}
+                style={{ gap: 6, borderWidth: 1, borderColor: c.bgInput }}
               >
-                <Text style={styles.templateChipText}>{t.label}</Text>
+                <Ionicons name="flash-outline" size={12} color={c.muted} />
+                <Text className={`text-xs font-medium ${textInk}`}>{item.label}</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+            )}
+          />
         </View>
       )}
 
-      {/* Input row */}
-      <View style={styles.inputRow}>
-        <TouchableOpacity style={styles.inputIcon}><Text style={{ fontSize: 18 }}>📎</Text></TouchableOpacity>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder="Type a message…"
-          placeholderTextColor={Colors.textLight}
-          style={styles.input}
-          multiline
-          maxLength={1000}
-        />
-        <TouchableOpacity style={styles.inputIcon} onPress={() => setShowTemplates(!showTemplates)}>
-          <Text style={{ fontSize: 18 }}>⚡</Text>
-        </TouchableOpacity>
+      {/* Composer */}
+      <View className={`flex-row items-end px-3 py-2 ${rootBg}`} style={{ gap: 8, borderTopWidth: 1, borderTopColor: c.bgInput }}>
         <TouchableOpacity
-          style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
-          onPress={() => sendMessage()}
-          disabled={!text.trim() || sending}
-          activeOpacity={0.85}
+          onPress={() => setShowTemplates((v) => !v)}
+          activeOpacity={0.75}
+          className={`w-10 h-10 rounded-full items-center justify-center ${softBg}`}
         >
-          <Text style={{ fontSize: 18, color: Colors.white }}>➤</Text>
+          <Ionicons name={showTemplates ? 'close' : 'add'} size={20} color={c.ink} />
+        </TouchableOpacity>
+        <View className={`flex-1 flex-row items-end rounded-[22px] px-3 ${inputBg}`} style={{ gap: 8 }}>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Type a message"
+            placeholderTextColor={c.muted}
+            multiline
+            className={`flex-1 py-2.5 text-[14px] leading-5 ${textInk}`}
+            style={[{ maxHeight: 110 }, Platform.select({ web: { outlineStyle: 'none' } })]}
+          />
+          <TouchableOpacity className="py-2" activeOpacity={0.7}>
+            <Ionicons name="happy-outline" size={20} color={c.muted} />
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity
+          onPress={() => sendMessage()}
+          disabled={sending || !text.trim()}
+          activeOpacity={0.85}
+          className="w-11 h-11 rounded-full items-center justify-center"
+          style={{ backgroundColor: text.trim() ? c.bubbleMe : (dark ? '#141418' : '#F2F2F5'), opacity: sending ? 0.6 : 1 }}
+        >
+          {sending ? (
+            <ActivityIndicator color="#0A0A0D" size="small" />
+          ) : (
+            <Ionicons name="send" size={17} color={text.trim() ? '#0A0A0D' : c.muted} />
+          )}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
-
-const MOCK_CONVERSATIONS = [
-  { id: 'c1', name: 'Acme Corp', emoji: '🏢', avatarColor: 'rgba(37,211,102,0.12)', channel: 'whatsapp', online: true, phone: '+919876543210' },
-];
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: Spacing.base, paddingTop: 56, paddingBottom: 12, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  backBtn: { paddingRight: 4 },
-  headerName: { fontSize: FontSizes.md, fontFamily: Fonts.bold, color: Colors.textDark },
-  headerStatus: { fontSize: FontSizes.xs, fontFamily: Fonts.semiBold, color: Colors.textMuted, marginTop: 1 },
-  headerIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
-  infoBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: Spacing.base, paddingVertical: 8, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  infoPhone: { fontSize: FontSizes.xs, color: Colors.textMuted, fontFamily: Fonts.mono },
-  infoAction: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
-  messagesFlatList: { flex: 1 },
-  messageList: { paddingHorizontal: Spacing.base, paddingVertical: Spacing.base, paddingBottom: 20 },
-  msgWrap: { marginBottom: 8, maxWidth: '78%' },
-  msgWrapIn: { alignSelf: 'flex-start' },
-  msgWrapOut: { alignSelf: 'flex-end' },
-  bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleIn: { backgroundColor: Colors.card, borderBottomLeftRadius: 4, ...Shadows.sm },
-  bubbleOut: { backgroundColor: Colors.primary, borderBottomRightRadius: 4 },
-  bubbleText: { fontSize: 13, lineHeight: 19 },
-  bubbleTextIn: { color: Colors.textDark, fontFamily: Fonts.regular },
-  bubbleTextOut: { color: Colors.white, fontFamily: Fonts.regular },
-  msgMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 2 },
-  msgTime: { fontSize: 10, color: Colors.textLight },
-  msgStatus: { fontSize: 10, color: Colors.textLight },
-  dateSep: { flexDirection: 'row', alignItems: 'center', marginVertical: 12, gap: 8 },
-  dateLine: { flex: 1, height: 1, backgroundColor: Colors.divider },
-  datePill: { backgroundColor: 'rgba(83,74,183,0.1)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: Radii.full },
-  datePillText: { fontSize: 10, fontFamily: Fonts.semiBold, color: Colors.primary },
-  templatesWrap: { paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.card },
-  templateChip: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: Radii.full, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
-  templateChipText: { fontSize: 11, fontFamily: Fonts.semiBold, color: Colors.primary },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: Spacing.sm, paddingVertical: 10, backgroundColor: Colors.card, borderTopWidth: 1, borderTopColor: Colors.border },
-  inputIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  input: { flex: 1, backgroundColor: Colors.background, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontSize: FontSizes.sm, color: Colors.textDark, maxHeight: 90, fontFamily: Fonts.regular, borderWidth: 1, borderColor: Colors.border },
-  sendBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  sendBtnDisabled: { backgroundColor: Colors.textLight, opacity: 0.5 },
-});
