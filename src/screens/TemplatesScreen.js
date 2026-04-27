@@ -1,147 +1,74 @@
-// src/screens/TemplatesScreen.js — Live template list (no mock, no cache)
+// src/screens/TemplatesScreen.js — Live template list (brand palette · matches template white.png)
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import {
-  View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput,
+  View, Text, FlatList, TouchableOpacity, TextInput,
   RefreshControl, Alert, ActivityIndicator, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFeed, Fonts } from '../theme';
+import { useBrand } from '../theme';
 import { TemplatesAPI } from '../services/api';
+import { BottomTabBar } from './DashboardScreen';
+import toast from '../services/toast';
 
-const CHANNEL_FILTERS = [
-  { id: 'all',      label: 'All',      icon: 'albums-outline' },
-  { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp' },
-  { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline' },
-  { id: 'rcs',      label: 'RCS',      icon: 'card-outline' },
+// Category filters per WhatsApp template taxonomy.
+const CATEGORY_FILTERS = [
+  { id: 'all',           label: 'All',           icon: 'apps-outline' },
+  { id: 'marketing',     label: 'Marketing',     icon: 'megaphone-outline' },
+  { id: 'utility',       label: 'Utility',       icon: 'construct-outline' },
+  { id: 'authentication', label: 'Authentication', icon: 'shield-checkmark-outline' },
 ];
 
-const channelTint = (c, ch) => ({
-  whatsapp: c.tintMint,
-  sms:      c.tintRose,
-  rcs:      c.tintLavender,
-}[ch?.toLowerCase()] || c.tintPeach);
-
-const statusColor = (c, s) => {
-  const v = String(s || '').toUpperCase();
-  if (v === 'APPROVED') return c.accentCyan;
-  if (v === 'PENDING')  return c.accentOrange;
-  return c.accentPink;
+const matchCategory = (cat, filterId) => {
+  if (filterId === 'all') return true;
+  const k = String(cat || '').toUpperCase();
+  if (filterId === 'marketing')      return k.includes('MARKET');
+  if (filterId === 'utility')        return k.includes('UTIL');
+  if (filterId === 'authentication') return k.includes('AUTH');
+  return false;
 };
 
-const makeStyles = (c) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: c.bg },
-  scrollHeader: { paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 8 },
+const CATEGORY_TINT = (cat) => {
+  const k = String(cat || '').toUpperCase();
+  if (k.includes('MARKET')) return { bg: '#FCE7F3', fg: '#BE185D' };
+  if (k.includes('UTIL'))   return { bg: '#DBEAFE', fg: '#1D4ED8' };
+  if (k.includes('AUTH'))   return { bg: '#FEF3C7', fg: '#B45309' };
+  if (k.includes('TRANSACT')) return { bg: '#EDE9FE', fg: '#6D28D9' };
+  return { bg: '#D1FAE5', fg: '#047857' };
+};
 
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  backBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: c.bgSoft, alignItems: 'center', justifyContent: 'center' },
-  title: { color: c.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.6, flex: 1, fontFamily: Fonts.sans },
+const STATUS_TINT = (s, c) => {
+  const v = String(s || '').toUpperCase();
+  if (v === 'APPROVED') return { bg: '#D1FAE5', fg: '#047857', icon: 'checkmark-circle' };
+  if (v === 'PENDING')  return { bg: '#FEF3C7', fg: '#B45309', icon: 'time' };
+  if (v === 'REJECTED') return { bg: '#FEE2E2', fg: '#B91C1C', icon: 'close-circle' };
+  return { bg: c.bgInput, fg: c.textMuted, icon: 'ellipse' };
+};
 
-  summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  summaryCell: { flex: 1, backgroundColor: c.bgSoft, borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12 },
-  summaryLabel: { color: c.textMuted, fontSize: 10, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.5 },
-  summaryValue: { color: c.text, fontSize: 20, fontWeight: '700', marginTop: 2 },
-
-  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.bgSoft, borderRadius: 20, paddingHorizontal: 14, marginBottom: 12 },
-  searchInput: {
-    flex: 1, paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    color: c.text, fontSize: 14, fontFamily: Fonts.sans,
-    ...Platform.select({ web: { outlineStyle: 'none' } }),
-  },
-
-  filterRow: { flexDirection: 'row', gap: 6, marginBottom: 16, flexWrap: 'wrap' },
-  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, backgroundColor: c.bgSoft },
-  filterChipActive: { backgroundColor: c.text },
-  filterChipLabel: { color: c.textMuted, fontSize: 12, fontWeight: '500' },
-  filterChipLabelActive: { color: c.bg, fontSize: 12, fontWeight: '700' },
-
-  listContent: { padding: 22, paddingTop: 4, paddingBottom: 140 },
-
-  card: { backgroundColor: c.bgSoft, borderRadius: 20, padding: 14, marginBottom: 10 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  channelDot: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  grow: { flex: 1 },
-  cardName: { color: c.text, fontSize: 15, fontWeight: '600' },
-  cardSub: { color: c.textMuted, fontSize: 11, marginTop: 2 },
-  statusPill: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
-  statusLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-
-  body: { backgroundColor: c.bgInput, borderRadius: 14, padding: 12, marginBottom: 10 },
-  bodyText: { color: c.text, fontSize: 13, lineHeight: 19, fontFamily: Fonts.sans },
-
-  actions: { flexDirection: 'row', gap: 8 },
-  action: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 14, backgroundColor: c.bgInput },
-  actionPrimary: { backgroundColor: c.text },
-  actionLabel: { color: c.textMuted, fontSize: 12, fontWeight: '600' },
-  actionLabelPrimary: { color: c.bg, fontSize: 12, fontWeight: '700' },
-
-  emptyBlock: { paddingVertical: 60, alignItems: 'center', gap: 8 },
-  emptyHead: { color: c.text, fontSize: 17, fontWeight: '600' },
-  emptyBody: { color: c.textMuted, fontSize: 13, textAlign: 'center', maxWidth: 300 },
-
-  errBlock: { backgroundColor: c.bgSoft, borderRadius: 16, padding: 14, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: c.accentPink },
-  errKicker: { color: c.accentPink, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
-  errText: { color: c.text, fontSize: 13 },
-});
-
-const TemplateCard = ({ item, onCopy, onUse, c, styles }) => {
-  const ch = String(item.channel || '').toLowerCase();
-  const tint = channelTint(c, ch);
-  const sc = statusColor(c, item.status);
-  const icon = ch === 'whatsapp' ? 'logo-whatsapp' : ch === 'sms' ? 'chatbubble-outline' : ch === 'rcs' ? 'card-outline' : 'document-text-outline';
-
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <View style={[styles.channelDot, { backgroundColor: tint }]}>
-          <Ionicons name={icon} size={18} color="#0A0A0D" />
-        </View>
-        <View style={styles.grow}>
-          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.cardSub} numberOfLines={1}>
-            {item.category || ch.toUpperCase()}{item.language ? ` · ${item.language}` : ''}
-          </Text>
-        </View>
-        <View style={[styles.statusPill, { backgroundColor: sc + '22' }]}>
-          <Text style={[styles.statusLabel, { color: sc }]}>{String(item.status || '—')}</Text>
-        </View>
-      </View>
-
-      {item.body ? (
-        <View style={styles.body}>
-          <Text style={styles.bodyText} numberOfLines={6}>{item.body}</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.action} onPress={() => onCopy(item)} activeOpacity={0.8}>
-          <Ionicons name="copy-outline" size={14} color={c.textMuted} />
-          <Text style={styles.actionLabel}>Copy</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.action, styles.actionPrimary]} onPress={() => onUse(item)} activeOpacity={0.88}>
-          <Ionicons name="send" size={14} color={c.bg} />
-          <Text style={styles.actionLabelPrimary}>Use</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+const fmtDate = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
 };
 
 export default function TemplatesScreen({ navigation }) {
-  const c = useFeed();
-  const styles = useMemo(() => makeStyles(c), [c]);
+  const c = useBrand();
 
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState(null);
   const [search, setSearch] = useState('');
-  const [channel, setChannel] = useState('all');
+  const [category, setCategory] = useState('all');
 
   const fetchTemplates = useCallback(async () => {
     setErr(null);
     try {
-      const res = await TemplatesAPI.getAll();
+      // WhatsApp-only here (SMS / RCS get their own dedicated screens).
+      const res = await TemplatesAPI.getWhatsApp();
       setTemplates(Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
       setTemplates([]);
@@ -157,18 +84,18 @@ export default function TemplatesScreen({ navigation }) {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return templates.filter((t) => {
-      if (channel !== 'all' && String(t.channel || '').toLowerCase() !== channel) return false;
+      if (!matchCategory(t.category, category)) return false;
       if (!q) return true;
       return (
         String(t.name || '').toLowerCase().includes(q) ||
         String(t.body || '').toLowerCase().includes(q)
       );
     });
-  }, [templates, search, channel]);
+  }, [templates, search, category]);
 
   const handleCopy = async (item) => {
     await Clipboard.setStringAsync(item.body || item.name || '');
-    Alert.alert('Copied', `${item.name} copied to clipboard.`);
+    toast.success('Copied', `${item.name} copied to clipboard.`);
   };
 
   const handleUse = (item) => {
@@ -178,71 +105,80 @@ export default function TemplatesScreen({ navigation }) {
     });
   };
 
-  const counts = useMemo(() => ({
-    total:    templates.length,
-    approved: templates.filter((t) => String(t.status || '').toUpperCase() === 'APPROVED').length,
-    pending:  templates.filter((t) => String(t.status || '').toUpperCase() === 'PENDING').length,
-  }), [templates]);
-
-  const renderHeader = () => (
-    <View style={styles.scrollHeader}>
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={c.text} />
+  const Header = (
+    <View style={{ paddingHorizontal: 18, paddingTop: Platform.OS === 'ios' ? 56 : 36, backgroundColor: c.bg }}>
+      {/* Top bar */}
+      <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
+          <Ionicons name="arrow-back" size={22} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Templates</Text>
-        <TouchableOpacity style={styles.backBtn} onPress={fetchTemplates} activeOpacity={0.7}>
-          <Ionicons name="refresh" size={18} color={c.text} />
+        <View className="flex-row items-center" style={{ gap: 8, flex: 1 }}>
+          <Text className="text-[18px] font-extrabold" style={{ color: c.text }}>Templates</Text>
+          <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.primarySoft }}>
+            <Text className="text-[10px] font-bold" style={{ color: c.primaryDeep }}>Active</Text>
+          </View>
+        </View>
+        <TouchableOpacity onPress={fetchTemplates} activeOpacity={0.7} className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: c.bgInput }}>
+          <Ionicons name="refresh" size={16} color={c.text} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryCell}>
-          <Text style={styles.summaryLabel}>Total</Text>
-          <Text style={styles.summaryValue}>{counts.total}</Text>
-        </View>
-        <View style={styles.summaryCell}>
-          <Text style={styles.summaryLabel}>Approved</Text>
-          <Text style={[styles.summaryValue, { color: c.accentCyan }]}>{counts.approved}</Text>
-        </View>
-        <View style={styles.summaryCell}>
-          <Text style={styles.summaryLabel}>Pending</Text>
-          <Text style={[styles.summaryValue, { color: c.accentOrange }]}>{counts.pending}</Text>
-        </View>
+      <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
+        <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.success }} />
+        <Text className="text-[12px] font-semibold" style={{ color: c.success }}>Connected · WhatsApp</Text>
       </View>
 
-      <View style={styles.searchWrap}>
+      <Text className="text-[12px] mb-3" style={{ color: c.textMuted }}>
+        Create, manage and personalize message templates
+      </Text>
+
+      {/* Search */}
+      <View
+        className="flex-row items-center rounded-[14px] px-4 mb-3"
+        style={{ backgroundColor: c.bgInput, gap: 10 }}
+      >
         <Ionicons name="search-outline" size={16} color={c.textMuted} />
         <TextInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Search name or body"
+          placeholder="Search templates, messages…"
           placeholderTextColor={c.textMuted}
-          style={styles.searchInput}
+          className="flex-1 text-[13px]"
+          autoCorrect={false}
+          autoCapitalize="none"
+          style={[
+            { paddingVertical: Platform.OS === 'ios' ? 11 : 9, color: c.text },
+            Platform.select({ web: { outlineStyle: 'none' } }),
+          ]}
         />
+        <Ionicons name="options-outline" size={16} color={c.textMuted} />
       </View>
 
-      <View style={styles.filterRow}>
-        {CHANNEL_FILTERS.map((f) => {
-          const active = channel === f.id;
+      {/* Category filter chips */}
+      <View className="flex-row flex-wrap mb-2" style={{ gap: 6 }}>
+        {CATEGORY_FILTERS.map((f) => {
+          const active = category === f.id;
           return (
             <TouchableOpacity
               key={f.id}
-              onPress={() => setChannel(f.id)}
-              activeOpacity={0.8}
-              style={[styles.filterChip, active && styles.filterChipActive]}
+              onPress={() => setCategory(f.id)}
+              activeOpacity={0.85}
+              className="flex-row items-center py-2 px-3 rounded-[14px]"
+              style={{ backgroundColor: active ? c.primary : c.bgInput, gap: 6 }}
             >
-              <Ionicons name={f.icon} size={12} color={active ? c.bg : c.textMuted} />
-              <Text style={active ? styles.filterChipLabelActive : styles.filterChipLabel}>{f.label}</Text>
+              <Ionicons name={f.icon} size={12} color={active ? '#FFFFFF' : c.textMuted} />
+              <Text className="text-[12px]" style={{ color: active ? '#FFFFFF' : c.textMuted, fontWeight: active ? '700' : '500' }}>
+                {f.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
       {err ? (
-        <View style={styles.errBlock}>
-          <Text style={styles.errKicker}>Fetch error</Text>
-          <Text style={styles.errText}>{err}</Text>
+        <View className="rounded-[14px] p-3 mt-2 mb-2 border-l-[3px]" style={{ backgroundColor: c.bgInput, borderLeftColor: c.danger }}>
+          <Text className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: c.danger }}>Error</Text>
+          <Text className="text-[12px]" style={{ color: c.text }}>{err}</Text>
         </View>
       ) : null}
     </View>
@@ -250,44 +186,117 @@ export default function TemplatesScreen({ navigation }) {
 
   if (loading) {
     return (
-      <View style={styles.root}>
-        {renderHeader()}
-        <View style={styles.emptyBlock}>
-          <ActivityIndicator color={c.accentPink} />
-          <Text style={styles.emptyBody}>Loading live templates…</Text>
+      <View style={{ flex: 1, backgroundColor: c.bg }}>
+        {Header}
+        <View className="flex-1 items-center justify-center" style={{ gap: 10 }}>
+          <ActivityIndicator color={c.primary} />
+          <Text className="text-[12px] tracking-widest uppercase" style={{ color: c.textMuted }}>loading templates</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.root}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      {Header}
       <FlatList
         data={filtered}
         keyExtractor={(item, i) => String(item.id ?? item.name ?? i)}
-        renderItem={({ item }) => <TemplateCard item={item} onCopy={handleCopy} onUse={handleUse} c={c} styles={styles} />}
-        ListHeaderComponent={renderHeader}
-        contentContainerStyle={styles.listContent}
+        renderItem={({ item }) => <TemplateCard item={item} onCopy={handleCopy} onUse={handleUse} c={c} />}
+        keyboardShouldPersistTaps="handled"
+        numColumns={2}
+        columnWrapperStyle={{ gap: 10 }}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 130 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); fetchTemplates(); }}
-            tintColor={c.accentPink}
+            tintColor={c.primary}
           />
         }
         ListEmptyComponent={
           !err ? (
-            <View style={styles.emptyBlock}>
-              <Ionicons name="document-text-outline" size={36} color={c.textDim} />
-              <Text style={styles.emptyHead}>No templates</Text>
-              <Text style={styles.emptyBody}>
-                Save an API key in Config, then pull down to refresh from gsauth.
+            <View className="items-center py-12" style={{ gap: 8 }}>
+              <View className="w-20 h-20 rounded-2xl items-center justify-center" style={{ backgroundColor: c.bgInput }}>
+                <Ionicons name="document-outline" size={32} color={c.textDim} />
+              </View>
+              <Text className="text-[15px] font-bold" style={{ color: c.text }}>No templates</Text>
+              <Text className="text-[12px] text-center" style={{ color: c.textMuted, maxWidth: 280 }}>
+                Save an API key in Config, then pull down to refresh.
               </Text>
             </View>
           ) : null
         }
         showsVerticalScrollIndicator={false}
       />
+      <BottomTabBar c={c} navigation={navigation} active="home" />
     </View>
+  );
+}
+
+function TemplateCard({ item, onCopy, onUse, c }) {
+  const cat = CATEGORY_TINT(item.category);
+  const st = STATUS_TINT(item.status, c);
+  const updated = fmtDate(item.updatedAt || item.modifiedAt || item.createdAt);
+
+  return (
+    <View
+      className="rounded-[14px] p-3 mb-2.5"
+      style={{ flex: 1, backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border, minHeight: 168 }}
+    >
+      {/* Top: category pill + status pill */}
+      <View className="flex-row items-center justify-between mb-2" style={{ gap: 6 }}>
+        <View className="rounded-full px-2 py-0.5 flex-row items-center" style={{ backgroundColor: cat.bg, gap: 3 }}>
+          <Ionicons name="ellipse" size={5} color={cat.fg} />
+          <Text className="text-[9px] font-bold" style={{ color: cat.fg }} numberOfLines={1}>
+            {String(item.category || 'TEMPLATE').toUpperCase()}
+          </Text>
+        </View>
+        <View className="flex-row items-center rounded-full px-2 py-0.5" style={{ backgroundColor: st.bg, gap: 3 }}>
+          <Ionicons name={st.icon} size={9} color={st.fg} />
+          <Text className="text-[9px] font-bold" style={{ color: st.fg }}>
+            {String(item.status || '—').toUpperCase()}
+          </Text>
+        </View>
+      </View>
+
+      {/* Template name */}
+      <Text className="text-[13px] font-extrabold mb-2" style={{ color: c.text }} numberOfLines={2}>{item.name}</Text>
+
+      {/* Lang Code + Updated stacked */}
+      <View style={{ gap: 4 }}>
+        <View className="flex-row items-baseline" style={{ gap: 4 }}>
+          <Text className="text-[10px] font-semibold" style={{ color: c.textMuted }}>Lang Code:</Text>
+          <Text className="text-[10px] font-bold" style={{ color: c.text }} numberOfLines={1}>{item.language || 'en'}</Text>
+        </View>
+        {updated ? (
+          <View className="flex-row items-baseline" style={{ gap: 4 }}>
+            <Text className="text-[10px] font-semibold" style={{ color: c.textMuted }}>Updated:</Text>
+            <Text className="text-[10px]" style={{ color: c.text }} numberOfLines={1}>{updated}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* 4 small action icons */}
+      <View className="flex-row mt-auto pt-3" style={{ gap: 6 }}>
+        <ActionBtn c={c} icon="create-outline"  tint={c.primary} onPress={() => {}} />
+        <ActionBtn c={c} icon="copy-outline"    tint={c.primary} onPress={() => onCopy(item)} />
+        <ActionBtn c={c} icon="paper-plane-outline" tint={c.primary} onPress={() => onUse(item)} />
+        <ActionBtn c={c} icon="trash-outline"   tint={c.danger}  onPress={() => {}} />
+      </View>
+    </View>
+  );
+}
+
+function ActionBtn({ c, icon, tint, onPress }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      className="flex-1 h-8 rounded-[8px] items-center justify-center"
+      style={{ borderWidth: 1, borderColor: tint + '55', backgroundColor: tint + '10' }}
+    >
+      <Ionicons name={icon} size={13} color={tint} />
+    </TouchableOpacity>
   );
 }

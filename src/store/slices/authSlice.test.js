@@ -18,13 +18,13 @@ describe('authSlice', () => {
   const initial = { isAuthenticated: false, user: null };
 
   test('loginSuccess sets user and flips isAuthenticated', () => {
-    const next = authReducer(initial, loginSuccess({ username: 'admin', name: 'Administrator', role: 'Super Admin' }));
+    const next = authReducer(initial, loginSuccess({ username: 'omniuser', name: 'Omniuser', role: 'Super Admin' }));
     expect(next.isAuthenticated).toBe(true);
-    expect(next.user).toEqual({ username: 'admin', name: 'Administrator', role: 'Super Admin' });
+    expect(next.user).toEqual({ username: 'omniuser', name: 'Omniuser', role: 'Super Admin' });
   });
 
   test('logout resets state', () => {
-    const loggedIn = { isAuthenticated: true, user: { username: 'admin' } };
+    const loggedIn = { isAuthenticated: true, user: { username: 'omniuser' } };
     expect(authReducer(loggedIn, logout())).toEqual(initial);
   });
 
@@ -35,9 +35,9 @@ describe('authSlice', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  test('login thunk accepts admin/Pass@1234 and dispatches loginSuccess', async () => {
+  test('login thunk accepts omniuser/Omni@1234 and dispatches loginSuccess', async () => {
     const dispatch = jest.fn();
-    const result = await login({ username: 'admin', password: 'Pass@1234' })(dispatch);
+    const result = await login({ username: 'omniuser', password: 'Omni@1234' })(dispatch);
     expect(result).toEqual({ ok: true });
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: loginSuccess.type }));
   });

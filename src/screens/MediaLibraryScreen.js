@@ -1,38 +1,68 @@
-// src/screens/MediaLibraryScreen.js — Voice media library (.wav upload + status)
+// src/screens/MediaLibraryScreen.js — matches UI image/Media Library Screen.png
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Platform, RefreshControl, Alert, useColorScheme,
+  View, Text, ScrollView, TouchableOpacity, Image,
+  ActivityIndicator, Platform, RefreshControl, Alert,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
+import { useBrand } from '../theme';
 import { VoiceAPI } from '../services/api';
 import { addMedia, updateMedia, removeMedia } from '../store/slices/mediaSlice';
+import { pushNotification } from '../store/slices/notificationsSlice';
+import { BottomTabBar } from './DashboardScreen';
+import toast from '../services/toast';
 
-const C = {
-  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0', orange: '#FF8A3D', green: '#4BD08D' },
-  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', pink: '#E6428A', cyan: '#2FB8C4', orange: '#FF7A22', green: '#22C55E' },
+const RETENTION_DAYS = 30;
+
+const FILTERS = ['All', 'Image', 'Document', 'Audio', 'Expired'];
+
+const fmtAge = (uploadedAt) => {
+  if (!uploadedAt) return null;
+  try {
+    const t = new Date(uploadedAt).getTime();
+    const ms = Date.now() - t;
+    const left = RETENTION_DAYS - Math.floor(ms / (1000 * 60 * 60 * 24));
+    return left;
+  } catch { return null; }
 };
 
-const statusColor = (c, s) => {
-  const v = String(s || '').toLowerCase();
-  if (v.includes('approv')) return c.green;
-  if (v.includes('reject') || v.includes('fail')) return c.pink;
-  if (v.includes('process') || v.includes('pend')) return c.orange;
-  return c.muted;
+const guessKind = (name = '') => {
+  const ext = name.split('.').pop().toLowerCase();
+  if (['png','jpg','jpeg','gif','webp'].includes(ext)) return 'image';
+  if (['mp3','wav','m4a','ogg'].includes(ext)) return 'audio';
+  if (['mp4','mov','webm'].includes(ext)) return 'video';
+  if (['pdf'].includes(ext)) return 'pdf';
+  return 'doc';
+};
+
+const KIND_ICON = {
+  image: 'image',
+  audio: 'musical-notes',
+  video: 'videocam',
+  pdf: 'document',
+  doc: 'document-text',
+};
+
+const KIND_TINT = {
+  image: { fg: '#10B981', bg: '#D1FAE5' },
+  audio: { fg: '#8B5CF6', bg: '#EDE9FE' },
+  video: { fg: '#EC4899', bg: '#FCE7F3' },
+  pdf:   { fg: '#3B82F6', bg: '#DBEAFE' },
+  doc:   { fg: '#6B7280', bg: '#F3F4F6' },
 };
 
 export default function MediaLibraryScreen({ navigation }) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
-
+  const c = useBrand();
   const dispatch = useDispatch();
   const media = useSelector((s) => s.media);
+
   const [uploading, setUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState('All');
+  const [showFilter, setShowFilter] = useState(false);
 
   const pollStatuses = useCallback(async () => {
     await Promise.all(
@@ -44,19 +74,17 @@ export default function MediaLibraryScreen({ navigation }) {
             status: res?.messageStatus || res?.status || m.status,
             lastCheckedAt: new Date().toISOString(),
           }));
-        } catch {
-          // ignore per-item failure
-        }
+        } catch {}
       }),
     );
   }, [media, dispatch]);
 
-  useEffect(() => { pollStatuses(); }, []); // initial poll only
+  useEffect(() => { pollStatuses(); }, []); // initial poll
 
   const upload = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
-        type: ['audio/wav', 'audio/x-wav', 'audio/*'],
+        type: ['image/*', 'application/pdf', 'audio/*'],
         multiple: false,
         copyToCacheDirectory: true,
       });
@@ -65,26 +93,32 @@ export default function MediaLibraryScreen({ navigation }) {
       if (!file) return;
 
       setUploading(true);
-      const upload = await VoiceAPI.uploadMedia({
+      const uploadRes = await VoiceAPI.uploadMedia({
         uri: file.uri,
-        name: file.name || 'upload.wav',
-        type: file.mimeType || 'audio/wav',
+        name: file.name || 'upload.bin',
+        type: file.mimeType || 'application/octet-stream',
       });
 
-      const fileId = upload?.fileId || upload?.messageId;
-      if (!fileId) throw { message: upload?.messageStatus || 'Upload failed' };
+      const fileId = uploadRes?.fileId || uploadRes?.messageId;
+      if (!fileId) throw { message: uploadRes?.messageStatus || 'Upload failed' };
 
       dispatch(addMedia({
         fileId,
-        name: file.name || 'upload.wav',
+        name: file.name || 'upload.bin',
         sizeBytes: file.size || 0,
-        status: upload?.messageStatus || 'Pending',
-        errorCode: upload?.errorCode || null,
+        kind: guessKind(file.name || ''),
+        url: uploadRes?.fileUrl || file.uri,
+        status: uploadRes?.messageStatus || 'Pending',
         uploadedAt: new Date().toISOString(),
       }));
-      Alert.alert('Uploaded', `File ID ${fileId} is now ${upload?.messageStatus || 'Pending'}.`);
+      toast.success('Media uploaded', `${file.name || 'file'} (ID ${fileId})`);
+      dispatch(pushNotification({
+        kind: 'template-created',
+        title: 'Media uploaded',
+        body: `${file.name || 'upload.bin'} (ID ${fileId}) is ${uploadRes?.messageStatus || 'Pending'}.`,
+      }));
     } catch (e) {
-      Alert.alert('Upload failed', e?.message || 'Unknown error');
+      toast.error('Upload failed', e?.message || 'Unknown error');
     } finally {
       setUploading(false);
     }
@@ -96,137 +130,232 @@ export default function MediaLibraryScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  const copyId = async (fileId) => {
-    await Clipboard.setStringAsync(String(fileId));
-    Alert.alert('Copied', `File ID ${fileId} copied`);
+  const copyUrl = async (m) => {
+    const v = m.url || `id:${m.fileId}`;
+    await Clipboard.setStringAsync(String(v));
+    toast.success('Copied', `${m.name || 'media'} URL copied.`);
   };
 
-  const remove = (fileId) => {
-    Alert.alert('Remove entry?', 'This only removes the local record. The file remains on the server.', [
+  const remove = (m) =>
+    Alert.alert('Remove entry?', `${m.name} will be removed from this list (server file is unchanged).`, [
       { text: 'Cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => dispatch(removeMedia(fileId)) },
+      { text: 'Remove', style: 'destructive', onPress: () => dispatch(removeMedia(m.fileId)) },
     ]);
-  };
 
-  const rootBg = dark ? 'bg-bg' : 'bg-white';
-  const softBg = dark ? 'bg-bgSoft' : 'bg-[#F2F2F5]';
-  const textInk = dark ? 'text-ink' : 'text-[#0A0A0D]';
-  const textMuted = dark ? 'text-textMuted' : 'text-[#5C5C63]';
-  const textDim = dark ? 'text-textDim' : 'text-[#9A9AA2]';
-
-  const approved = media.filter((m) => String(m.status || '').toLowerCase().includes('approv')).length;
-  const pending = media.filter((m) => /process|pend/.test(String(m.status || '').toLowerCase())).length;
+  const filtered = media.filter((m) => {
+    if (filter === 'All') return true;
+    if (filter === 'Expired') return fmtAge(m.uploadedAt) != null && fmtAge(m.uploadedAt) <= 0;
+    const k = m.kind || guessKind(m.name || '');
+    if (filter === 'Image')    return k === 'image';
+    if (filter === 'Document') return k === 'pdf' || k === 'doc';
+    if (filter === 'Audio')    return k === 'audio';
+    return true;
+  });
 
   return (
-    <View className={`flex-1 ${rootBg}`}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      {/* Header */}
+      <View
+        className="flex-row items-center px-4"
+        style={{
+          paddingTop: Platform.OS === 'ios' ? 56 : 36,
+          paddingBottom: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: c.rule,
+        }}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
+          <Ionicons name="arrow-back" size={22} color={c.text} />
+        </TouchableOpacity>
+        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>Media Library</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 140 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.pink} />}
+        contentContainerStyle={{ padding: 16, paddingBottom: 130 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-widest uppercase ${textMuted}`}>Voice</Text>
-            <Text className={`text-[24px] font-bold tracking-tight ${textInk}`}>Media Library</Text>
+        {/* Breadcrumb + Add Media */}
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center" style={{ gap: 6 }}>
+            <Text className="text-[12px] font-semibold" style={{ color: c.textMuted }}>WhatsApp</Text>
+            <Ionicons name="chevron-forward" size={11} color={c.textDim} />
+            <Text className="text-[12px] font-bold" style={{ color: c.primary }}>Media Library</Text>
           </View>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={refresh} activeOpacity={0.7}>
-            <Ionicons name="refresh" size={18} color={c.ink} />
+          <TouchableOpacity
+            onPress={upload}
+            disabled={uploading}
+            activeOpacity={0.85}
+            className="flex-row items-center rounded-[10px] px-3 py-2"
+            style={{ backgroundColor: c.primary, gap: 6 }}
+          >
+            {uploading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Ionicons name="add" size={14} color="#FFFFFF" />
+                <Text className="text-[12px] font-bold text-white">Add Media</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
-        {/* Summary */}
-        <View className="flex-row mb-3" style={{ gap: 10 }}>
-          <Summary bg={softBg} label="Files" value={media.length} textInk={textInk} textMuted={textMuted} />
-          <Summary bg={softBg} label="Approved" value={approved} accent={c.green} textInk={textInk} textMuted={textMuted} />
-          <Summary bg={softBg} label="Pending" value={pending} accent={c.orange} textInk={textInk} textMuted={textMuted} />
-        </View>
-
-        {/* Upload CTA */}
-        <TouchableOpacity
-          onPress={upload}
-          disabled={uploading}
-          activeOpacity={0.88}
-          className={`rounded-[20px] py-4 px-4 mb-4 flex-row items-center ${softBg}`}
-          style={{ gap: 12, borderWidth: 1, borderColor: c.bgInput }}
+        {/* Top info banner */}
+        <View
+          className="flex-row rounded-[10px] p-3 mb-3"
+          style={{ backgroundColor: '#DBEAFE', gap: 10, borderWidth: 1, borderColor: '#BFDBFE' }}
         >
-          <View className="w-11 h-11 rounded-full items-center justify-center" style={{ backgroundColor: c.ink }}>
-            {uploading ? <ActivityIndicator color={c.bg} /> : <Ionicons name="cloud-upload-outline" size={20} color={c.bg} />}
-          </View>
-          <View className="flex-1">
-            <Text className={`text-[14px] font-semibold ${textInk}`}>
-              {uploading ? 'Uploading…' : 'Upload .wav file'}
-            </Text>
-            <Text className={`text-[11px] mt-0.5 ${textMuted}`}>10KB – 20MB · 128 Kbps · unique name</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={c.muted} />
+          <Ionicons name="information-circle" size={16} color="#1D4ED8" style={{ marginTop: 1 }} />
+          <Text className="flex-1 text-[12px] leading-[18px]" style={{ color: '#1E40AF' }}>
+            As per Meta (WhatsApp) media retention policies, only media files from the last{' '}
+            <Text className="font-bold">30 days</Text> are available in the Media Library. Older media is
+            automatically deleted. If required, please re-upload the media.
+          </Text>
+        </View>
+
+        {/* Filter dropdown */}
+        <TouchableOpacity
+          onPress={() => setShowFilter((v) => !v)}
+          activeOpacity={0.85}
+          className="flex-row items-center rounded-[10px] px-3 py-3 mb-3"
+          style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bgInput, gap: 10 }}
+        >
+          <Ionicons name="filter" size={14} color={c.textMuted} />
+          <Text className="flex-1 text-[13px] font-semibold" style={{ color: filter === 'All' ? c.textMuted : c.text }}>
+            {filter === 'All' ? 'Filter Records' : `Filter: ${filter}`}
+          </Text>
+          <Ionicons name={showFilter ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
         </TouchableOpacity>
+        {showFilter ? (
+          <View
+            className="rounded-[10px] mb-3 overflow-hidden"
+            style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bgCard }}
+          >
+            {FILTERS.map((f, i) => (
+              <TouchableOpacity
+                key={f}
+                onPress={() => { setFilter(f); setShowFilter(false); }}
+                activeOpacity={0.85}
+                className="flex-row items-center px-3 py-3"
+                style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.rule, gap: 8 }}
+              >
+                <Text className="flex-1 text-[13px]" style={{ color: c.text, fontWeight: filter === f ? '700' : '400' }}>{f}</Text>
+                {filter === f ? <Ionicons name="checkmark" size={14} color={c.primary} /> : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
 
-        {/* Files list */}
-        {media.length === 0 ? (
-          <View className="py-12 items-center" style={{ gap: 8 }}>
-            <Ionicons name="musical-notes-outline" size={40} color={c.dim} />
-            <Text className={`text-[15px] font-semibold ${textInk}`}>No media uploaded</Text>
-            <Text className={`text-xs text-center ${textDim}`} style={{ maxWidth: 260 }}>
-              Upload a .wav via the button above. The server assigns a file ID you can use in voice campaigns.
+        {/* Empty state */}
+        {filtered.length === 0 ? (
+          <View className="items-center py-12" style={{ gap: 8 }}>
+            <View className="w-20 h-20 rounded-2xl items-center justify-center" style={{ backgroundColor: c.bgInput }}>
+              <Ionicons name="images-outline" size={32} color={c.textDim} />
+            </View>
+            <Text className="text-[15px] font-bold" style={{ color: c.text }}>No media yet</Text>
+            <Text className="text-[12px] text-center" style={{ color: c.textMuted, maxWidth: 280 }}>
+              Tap "Add Media" to upload images, PDFs or audio. The server assigns an ID for use in campaigns.
             </Text>
           </View>
-        ) : (
-          media.map((m) => {
-            const sc = statusColor(c, m.status);
-            return (
-              <View key={m.fileId} className={`rounded-[18px] p-3.5 mb-2.5 ${softBg}`} style={{ borderWidth: 1, borderColor: c.bgInput }}>
-                <View className="flex-row items-center" style={{ gap: 12 }}>
-                  <View className="w-11 h-11 rounded-full items-center justify-center" style={{ backgroundColor: sc + '22' }}>
-                    <Ionicons name="musical-notes" size={18} color={sc} />
-                  </View>
-                  <View className="flex-1">
-                    <Text className={`text-[14px] font-semibold ${textInk}`} numberOfLines={1}>{m.name || 'upload.wav'}</Text>
-                    <Text className={`text-[11px] font-mono ${textMuted}`}>ID: {m.fileId}</Text>
-                  </View>
-                  <View className="rounded-[12px] px-2.5 py-1" style={{ backgroundColor: sc + '22' }}>
-                    <Text className="text-[10px] font-bold tracking-wider uppercase" style={{ color: sc }}>{m.status || '—'}</Text>
-                  </View>
-                </View>
+        ) : null}
 
-                <View className="flex-row mt-3" style={{ gap: 8 }}>
-                  <Action icon="copy-outline" label="Copy ID" onPress={() => copyId(m.fileId)} bg={c.bgInput} textInk={textInk} />
-                  <Action icon="refresh" label="Recheck" onPress={async () => {
-                    try {
-                      const res = await VoiceAPI.getFileStatus(m.fileId);
-                      dispatch(updateMedia({ fileId: m.fileId, status: res?.messageStatus || res?.status || m.status }));
-                    } catch (e) {
-                      Alert.alert('Check failed', e?.message || 'Unknown error');
-                    }
-                  }} bg={c.bgInput} textInk={textInk} />
-                  <Action icon="trash-outline" label="Remove" onPress={() => remove(m.fileId)} bg={c.bgInput} textInk={c.pink} />
-                </View>
-              </View>
-            );
-          })
-        )}
+        {/* Media rows */}
+        {filtered.map((m) => (
+          <MediaRow
+            key={m.fileId}
+            c={c}
+            m={m}
+            onCopy={() => copyUrl(m)}
+            onRemove={() => remove(m)}
+          />
+        ))}
+
+        {/* Bottom info banner */}
+        {filtered.length > 0 ? (
+          <View
+            className="flex-row items-center rounded-[10px] p-3 mt-3"
+            style={{ backgroundColor: c.primarySoft, gap: 8, borderWidth: 1, borderColor: c.primaryMint + '40' }}
+          >
+            <Ionicons name="information-circle" size={14} color={c.primaryDeep} />
+            <Text className="flex-1 text-[11px]" style={{ color: c.primaryDeep }}>
+              Only media files from the last <Text className="font-bold">30 days</Text> are shown.
+            </Text>
+          </View>
+        ) : null}
       </ScrollView>
+
+      <BottomTabBar c={c} navigation={navigation} active="you" />
     </View>
   );
 }
 
-const Summary = ({ bg, label, value, accent, textInk, textMuted }) => (
-  <View className={`flex-1 rounded-[18px] py-3 px-3.5 ${bg}`}>
-    <Text className={`text-[10px] font-semibold tracking-widest uppercase ${textMuted}`}>{label}</Text>
-    <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`} style={accent ? { color: accent } : undefined}>{value}</Text>
-  </View>
-);
+function MediaRow({ c, m, onCopy, onRemove }) {
+  const kind = m.kind || guessKind(m.name || '');
+  const tint = KIND_TINT[kind] || KIND_TINT.doc;
+  const left = fmtAge(m.uploadedAt);
+  const expired = left != null && left <= 0;
 
-const Action = ({ icon, label, onPress, bg, textInk }) => (
-  <TouchableOpacity
-    onPress={onPress}
-    activeOpacity={0.8}
-    className="flex-1 flex-row items-center justify-center rounded-[14px] py-2.5"
-    style={{ backgroundColor: bg, gap: 6 }}
-  >
-    <Ionicons name={icon} size={13} color={typeof textInk === 'string' && textInk.startsWith('text-') ? '#FFFFFF' : textInk} />
-    <Text className="text-[12px] font-semibold" style={{ color: typeof textInk === 'string' && textInk.startsWith('text-') ? undefined : textInk }}>{label}</Text>
-  </TouchableOpacity>
-);
+  return (
+    <View
+      className="flex-row items-center rounded-[14px] p-3 mb-2.5"
+      style={{ backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border, gap: 12 }}
+    >
+      <View className="flex-row items-center" style={{ gap: 6 }}>
+        <Ionicons name="arrow-down-circle-outline" size={16} color={c.primary} />
+      </View>
+
+      {/* Thumbnail */}
+      <View
+        className="w-14 h-14 rounded-[10px] items-center justify-center overflow-hidden"
+        style={{ backgroundColor: tint.bg, borderWidth: 1, borderColor: c.rule }}
+      >
+        {kind === 'image' && m.url ? (
+          <Image source={{ uri: m.url }} style={{ width: 56, height: 56 }} />
+        ) : (
+          <Ionicons name={KIND_ICON[kind]} size={26} color={tint.fg} />
+        )}
+      </View>
+
+      {/* Body */}
+      <View className="flex-1">
+        <Text className="text-[13px] font-bold" style={{ color: c.text }} numberOfLines={1}>{m.name || 'upload.bin'}</Text>
+        <View className="flex-row items-center mt-1" style={{ gap: 4 }}>
+          <Ionicons name="link" size={11} color={c.primary} />
+          <Text className="text-[11px] font-semibold" style={{ color: c.primary }}>File URL</Text>
+        </View>
+        <View className="flex-row mt-1.5">
+          <View
+            className="rounded-full px-2 py-0.5"
+            style={{ backgroundColor: expired ? '#FEE2E2' : '#D1FAE5' }}
+          >
+            <Text
+              className="text-[10px] font-bold"
+              style={{ color: expired ? '#B91C1C' : '#047857' }}
+            >
+              {expired ? 'Expired' : `${Math.max(left ?? 0, 0)} days left`}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Actions */}
+      <TouchableOpacity
+        onPress={onCopy}
+        activeOpacity={0.85}
+        className="w-9 h-9 rounded-[8px] items-center justify-center"
+        style={{ borderWidth: 1, borderColor: c.primary }}
+      >
+        <Ionicons name="copy-outline" size={14} color={c.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={onRemove}
+        activeOpacity={0.85}
+        className="w-9 h-9 rounded-[8px] items-center justify-center"
+        style={{ borderWidth: 1, borderColor: c.danger }}
+      >
+        <Ionicons name="trash-outline" size={14} color={c.danger} />
+      </TouchableOpacity>
+    </View>
+  );
+}

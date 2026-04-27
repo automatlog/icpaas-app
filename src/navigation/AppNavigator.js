@@ -18,6 +18,10 @@ import MediaLibraryScreen from '../screens/MediaLibraryScreen';
 import CampaignStep1Screen from '../screens/CampaignStep1Screen';
 import CampaignStep2Screen from '../screens/CampaignStep2Screen';
 import CampaignStep3Screen from '../screens/CampaignStep3Screen';
+import ChannelScreen from '../screens/ChannelScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import YouScreen from '../screens/YouScreen';
+import ApiDocsScreen from '../screens/ApiDocsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -67,6 +71,10 @@ export default function AppNavigator() {
         <Stack.Screen name="CampaignStep1" component={CampaignStep1Screen} />
         <Stack.Screen name="CampaignStep2" component={CampaignStep2Screen} />
         <Stack.Screen name="CampaignStep3" component={CampaignStep3Screen} />
+        <Stack.Screen name="Channel" component={ChannelScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="You" component={YouScreen} />
+        <Stack.Screen name="ApiDocs" component={ApiDocsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

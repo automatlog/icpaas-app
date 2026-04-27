@@ -24,8 +24,8 @@ export const { loginSuccess, logout } = authSlice.actions;
 
 // Thunk: validates demo credentials, seeds the API bearer, then dispatches loginSuccess
 export const login = ({ username, password }) => async (dispatch) => {
-  if (username !== 'admin' || password !== 'Pass@1234') {
-    return { ok: false, error: 'Use username "admin" and password "Pass@1234".' };
+  if (username !== 'omniuser' || password !== 'Omni@1234') {
+    return { ok: false, error: 'Use username "omniuser" and password "Omni@1234".' };
   }
 
   // Seed the default bearer so all screens can call gsauth.com + icpaas.in.
@@ -34,8 +34,8 @@ export const login = ({ username, password }) => async (dispatch) => {
   if (!existing) await AuthAPI.saveCredentials(DEFAULT_API_TOKEN);
 
   dispatch(loginSuccess({
-    username: 'admin',
-    name: 'Administrator',
+    username: 'omniuser',
+    name: 'Omniuser',
     role: 'Super Admin',
   }));
   return { ok: true };

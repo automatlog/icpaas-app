@@ -20,6 +20,7 @@ import contactsReducer from './slices/contactsSlice';
 import campaignsReducer from './slices/campaignsSlice';
 import templatesReducer from './slices/templatesSlice';
 import mediaReducer from './slices/mediaSlice';
+import notificationsReducer from './slices/notificationsSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -30,6 +31,7 @@ const rootReducer = combineReducers({
   campaigns: campaignsReducer,
   templates: templatesReducer,
   media: mediaReducer,
+  notifications: notificationsReducer,
 });
 
 const persistConfig = {

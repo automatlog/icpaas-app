@@ -1,78 +1,26 @@
-// src/screens/LoginScreen.js — Feed minimal sign-in (username + password)
-import React, { useMemo, useState } from 'react';
+// src/screens/LoginScreen.js — Brand sign-in (matches Sign In.png / Sign In white.png)
+import React, { useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, TouchableOpacity, Image,
+  View, Text, TextInput, TouchableOpacity, Image,
   KeyboardAvoidingView, Platform, Alert, ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
-import { useFeed, Fonts } from '../theme';
+import { useBrand } from '../theme';
 import { login as loginThunk } from '../store/slices/authSlice';
 
-const LOGO = require('../../logo-main.png');
-
-const makeStyles = (c) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: c.bg },
-  scroll: { flexGrow: 1, paddingTop: Platform.OS === 'ios' ? 64 : 48, paddingHorizontal: 28, paddingBottom: 40 },
-
-  brandBlock: { alignItems: 'center', marginTop: 8, marginBottom: 20 },
-  logoImage: { width: 260, height: 110, marginBottom: 4 },
-  brandTag: { color: c.textMuted, fontSize: 12, marginTop: 4, fontFamily: Fonts.sans },
-
-  heroBlock: { alignItems: 'center', marginBottom: 28 },
-  heroTitle: { color: c.text, fontSize: 44, fontWeight: '700', letterSpacing: -1.2, lineHeight: 50, fontFamily: Fonts.sans },
-  accentLine: {
-    width: 180, height: 3, borderRadius: 2, marginTop: 6,
-    backgroundColor: c.accentOrange,
-  },
-
-  fieldBlock: { marginTop: 16 },
-  fieldLabel: { color: c.text, fontSize: 14, fontFamily: Fonts.sans, fontWeight: '500', marginBottom: 8 },
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: c.bgInput, borderRadius: 28,
-    paddingHorizontal: 18,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: Platform.OS === 'ios' ? 18 : 14,
-    color: c.text,
-    fontSize: 15,
-    fontFamily: Fonts.sans,
-    ...Platform.select({ web: { outlineStyle: 'none' } }),
-  },
-
-  cta: {
-    marginTop: 32,
-    borderRadius: 36,
-    padding: 2,
-    overflow: 'hidden',
-  },
-  ctaInner: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: c.bg,
-    borderRadius: 34,
-    paddingVertical: 18,
-  },
-  ctaArrow: {
-    width: 26, height: 26, borderRadius: 13,
-    borderWidth: 1.2, borderColor: c.text,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  ctaLabel: { color: c.text, fontSize: 16, fontFamily: Fonts.sans, fontWeight: '600' },
-
-  helper: { color: c.textDim, fontSize: 12, fontFamily: Fonts.sans, marginTop: 22, textAlign: 'center' },
-});
+const LOGO = require('../../logo-icon.png');
 
 export default function LoginScreen() {
-  const c = useFeed();
-  const styles = useMemo(() => makeStyles(c), [c]);
-
+  const c = useBrand();
+  const dark = c.scheme === 'dark';
   const dispatch = useDispatch();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
       Alert.alert('Required', 'Enter username and password.');
@@ -85,71 +33,122 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.brandBlock}>
-          <Image source={LOGO} style={styles.logoImage} resizeMode="contain" />
-          <Text style={styles.brandTag}>Omnichannel Communication</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: c.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingTop: Platform.OS === 'ios' ? 80 : 60, paddingHorizontal: 24, paddingBottom: 32 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Brand lockup — icon + wordmark */}
+        <View className="flex-row items-center justify-center mb-12" style={{ gap: 14 }}>
+          <View
+            className="w-[88px] h-[88px] rounded-[20px] items-center justify-center bg-white"
+            style={{ borderWidth: 1.5, borderColor: c.primary }}
+          >
+            <Image source={LOGO} className="w-[80px] h-[80px] rounded-[18px]" resizeMode="contain" />
+          </View>
+          <View>
+            <Text className="text-[34px] font-extrabold tracking-tight" style={{ color: c.text, fontFamily: 'System' }}>
+              icpaas<Text style={{ color: c.primary }}>.ai</Text>
+            </Text>
+            <Text
+              className="text-[12px] font-bold tracking-[3px] mt-1"
+              style={{ color: dark ? '#A78BFA' : '#7C3AED', letterSpacing: 3 }}
+            >
+              SMART TECHNOLOGY
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.heroBlock}>
-          <Text style={styles.heroTitle}>Sign In</Text>
+        {/* Sign In headline + gradient underline */}
+        <View className="items-center mb-10">
+          <Text className="text-[44px] font-extrabold tracking-tight" style={{ color: c.text, fontFamily: 'System' }}>
+            Sign In
+          </Text>
           <LinearGradient
-            colors={[c.gradA, c.gradB, c.gradC]}
+            colors={[c.gCtaA, c.gCtaB, c.gCtaC]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.accentLine}
+            style={{ width: 200, height: 3, borderRadius: 2, marginTop: 6 }}
           />
         </View>
 
-        <View style={styles.fieldBlock}>
-          <Text style={styles.fieldLabel}>Username</Text>
-          <View style={styles.inputWrap}>
-            <Ionicons name="person-outline" size={16} color={c.textMuted} />
-            <TextInput
-              value={username}
-              onChangeText={setUsername}
-              placeholder="admin"
-              placeholderTextColor={c.textMuted}
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
+        {/* Username */}
+        <Text className="text-[15px] font-semibold mb-2" style={{ color: c.text }}>Username</Text>
+        <View
+          className="flex-row items-center rounded-[28px] px-5 mb-5"
+          style={{ backgroundColor: c.bgInput, gap: 12 }}
+        >
+          <Ionicons name="person-outline" size={18} color={c.textMuted} />
+          <TextInput
+            value={username}
+            onChangeText={setUsername}
+            placeholder="omniuser"
+            placeholderTextColor={c.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            className="flex-1 text-[15px]"
+            style={[
+              { paddingVertical: Platform.OS === 'ios' ? 18 : 14, color: c.text },
+              Platform.select({ web: { outlineStyle: 'none' } }),
+            ]}
+          />
         </View>
 
-        <View style={styles.fieldBlock}>
-          <Text style={styles.fieldLabel}>Password</Text>
-          <View style={styles.inputWrap}>
-            <Ionicons name="lock-closed-outline" size={16} color={c.textMuted} />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••••••"
-              placeholderTextColor={c.textMuted}
-              style={styles.input}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
+        {/* Password */}
+        <Text className="text-[15px] font-semibold mb-2" style={{ color: c.text }}>Password</Text>
+        <View
+          className="flex-row items-center rounded-[28px] px-5 mb-8"
+          style={{ backgroundColor: c.bgInput, gap: 12 }}
+        >
+          <Ionicons name="lock-closed-outline" size={18} color={c.textMuted} />
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••••••"
+            placeholderTextColor={c.textMuted}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            className="flex-1 text-[15px]"
+            style={[
+              { paddingVertical: Platform.OS === 'ios' ? 18 : 14, color: c.text },
+              Platform.select({ web: { outlineStyle: 'none' } }),
+            ]}
+          />
         </View>
 
-        <TouchableOpacity onPress={handleLogin} disabled={loading} activeOpacity={0.85} style={[styles.cta, loading && { opacity: 0.7 }]}>
+        {/* Outline gradient Sign In button — bg interior with circle arrow */}
+        <TouchableOpacity onPress={handleLogin} disabled={loading} activeOpacity={0.85}>
           <LinearGradient
-            colors={[c.gradA, c.gradB, c.gradC]}
+            colors={[c.gCtaA, c.gCtaB, c.gCtaC]}
             start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ borderRadius: 36 }}
+            end={{ x: 1, y: 0 }}
+            style={{ borderRadius: 32, padding: 1.6 }}
           >
-            <View style={styles.ctaInner}>
-              <View style={styles.ctaArrow}><Ionicons name="arrow-forward" size={14} color={c.text} /></View>
-              <Text style={styles.ctaLabel}>{loading ? 'Signing in…' : 'Sign In'}</Text>
+            <View
+              className="rounded-[30px] flex-row items-center justify-center"
+              style={{ backgroundColor: c.bg, paddingVertical: 16, gap: 12, opacity: loading ? 0.7 : 1 }}
+            >
+              <View
+                className="w-[28px] h-[28px] rounded-full items-center justify-center"
+                style={{ borderWidth: 1.5, borderColor: c.primaryMint }}
+              >
+                <Ionicons name="arrow-forward" size={14} color={c.primaryMint} />
+              </View>
+              <Text className="text-[16px] font-semibold" style={{ color: c.text }}>
+                {loading ? 'Signing in…' : 'Sign In'}
+              </Text>
             </View>
           </LinearGradient>
         </TouchableOpacity>
 
-        <Text style={styles.helper}>Demo · admin / Pass@1234</Text>
+        <Text className="text-center text-[13px] mt-5" style={{ color: c.textMuted }}>
+          Demo · omniuser / Omni@1234
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

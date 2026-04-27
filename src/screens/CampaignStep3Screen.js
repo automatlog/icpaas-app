@@ -1,232 +1,199 @@
-// src/screens/CampaignStep3Screen.js — Campaign wizard · Step 3 · Schedule + launch
+// src/screens/CampaignStep3Screen.js — Make Campaign · Step 3 (matches Camapign screen3.png)
 import React, { useState, useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, Platform, Alert,
-  ActivityIndicator, useColorScheme, Switch,
+  View, Text, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
+import { useBrand } from '../theme';
 import { upsertCampaign } from '../store/slices/campaignsSlice';
-import { WhatsAppAPI, SMSAPI, RCSAPI, VoiceAPI } from '../services/api';
-
-const C = {
-  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0', gradA: '#FF4D7E', gradB: '#FF8A3D', gradC: '#B765E8' },
-  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', pink: '#E6428A', cyan: '#2FB8C4', gradA: '#E6428A', gradB: '#FF7A22', gradC: '#9A47D4' },
-};
+import { pushNotification } from '../store/slices/notificationsSlice';
+import { WhatsAppAPI } from '../services/api';
+import toast from '../services/toast';
+import {
+  Stepper, Card, SectionTitle, PrimaryButton, SecondaryButton,
+} from './CampaignStep1Screen';
 
 const toList = (raw) =>
-  String(raw || '')
-    .split(/[\n,;\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  String(raw || '').split(/[\n,;\s]+/).map((s) => s.trim()).filter(Boolean);
+
+const dedup = (arr) => [...new Set(arr)];
 
 export default function CampaignStep3Screen({ navigation, route }) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
+  const c = useBrand();
   const dispatch = useDispatch();
-
   const draft = route?.params?.draft || {};
-  const numbers = useMemo(() => toList(draft.contacts), [draft.contacts]);
-
-  const [scheduled, setScheduled] = useState(false);
-  const [schedTime, setSchedTime] = useState('');
-  const [callerId, setCallerId] = useState('');
-  const [mediaFileId, setMediaFileId] = useState('');
   const [launching, setLaunching] = useState(false);
 
+  const numbersRaw = useMemo(() => toList(draft.numbers), [draft.numbers]);
+  const numbers = useMemo(() => (draft.removeDup ? dedup(numbersRaw) : numbersRaw), [numbersRaw, draft.removeDup]);
+  const dupCount = numbersRaw.length - numbers.length;
+
+  const channelObj = (draft.channels || []).find((x) => x.phoneNumberId === draft.channelId);
+  const channelLabel = channelObj
+    ? `${channelObj.wabaBusinessId || ''}-${channelObj.wabaNumber || channelObj.phoneNumberId || ''}`
+    : draft.channelId || '—';
+
+  // Convert flat values { body_0, header_text_0, button_url_0, ... }
+  // into the grouped shape expected by buildInputData.
+  const templateVariables = useMemo(() => {
+    const tv = { headerText: [], body: [], buttonUrl: [], buttonCoupon: [], buttonPayload: [] };
+    (draft.varSpec || []).forEach((s) => {
+      const v = (draft.values || {})[s.key];
+      if (v === undefined) return;
+      tv[s.group][s.index] = v;
+    });
+    return tv;
+  }, [draft.varSpec, draft.values]);
+
   const launch = async () => {
+    if (!draft.templateName) { toast.warning('Pick a template', 'A template is required to launch.'); return; }
+    if (numbers.length === 0) { toast.warning('No recipients', 'Add at least one number.'); return; }
     setLaunching(true);
     try {
-      let response = null;
-      if (draft.channel === 'whatsapp') {
-        response = await Promise.all(
-          numbers.map((n) =>
-            WhatsAppAPI.sendTemplateAuto({ to: n, templateName: draft.templateName }).catch((e) => ({ error: e?.message })),
-          ),
-        );
-      } else if (draft.channel === 'sms') {
-        response = await SMSAPI.sendBulk(numbers, '', undefined, undefined, undefined);
-      } else if (draft.channel === 'rcs') {
-        response = await RCSAPI.sendBulk(numbers, undefined, draft.templateName);
-      } else if (draft.channel === 'voice') {
-        if (!callerId.trim()) throw { message: 'Caller ID is required for voice.' };
-        response = await VoiceAPI.makeCall({
-          numbers,
-          callerId: callerId.trim(),
-          mediaFileId: mediaFileId ? Number(mediaFileId) : undefined,
-          schedTime: scheduled && schedTime ? schedTime : undefined,
-        });
-      }
+      const results = await Promise.all(
+        numbers.map((n) =>
+          WhatsAppAPI.sendTemplateAuto({
+            to: n,
+            phoneNumberId: draft.channelId,
+            wabaBusinessId: channelObj?.wabaBusinessId,
+            templateName: draft.templateName,
+            templateVariables,
+          }).then((r) => ({ ok: true, r })).catch((e) => ({ ok: false, e })),
+        ),
+      );
 
-      const local = {
+      const failed = results.filter((r) => !r.ok).length;
+      const sent = results.length - failed;
+
+      dispatch(upsertCampaign({
         id: `cmp_${Date.now()}`,
         name: draft.name,
-        channel: draft.channel,
-        status: scheduled ? 'scheduled' : 'live',
-        total: numbers.length,
-        sent: scheduled ? 0 : numbers.length,
+        channel: 'whatsapp',
+        channelId: draft.channelId,
         templateName: draft.templateName,
-        schedTime: scheduled ? schedTime : null,
+        category: draft.category,
+        total: numbers.length,
+        sent,
+        failed,
+        status: failed === numbers.length ? 'failed' : (failed > 0 ? 'stuck' : (draft.scheduleNow ? 'scheduled' : 'live')),
         createdAt: new Date().toISOString(),
-      };
-      dispatch(upsertCampaign(local));
+      }));
 
-      Alert.alert(
-        scheduled ? 'Scheduled' : 'Launched',
-        `${draft.channel.toUpperCase()} · ${numbers.length} recipient${numbers.length === 1 ? '' : 's'}`,
-        [{ text: 'OK', onPress: () => navigation.navigate('Dashboard') }],
-      );
+      if (failed === 0) {
+        toast.success('Campaign launched', `${sent} message${sent === 1 ? '' : 's'} dispatched.`);
+        dispatch(pushNotification({
+          kind: 'campaign-success',
+          title: `Campaign "${draft.name}" launched`,
+          body: `${sent} message${sent === 1 ? '' : 's'} dispatched on WhatsApp.`,
+        }));
+      } else if (sent === 0) {
+        toast.error('Campaign failed', 'No messages were dispatched.');
+        dispatch(pushNotification({
+          kind: 'campaign-failed',
+          title: `Campaign "${draft.name}" failed`,
+          body: 'All recipients rejected. Check the bearer token and template approval status.',
+        }));
+      } else {
+        toast.warning('Campaign partially sent', `${sent}/${numbers.length} delivered, ${failed} failed.`);
+        dispatch(pushNotification({
+          kind: 'campaign-stuck',
+          title: `Campaign "${draft.name}" stuck`,
+          body: `${sent} of ${numbers.length} delivered. ${failed} attempts failed.`,
+        }));
+      }
+
+      navigation.navigate('Dashboard');
     } catch (e) {
-      Alert.alert('Launch failed', e?.message || 'Unknown error');
+      toast.error('Launch failed', e?.message || 'Unknown error');
+      dispatch(pushNotification({
+        kind: 'campaign-failed',
+        title: `Campaign "${draft.name}" failed`,
+        body: e?.message || 'Unknown error during launch.',
+      }));
     } finally {
       setLaunching(false);
     }
   };
 
-  const rootBg = dark ? 'bg-bg' : 'bg-white';
-  const softBg = dark ? 'bg-bgSoft' : 'bg-[#F2F2F5]';
-  const textInk = dark ? 'text-ink' : 'text-[#0A0A0D]';
-  const textMuted = dark ? 'text-textMuted' : 'text-[#5C5C63]';
-  const textDim = dark ? 'text-textDim' : 'text-[#9A9AA2]';
-
   return (
-    <View className={`flex-1 ${rootBg}`}>
-      <ScrollView contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 140 }}>
-        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-widest uppercase ${textMuted}`}>Step 3 of 3</Text>
-            <Text className={`text-[24px] font-bold tracking-tight ${textInk}`}>Review + launch</Text>
-          </View>
-        </View>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <Header c={c} navigation={navigation} title="Make Campaign" />
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+        <Stepper c={c} step={3} />
 
-        <Stepper current={3} dark={dark} c={c} />
+        <Card c={c}>
+          <SectionTitle c={c} icon="document-text" label="Campaign Summary" />
 
-        {/* Summary card */}
-        <View className={`rounded-[20px] p-4 mb-3 ${softBg}`} style={{ borderWidth: 1, borderColor: c.bgInput }}>
-          <Row label="Name" value={draft.name} textInk={textInk} textMuted={textMuted} />
-          <Row label="Channel" value={String(draft.channel || '').toUpperCase()} textInk={textInk} textMuted={textMuted} />
-          <Row label="Recipients" value={`${numbers.length} number${numbers.length === 1 ? '' : 's'}`} textInk={textInk} textMuted={textMuted} />
-          {draft.templateName ? <Row label="Template" value={draft.templateName} textInk={textInk} textMuted={textMuted} /> : null}
-          {draft.description ? <Row label="Description" value={draft.description} textInk={textInk} textMuted={textMuted} /> : null}
-        </View>
-
-        {/* Schedule */}
-        <View className={`rounded-[20px] p-4 mb-3 flex-row items-center ${softBg}`} style={{ gap: 12 }}>
-          <Ionicons name="time-outline" size={18} color={c.muted} />
-          <View className="flex-1">
-            <Text className={`text-[14px] font-semibold ${textInk}`}>Schedule for later</Text>
-            <Text className={`text-[11px] mt-0.5 ${textMuted}`}>Toggle to send at a future time</Text>
-          </View>
-          <Switch
-            value={scheduled}
-            onValueChange={setScheduled}
-            trackColor={{ false: c.bgInput, true: c.cyan }}
-            thumbColor={c.ink}
+          <SummaryRow c={c} icon="megaphone"          label="Campaign Name"  value={draft.name || '—'} />
+          <SummaryRow c={c} icon="wifi"               label="Channel"        value={channelLabel} />
+          <SummaryRow c={c} icon="document-text"      label="Template Name"  value={draft.templateName || '—'} />
+          <SummaryRow c={c} icon="options"            label="Category"       pill={draft.category || null} value={draft.category ? null : '—'} />
+          <SummaryRow c={c} icon="people"             label="Total Numbers"  value={String(numbers.length)} />
+          <SummaryRow c={c} icon="filter"             label="Duplicates"     value={String(dupCount)} />
+          <SummaryRow
+            c={c}
+            icon="code-slash"
+            label="Variables"
+            value={(draft.varSpec || []).length === 0
+              ? 'None — template static'
+              : `${Object.values(draft.values || {}).filter((v) => v).length} of ${(draft.varSpec || []).length} filled`}
+            last
           />
+        </Card>
+
+        <View className="flex-row" style={{ gap: 10 }}>
+          <SecondaryButton c={c} icon="hand-left" label="Previous" onPress={() => navigation.goBack()} />
+          <View style={{ flex: 1 }}>
+            <PrimaryButton c={c} icon="send" label={launching ? 'Launching…' : 'Launch Campaign'} onPress={launch} disabled={launching} />
+          </View>
         </View>
-
-        {scheduled && (
-          <>
-            <Label cls={textMuted}>Schedule time (yyyy-MM-dd HH:mm:ss)</Label>
-            <View className={`rounded-[18px] px-4 ${softBg}`}>
-              <TextInput
-                value={schedTime}
-                onChangeText={setSchedTime}
-                placeholder="2026-05-01 10:00:00"
-                placeholderTextColor={c.muted}
-                className={`py-3 text-sm font-mono ${textInk}`}
-                style={Platform.select({ web: { outlineStyle: 'none' } })}
-              />
-            </View>
-          </>
-        )}
-
-        {/* Voice-specific */}
-        {draft.channel === 'voice' && (
-          <>
-            <Label cls={textMuted}>Caller ID</Label>
-            <View className={`rounded-[18px] px-4 ${softBg}`}>
-              <TextInput
-                value={callerId}
-                onChangeText={setCallerId}
-                placeholder="Your verified caller ID"
-                placeholderTextColor={c.muted}
-                className={`py-3 text-sm ${textInk}`}
-                style={Platform.select({ web: { outlineStyle: 'none' } })}
-              />
-            </View>
-            <Label cls={textMuted}>Media file ID (optional)</Label>
-            <View className={`rounded-[18px] px-4 ${softBg}`}>
-              <TextInput
-                value={mediaFileId}
-                onChangeText={setMediaFileId}
-                placeholder="Uploaded .wav ID (Media Library)"
-                placeholderTextColor={c.muted}
-                keyboardType="numeric"
-                className={`py-3 text-sm font-mono ${textInk}`}
-                style={Platform.select({ web: { outlineStyle: 'none' } })}
-              />
-            </View>
-            <TouchableOpacity onPress={() => navigation.navigate('MediaLibrary')} className="mt-2 self-start flex-row items-center" style={{ gap: 6 }}>
-              <Ionicons name="folder-open-outline" size={14} color={c.cyan} />
-              <Text className="text-xs font-semibold" style={{ color: c.cyan }}>Browse Media Library</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {/* Launch */}
-        <TouchableOpacity onPress={launch} activeOpacity={0.88} disabled={launching} className="mt-6 rounded-[28px] overflow-hidden">
-          <LinearGradient
-            colors={[c.gradA, c.gradB, c.gradC]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, gap: 10 }}
-          >
-            {launching ? (
-              <ActivityIndicator color={c.ink} />
-            ) : (
-              <>
-                <Ionicons name={scheduled ? 'time-outline' : 'rocket'} size={16} color={c.ink} />
-                <Text className="text-[15px] font-bold" style={{ color: c.ink }}>
-                  {scheduled ? 'Schedule campaign' : 'Launch now'}
-                </Text>
-              </>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <Text className={`text-[11px] text-center mt-3.5 ${textDim}`}>
-          Launching will dispatch via {String(draft.channel || '').toUpperCase()} to {numbers.length} recipient{numbers.length === 1 ? '' : 's'}.
-        </Text>
       </ScrollView>
     </View>
   );
 }
 
-const Row = ({ label, value, textInk, textMuted }) => (
-  <View className="flex-row py-2 border-b border-transparent" style={{ borderBottomColor: 'rgba(255,255,255,0.04)' }}>
-    <Text className={`text-[11px] font-semibold uppercase tracking-widest flex-1 ${textMuted}`}>{label}</Text>
-    <Text className={`text-sm font-medium ${textInk}`} style={{ flex: 2, textAlign: 'right' }} numberOfLines={2}>{value || '—'}</Text>
-  </View>
-);
+function Header({ c, navigation, title }) {
+  return (
+    <View
+      className="flex-row items-center px-4"
+      style={{
+        paddingTop: Platform.OS === 'ios' ? 56 : 36,
+        paddingBottom: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: c.rule,
+        backgroundColor: c.bg,
+      }}
+    >
+      <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
+        <Ionicons name="arrow-back" size={22} color={c.text} />
+      </TouchableOpacity>
+      <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>{title}</Text>
+      <View style={{ width: 40 }} />
+    </View>
+  );
+}
 
-const Label = ({ cls, children }) => (
-  <Text className={`text-[11px] font-semibold tracking-widest uppercase mb-2 mt-3 ${cls}`}>{children}</Text>
-);
-
-const Stepper = ({ current, dark, c }) => (
-  <View className="flex-row mb-5" style={{ gap: 6 }}>
-    {[1, 2, 3].map((n) => (
-      <View
-        key={n}
-        className="flex-1 h-1 rounded-full"
-        style={{ backgroundColor: n <= current ? c.ink : (dark ? '#1C1C22' : '#ECECEF') }}
-      />
-    ))}
-  </View>
-);
+function SummaryRow({ c, icon, label, value, pill, last }) {
+  return (
+    <View
+      className="flex-row items-center rounded-[12px] px-3 py-3 mb-2"
+      style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bg, gap: 12 }}
+    >
+      <View className="w-9 h-9 rounded-[10px] items-center justify-center" style={{ backgroundColor: c.primarySoft }}>
+        <Ionicons name={icon} size={16} color={c.primary} />
+      </View>
+      <View className="flex-1">
+        <Text className="text-[12px] font-semibold" style={{ color: c.text }}>{label}</Text>
+        {value ? <Text className="text-[12px] mt-0.5" style={{ color: c.textMuted }} numberOfLines={1}>{value}</Text> : null}
+        {pill ? (
+          <View className="flex-row mt-1">
+            <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.primarySoft }}>
+              <Text className="text-[10px] font-bold" style={{ color: c.primaryDeep }}>{pill}</Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}

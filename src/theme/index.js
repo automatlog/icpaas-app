@@ -1,77 +1,93 @@
-// src/theme/index.js — icpaas.ai theme tokens (Feed palette only).
-// NativeWind handles utility classes; runtime code imports Feed/LightFeed + useFeed.
+// src/theme/index.js — icpaas.ai brand tokens (emerald-green primary).
+// NativeWind handles utilities; runtime imports Brand/LightBrand + useBrand.
 
 import { Platform, useColorScheme } from 'react-native';
 
-// Feed (dark social) palette — oversize typography, vibrant card tints, gradient CTA
-export const Feed = {
+// Dark (black) brand palette — channel screens + chat
+export const Brand = {
   scheme: 'dark',
-  bg: '#0A0A0D',
-  bgSoft: '#141418',
-  bgInput: '#1C1C22',
-  bgCard: '#16161B',
-  text: '#FFFFFF',
-  textMuted: '#9A9AA2',
-  textDim: '#5C5C63',
-  border: '#26262E',
+  bg: '#000000',
+  bgSoft: '#0F0F12',
+  bgCard: '#17171B',
+  bgInput: '#1F1F24',
+  text: '#F9FAFB',
+  textMuted: '#9CA3AF',
+  textDim: '#6B7280',
+  border: '#1F2937',
   rule: 'rgba(255,255,255,0.08)',
-  ruleSoft: 'rgba(255,255,255,0.04)',
 
-  accentPink: '#FF4D7E',
-  accentOrange: '#FF8A3D',
-  accentPurple: '#B765E8',
-  accentMagenta: '#E6428A',
-  accentCyan: '#5CD4E0',
+  primary: '#10B981',
+  primaryDeep: '#0B8A6F',
+  primaryMint: '#34D399',
+  primarySoft: 'rgba(16,185,129,0.18)',
 
-  tintPeach: '#E8B799',
-  tintMint: '#8FCFBD',
-  tintLavender: '#D4B3E8',
-  tintYellow: '#E8D080',
-  tintRose: '#F2A8B3',
-  tintSage: '#9CB89A',
-  tintClay: '#CB8A75',
+  chWa: '#10B981',
+  chSms: '#0B8A6F',
+  chRcs: '#3B82F6',
+  chVoice: '#10B981',
+  chIvr: '#8B5CF6',
 
-  gradA: '#FF4D7E',
-  gradB: '#FF8A3D',
-  gradC: '#B765E8',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  info: '#3B82F6',
+
+  gWordA: '#10B981',
+  gWordB: '#06B6D4',
+  gWordC: '#8B5CF6',
+
+  gCtaA: '#EC4899',
+  gCtaB: '#F97316',
+  gCtaC: '#A855F7',
 };
 
-export const LightFeed = {
+// Light (white) brand palette — home + most screens
+export const LightBrand = {
   scheme: 'light',
-  bg: '#FAFAFB',
-  bgSoft: '#F2F2F5',
-  bgInput: '#ECECEF',
+  bg: '#FFFFFF',
+  bgSoft: '#F9FAFB',
   bgCard: '#FFFFFF',
-  text: '#0A0A0D',
-  textMuted: '#5C5C63',
-  textDim: '#9A9AA2',
-  border: '#DCDCE2',
-  rule: 'rgba(10,10,13,0.08)',
-  ruleSoft: 'rgba(10,10,13,0.04)',
+  bgInput: '#F3F4F6',
+  text: '#111827',
+  textMuted: '#6B7280',
+  textDim: '#9CA3AF',
+  border: '#E5E7EB',
+  rule: '#F3F4F6',
 
-  accentPink: '#E6428A',
-  accentOrange: '#FF7A22',
-  accentPurple: '#9A47D4',
-  accentMagenta: '#C93370',
-  accentCyan: '#2FB8C4',
+  primary: '#0B8A6F',
+  primaryDeep: '#067258',
+  primaryMint: '#10B981',
+  primarySoft: '#D1FAE5',
 
-  tintPeach: '#E8B799',
-  tintMint: '#8FCFBD',
-  tintLavender: '#D4B3E8',
-  tintYellow: '#E8D080',
-  tintRose: '#F2A8B3',
-  tintSage: '#9CB89A',
-  tintClay: '#CB8A75',
+  chWa: '#10B981',
+  chSms: '#0B8A6F',
+  chRcs: '#3B82F6',
+  chVoice: '#10B981',
+  chIvr: '#8B5CF6',
 
-  gradA: '#E6428A',
-  gradB: '#FF7A22',
-  gradC: '#9A47D4',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  info: '#3B82F6',
+
+  gWordA: '#10B981',
+  gWordB: '#06B6D4',
+  gWordC: '#8B5CF6',
+
+  gCtaA: '#EC4899',
+  gCtaB: '#F97316',
+  gCtaC: '#A855F7',
 };
 
-export const useFeed = () => {
+export const useBrand = () => {
   const scheme = useColorScheme();
-  return scheme === 'light' ? LightFeed : Feed;
+  return scheme === 'dark' ? Brand : LightBrand;
 };
+
+// Back-compat aliases for screens still on the previous Feed names. Map onto Brand.
+export const Feed = Brand;
+export const LightFeed = LightBrand;
+export const useFeed = useBrand;
 
 // Colors is remapped to Feed (dark social) tokens so legacy screens inherit the unified palette.
 export const Colors = {
