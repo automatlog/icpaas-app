@@ -1,4 +1,4 @@
-// src/screens/YouScreen.js — Profile / personal info (matches reference screenshot)
+// src/screens/shared/ProfileScreen.js — Profile / personal info (matches reference screenshot)
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Image,
@@ -12,13 +12,14 @@ import { AuthAPI } from '../../services/api';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
+import dialog from '../../services/dialog';
 
 const TABS = [
   { id: 'info',     label: 'Personal Info',     icon: 'person-circle-outline' },
   { id: 'security', label: 'Security & Settings', icon: 'shield-checkmark-outline' },
 ];
 
-export default function YouScreen({ navigation }) {
+export default function ProfileScreen({ navigation }) {
   const c = useBrand();
   const dispatch = useDispatch();
   const user = useSelector((s) => s.auth.user) || {};
@@ -48,11 +49,19 @@ export default function YouScreen({ navigation }) {
     toast.success('Profile saved', 'Personal info updated.');
   };
 
-  const logout = () =>
-    Alert.alert('Sign out?', 'You will be returned to the sign-in screen.', [
-      { text: 'Cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => dispatch(logoutAction()) },
-    ]);
+  const logout = async () => {
+    const ok = await dialog.confirm({
+      title: 'Sign out?',
+      message: 'You will be returned to the sign-in screen.',
+      confirmText: 'Sign out',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (ok) {
+      dispatch(logoutAction());
+      toast.success('Signed out', 'See you again soon.');
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>

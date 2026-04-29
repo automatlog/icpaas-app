@@ -11,6 +11,7 @@ import { useBrand } from '../../theme';
 import { SMSAPI } from '../../services/api';
 import { pushNotification } from '../../store/slices/notificationsSlice';
 import toast from '../../services/toast';
+import GradientButton from '../../components/GradientButton';
 
 const TYPES = [
   { id: 'Normal',         label: 'Normal',         icon: 'chatbubble-outline',     desc: 'Standard transactional or promotional.' },
@@ -190,20 +191,13 @@ export default function CreateTemplateScreen({ navigation }) {
           style={[{ backgroundColor: c.bgInput, color: c.text, minHeight: 110, textAlignVertical: 'top' }, Platform.select({ web: { outlineStyle: 'none' } })]}
         />
 
-        <TouchableOpacity
+        <GradientButton
+          title="Create template"
           onPress={submit}
-          disabled={submitting}
-          activeOpacity={0.85}
-          className="rounded-[14px] flex-row items-center justify-center mt-6 py-3.5"
-          style={{ backgroundColor: c.primary, gap: 8, opacity: submitting ? 0.6 : 1 }}
-        >
-          {submitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" />
-          )}
-          <Text className="text-[13px] font-bold text-white">Create template</Text>
-        </TouchableOpacity>
+          loading={submitting}
+          icon="add-circle-outline"
+          style={{ marginTop: 24 }}
+        />
       </ScrollView>
     </View>
   );

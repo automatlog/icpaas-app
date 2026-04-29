@@ -58,7 +58,7 @@ const ROUTES = {
   },
   rcs: {
     inbox: 'RcsInbox',
-    campaignStart: 'RcsCampaignStep1',
+    campaignStart: 'RcsCampaign',
     templates: 'RcsTemplates',
     identityScreen: 'RcsBotIds',
     identityLabel: 'Bot IDs',
@@ -67,7 +67,7 @@ const ROUTES = {
   },
   sms: {
     inbox: 'SmsInbox',
-    campaignStart: 'SmsCampaignStep1',
+    campaignStart: 'SmsCampaign',
     templates: 'SmsTemplates',
     identityScreen: 'SmsSenderIds',
     identityLabel: 'Sender IDs',
@@ -76,12 +76,13 @@ const ROUTES = {
   },
   voice: {
     inbox: null,
-    campaignStart: 'VoiceCampaignStep1',
+    campaignStart: 'VoiceCampaign',
     templates: null,
     identityScreen: 'VoiceCallerIds',
     identityLabel: 'Caller IDs',
     identityDesc: 'Outbound caller numbers',
     identityIcon: 'call',
+    configScreen: 'VoiceConfig',
   },
 };
 
@@ -105,7 +106,7 @@ const TOOLS = (id, navigation) => {
   }
   items.push({ icon: 'people', tint: '#8B5CF6', tintBg: '#EDE9FE', label: 'Contacts', desc: 'Manage & segment contacts', onPress: () => navigation.navigate('Contacts') });
   items.push({ icon: 'bar-chart', tint: '#EC4899', tintBg: '#FCE7F3', label: 'Reports', desc: 'View analytics & performance', onPress: () => navigation.navigate('Report') });
-  items.push({ icon: 'settings', tint: '#3B82F6', tintBg: '#DBEAFE', label: 'Config', desc: 'Manage channel preferences', onPress: () => navigation.navigate('Config') });
+  items.push({ icon: 'settings', tint: '#3B82F6', tintBg: '#DBEAFE', label: 'Config', desc: 'Manage channel preferences', onPress: () => navigation.navigate(r.configScreen || 'Config') });
   items.push({ icon: 'code-slash', tint: '#10B981', tintBg: '#D1FAE5', label: 'API Docs', desc: `Integrate ${id.toUpperCase()} using our API`, onPress: () => navigation.navigate('ApiDocs', { product: id }) });
 
   return items;

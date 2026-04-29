@@ -10,6 +10,7 @@ import { PersistGate } from 'redux-persist/integration/react';
 import AppNavigator from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import LoadingScreen from './src/screens/auth/LoadingScreen';
+import AlertDialogHost from './src/components/AlertDialog';
 import { store, persistor } from './src/store';
 import { setHydrated } from './src/store/slices/hydratedSlice';
 import { Feed, LightFeed } from './src/theme';
@@ -52,6 +53,7 @@ function AppInner() {
         {isLoggedIn && isHydrated ? <AppNavigator /> : <AuthNavigator />}
       </View>
       <FlashMessage position="top" />
+      <AlertDialogHost />
     </SafeAreaProvider>
   );
 }

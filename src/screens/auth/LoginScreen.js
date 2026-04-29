@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
 import { useBrand } from '../../theme';
 import { login as loginThunk } from '../../store/slices/authSlice';
+import GradientButton from '../../components/GradientButton';
 
 const LOGO = require('../../../logo-icon.png');
 
@@ -272,33 +273,16 @@ export default function LoginScreen({ navigation }) {
               </View>
             </View>
 
-            <TouchableOpacity 
-              onPress={handleLogin} 
-              disabled={loading} 
-              activeOpacity={0.8}
-              className="mt-10"
-            >
-              <LinearGradient
-                colors={['#2094abff', '#175a6eff']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ borderRadius: 20, shadowColor: '#2094ab', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 8 }}
-              >
-                <View
-                  className="flex-row items-center justify-center"
-                  style={{ paddingVertical: 18, gap: 12, opacity: loading ? 0.7 : 1 }}
-                >
-                  {loading ? (
-                    <Text className="text-[17px] font-bold text-white">Signing in...</Text>
-                  ) : (
-                    <>
-                      <Text className="text-[17px] font-bold text-white">Sign In</Text>
-                      <Ionicons name="arrow-forward" size={20} color="white" />
-                    </>
-                  )}
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
+            <GradientButton
+              title={loading ? 'Signing in...' : 'Sign In'}
+              onPress={handleLogin}
+              loading={loading}
+              icon={loading ? null : 'arrow-forward'}
+              iconPosition="right"
+              size="lg"
+              variant="teal"
+              style={{ marginTop: 40 }}
+            />
           </View>
 
           <View className="mt-8 items-center">

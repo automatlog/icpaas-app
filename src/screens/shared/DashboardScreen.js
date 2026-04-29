@@ -11,6 +11,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import { BalanceAPI, VoiceAPI, IVRAPI } from '../../services/api';
 import { selectUnreadCount, pushNotification } from '../../store/slices/notificationsSlice';
+import Banner from '../../components/Banner';
 
 const greet = () => {
   const h = new Date().getHours();
@@ -60,6 +61,7 @@ export default function DashboardScreen({ navigation }) {
   const [ivrRows, setIvrRows] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const fetchFront = useCallback(async () => {
     const today = new Date();
@@ -108,6 +110,19 @@ export default function DashboardScreen({ navigation }) {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Low-balance Banner — surfaces when wallet < ₹1000 */}
+        {!bannerDismissed && typeof balance === 'number' && balance < 1000 ? (
+          <Banner
+            tone="warning"
+            title="Low wallet balance"
+            message={`Wallet at ₹${Number(balance).toLocaleString('en-IN', { maximumFractionDigits: 2 })}. Top up to keep campaigns running.`}
+            actionText="Top up"
+            onAction={() => navigation.navigate('Config')}
+            onClose={() => setBannerDismissed(true)}
+            style={{ marginBottom: 12 }}
+          />
+        ) : null}
+
         {/* Greeting */}
         <View className="flex-row items-start justify-between mb-3">
           <View className="flex-1">
@@ -314,7 +329,7 @@ export function BottomTabBar({ c, navigation, active = 'home' }) {
       </View>
 
       {tab('reports', 'bar-chart-outline', 'Reports', () => navigation.navigate('Report'))}
-      {tab('you', 'person-outline', 'You', () => navigation.navigate('You'))}
+      {tab('you', 'person-outline', 'Profile', () => navigation.navigate('Profile'))}
     </View>
   );
 }

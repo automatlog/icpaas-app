@@ -14,7 +14,7 @@ import SendMessageScreen from '../screens/shared/SendMessageScreen';
 import MediaLibraryScreen from '../screens/shared/MediaLibraryScreen';
 import ChannelScreen from '../screens/shared/ChannelScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
-import YouScreen from '../screens/shared/YouScreen';
+import ProfileScreen from '../screens/shared/ProfileScreen';
 import ApiDocsScreen from '../screens/shared/ApiDocsScreen';
 import ContactsScreen from '../screens/shared/ContactsScreen';
 
@@ -36,6 +36,7 @@ import RcsChatScreen from '../screens/rcs/ChatScreen';
 import RcsBotIdScreen from '../screens/rcs/BotIdScreen';
 import RcsTemplatesScreen from '../screens/rcs/TemplatesScreen';
 import RcsCreateTemplateScreen from '../screens/rcs/CreateTemplateScreen';
+import RcsCampaignScreen from '../screens/rcs/CampaignScreen';
 import RcsCampaignsList from '../screens/rcs/campaigns/CampaignsListScreen';
 import RcsCampaignDetail from '../screens/rcs/campaigns/CampaignDetailScreen';
 import RcsCampaignStep1 from '../screens/rcs/campaigns/CampaignStep1Screen';
@@ -48,6 +49,7 @@ import SmsChatScreen from '../screens/sms/ChatScreen';
 import SmsSenderIdScreen from '../screens/sms/SenderIdScreen';
 import SmsTemplatesScreen from '../screens/sms/TemplatesScreen';
 import SmsCreateTemplateScreen from '../screens/sms/CreateTemplateScreen';
+import SmsCampaignScreen from '../screens/sms/CampaignScreen';
 import SmsCampaignsList from '../screens/sms/campaigns/CampaignsListScreen';
 import SmsCampaignDetail from '../screens/sms/campaigns/CampaignDetailScreen';
 import SmsCampaignStep1 from '../screens/sms/campaigns/CampaignStep1Screen';
@@ -56,6 +58,8 @@ import SmsCampaignStep3 from '../screens/sms/campaigns/CampaignStep3Screen';
 
 // Voice screens
 import VoiceCallerIdScreen from '../screens/voice/CallerIdScreen';
+import VoiceConfigScreen from '../screens/voice/VoiceConfigScreen';
+import VoiceCampaignScreen from '../screens/voice/CampaignScreen';
 import VoiceCampaignsList from '../screens/voice/campaigns/CampaignsListScreen';
 import VoiceCampaignDetail from '../screens/voice/campaigns/CampaignDetailScreen';
 import VoiceCampaignStep1 from '../screens/voice/campaigns/CampaignStep1Screen';
@@ -106,7 +110,8 @@ export default function AppNavigator() {
         <Stack.Screen name="MediaLibrary" component={MediaLibraryScreen} />
         <Stack.Screen name="Channel" component={ChannelScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
-        <Stack.Screen name="You" component={YouScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="You" component={ProfileScreen} />
         <Stack.Screen name="ApiDocs" component={ApiDocsScreen} />
         <Stack.Screen name="Contacts" component={ContactsScreen} />
 
@@ -128,6 +133,7 @@ export default function AppNavigator() {
         <Stack.Screen name="RcsBotIds" component={RcsBotIdScreen} />
         <Stack.Screen name="RcsTemplates" component={RcsTemplatesScreen} />
         <Stack.Screen name="RcsCreateTemplate" component={RcsCreateTemplateScreen} />
+        <Stack.Screen name="RcsCampaign" component={RcsCampaignScreen} />
         <Stack.Screen name="RcsCampaignsList" component={RcsCampaignsList} />
         <Stack.Screen name="RcsCampaignDetail" component={RcsCampaignDetail} />
         <Stack.Screen name="RcsCampaignStep1" component={RcsCampaignStep1} />
@@ -140,6 +146,7 @@ export default function AppNavigator() {
         <Stack.Screen name="SmsSenderIds" component={SmsSenderIdScreen} />
         <Stack.Screen name="SmsTemplates" component={SmsTemplatesScreen} />
         <Stack.Screen name="SmsCreateTemplate" component={SmsCreateTemplateScreen} />
+        <Stack.Screen name="SmsCampaign" component={SmsCampaignScreen} />
         <Stack.Screen name="SmsCampaignsList" component={SmsCampaignsList} />
         <Stack.Screen name="SmsCampaignDetail" component={SmsCampaignDetail} />
         <Stack.Screen name="SmsCampaignStep1" component={SmsCampaignStep1} />
@@ -148,6 +155,8 @@ export default function AppNavigator() {
 
         {/* Voice */}
         <Stack.Screen name="VoiceCallerIds" component={VoiceCallerIdScreen} />
+        <Stack.Screen name="VoiceConfig" component={VoiceConfigScreen} />
+        <Stack.Screen name="VoiceCampaign" component={VoiceCampaignScreen} />
         <Stack.Screen name="VoiceCampaignsList" component={VoiceCampaignsList} />
         <Stack.Screen name="VoiceCampaignDetail" component={VoiceCampaignDetail} />
         <Stack.Screen name="VoiceCampaignStep1" component={VoiceCampaignStep1} />

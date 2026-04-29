@@ -1,0 +1,590 @@
+// src/screens/sms/CampaignScreen.js — single-page SMS campaign composer.
+// Mirrors UI image/SMS Campaign Screen.png. Picks route, sender ID, language,
+// DLT template ID, then sends bulk SMS via SMSAPI.send.
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, TextInput, Switch,
+  ActivityIndicator, Platform, Alert,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useDispatch } from 'react-redux';
+import { useBrand } from '../../theme';
+import { SMSAPI, TemplatesAPI } from '../../services/api';
+import { pushNotification } from '../../store/slices/notificationsSlice';
+import toast from '../../services/toast';
+import dialog from '../../services/dialog';
+import GradientButton from '../../components/GradientButton';
+
+const ROUTES = [
+  { id: 'master',        label: 'Master' },
+  { id: 'transactional', label: 'Transactional' },
+  { id: 'promotional',   label: 'Promotional' },
+];
+
+const LANGUAGES = [
+  { id: 'en', label: 'ENGLISH' },
+  { id: 'hi', label: 'HINDI' },
+  { id: 'mr', label: 'MARATHI' },
+  { id: 'gu', label: 'GUJARATI' },
+  { id: 'ta', label: 'TAMIL' },
+  { id: 'te', label: 'TELUGU' },
+];
+
+const CAMPAIGN_TYPES = [
+  { id: 'one_many', label: 'One To Many' },
+  { id: 'one_one',  label: 'One To One' },
+];
+
+const stamp = () => {
+  const d = new Date();
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}, ${d.toLocaleTimeString()}`;
+};
+
+export default function CampaignScreen({ navigation }) {
+  const c = useBrand();
+  const dispatch = useDispatch();
+
+  const [name, setName] = useState(stamp());
+
+  const [route, setRoute] = useState('master');
+  const [showRoute, setShowRoute] = useState(false);
+
+  const [senders, setSenders] = useState([]);
+  const [sender, setSender] = useState(null);
+  const [showSender, setShowSender] = useState(false);
+  const [loadingSenders, setLoadingSenders] = useState(true);
+
+  const [language, setLanguage] = useState('en');
+  const [showLanguage, setShowLanguage] = useState(false);
+
+  const [dltId, setDltId] = useState('');
+
+  const [templates, setTemplates] = useState([]);
+  const [template, setTemplate] = useState(null);
+  const [showTemplate, setShowTemplate] = useState(false);
+
+  const [messageText, setMessageText] = useState('');
+
+  const [campaignType, setCampaignType] = useState('one_many');
+  const [showCampaignType, setShowCampaignType] = useState(false);
+
+  const [group, setGroup] = useState(null);
+  const [showGroup, setShowGroup] = useState(false);
+  const [groupFrom, setGroupFrom] = useState('');
+  const [groupTo, setGroupTo] = useState('');
+
+  const [numbers, setNumbers] = useState('');
+
+  const [removeDup, setRemoveDup] = useState(true);
+  const [flashSms, setFlashSms] = useState(false);
+  const [tinyCampaign, setTinyCampaign] = useState(false);
+  const [schedule, setSchedule] = useState(false);
+
+  const [sending, setSending] = useState(false);
+
+  // Load sender IDs.
+  useEffect(() => {
+    setLoadingSenders(true);
+    SMSAPI.getSenderIds()
+      .then((res) => {
+        const list = res?.senderIds || res?.data?.senderIds || res?.data || [];
+        setSenders(Array.isArray(list) ? list : []);
+        if (!sender && list[0]?.senderId) {
+          setSender(list[0]);
+          if (list[0].entityId) setDltId('');
+        }
+      })
+      .catch(() => setSenders([]))
+      .finally(() => setLoadingSenders(false));
+  }, []);
+
+  // Load templates whenever sender changes.
+  useEffect(() => {
+    if (!sender?.senderId) { setTemplates([]); return; }
+    TemplatesAPI.getSMS(sender.senderId)
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setTemplates(list);
+      })
+      .catch(() => setTemplates([]));
+  }, [sender?.senderId]);
+
+  const numberCount = useMemo(() => {
+    return numbers
+      .split(/[,\n\s]+/)
+      .map((n) => n.trim())
+      .filter(Boolean)
+      .length;
+  }, [numbers]);
+
+  // SMS segment math: 160 chars for plain GSM, 153 per segment after first.
+  const stats = useMemo(() => {
+    const len = messageText.length;
+    const maxLen = 160;
+    const segments = len === 0 ? 0 : (len <= 160 ? 1 : Math.ceil(len / 153));
+    const charsLeft = segments === 0 ? 160 : (segments === 1 ? 160 - len : (153 * segments) - len);
+    return { length: len, maxLength: maxLen, segments, charsLeft };
+  }, [messageText]);
+
+  const send = async () => {
+    if (!sender?.senderId) { Alert.alert('Pick sender', 'Select a sender ID first.'); return; }
+    if (!messageText.trim() && !template) { Alert.alert('No message', 'Pick a template or type a message.'); return; }
+
+    const list = numbers.split(/[,\n\s]+/).map((n) => n.trim()).filter(Boolean);
+    if (list.length === 0) { Alert.alert('No numbers', 'Add at least one recipient number.'); return; }
+    if (list.length > 5000) { Alert.alert('Too many numbers', 'Up to 5,000 numbers per request.'); return; }
+
+    const ok = await dialog.confirm({
+      title: 'Send SMS campaign?',
+      message: `${name} → ${list.length} recipient${list.length === 1 ? '' : 's'}`,
+      confirmText: 'Send now',
+    });
+    if (!ok) return;
+
+    setSending(true);
+    try {
+      const result = await SMSAPI.send({
+        senderId: sender.senderId,
+        peId: sender.entityId,
+        chainValue: sender.hashChainId,
+        dltTemplateId: dltId || (template?.dltTemplateId || ''),
+        text: messageText.trim() || (template?.body || ''),
+        flashSms: flashSms ? 1 : 0,
+        schedTime: schedule ? '' : '',
+        numbers: list,
+        messageId: `cmp_${Date.now()}`,
+      });
+      dispatch(pushNotification({
+        title: 'SMS campaign sent',
+        body: `${name} · ${list.length} recipients`,
+        type: 'success',
+      }));
+      toast.success('Campaign sent', `${list.length} recipients queued`);
+      navigation.goBack();
+    } catch (e) {
+      await dialog.error({ title: 'Send failed', message: e?.message || 'Unknown error' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const routeLabel = ROUTES.find((r) => r.id === route)?.label || 'Pick route';
+  const langLabel = LANGUAGES.find((l) => l.id === language)?.label || 'Pick language';
+  const campaignLabel = CAMPAIGN_TYPES.find((t) => t.id === campaignType)?.label || 'Pick';
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScrollView
+        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 36, paddingBottom: 140, paddingHorizontal: 18 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
+          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
+            <Ionicons name="arrow-back" size={22} color={c.text} />
+          </TouchableOpacity>
+          <Text className="flex-1 text-[18px] font-extrabold text-center" style={{ color: c.text }}>
+            SMS Campaign
+          </Text>
+          <View style={{ width: 36 }} />
+        </View>
+
+        <Field
+          c={c}
+          label="Campaign Name *"
+          icon="megaphone-outline"
+          hint="User-defined campaign name."
+        >
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Campaign name"
+            placeholderTextColor={c.textMuted}
+            style={inputStyle(c)}
+          />
+        </Field>
+
+        <Row>
+          <Field c={c} label="Route *" hint="Select the route for delivering messages." flex>
+            <Dropdown
+              c={c}
+              placeholder="Pick route"
+              value={routeLabel}
+              open={showRoute}
+              onToggle={() => setShowRoute((v) => !v)}
+              options={ROUTES}
+              selectedId={route}
+              onSelect={(opt) => { setRoute(opt.id); setShowRoute(false); }}
+            />
+          </Field>
+          <Field c={c} label="SenderId *" hint="Enter a valid 6-character SenderID from this list." flex>
+            <Dropdown
+              c={c}
+              placeholder={loadingSenders ? 'Loading…' : 'Pick sender'}
+              value={sender?.senderId || ''}
+              open={showSender}
+              onToggle={() => setShowSender((v) => !v)}
+              options={senders.map((s) => ({ id: s.senderId, label: s.senderId, sub: `PE: ${s.entityId}` }))}
+              selectedId={sender?.senderId}
+              onSelect={(opt) => { setSender(senders.find((x) => x.senderId === opt.id) || null); setShowSender(false); }}
+            />
+          </Field>
+        </Row>
+
+        <Row>
+          <Field c={c} label="Language" hint="Select preferred language." flex>
+            <Dropdown
+              c={c}
+              placeholder="Pick"
+              value={langLabel}
+              open={showLanguage}
+              onToggle={() => setShowLanguage((v) => !v)}
+              options={LANGUAGES}
+              selectedId={language}
+              onSelect={(opt) => { setLanguage(opt.id); setShowLanguage(false); }}
+            />
+          </Field>
+          <Field c={c} label="DLT TemplateId *" hint="Enter the DLT-approved template ID" flex>
+            <TextInput
+              value={dltId}
+              onChangeText={setDltId}
+              placeholder="1234567890"
+              placeholderTextColor={c.textMuted}
+              keyboardType="number-pad"
+              style={[inputStyle(c), { fontFamily: 'monospace' }]}
+            />
+          </Field>
+        </Row>
+
+        {/* Select Template (full-width dark button) */}
+        <TouchableOpacity
+          onPress={() => setShowTemplate((v) => !v)}
+          activeOpacity={0.85}
+          style={{
+            backgroundColor: c.text,
+            borderRadius: 10,
+            paddingVertical: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            marginBottom: 6,
+          }}
+        >
+          <Ionicons name="document-text-outline" size={14} color={c.bg} />
+          <Text style={{ color: c.bg, fontSize: 13, fontWeight: '700' }}>
+            {template?.name ? `Template: ${template.name}` : 'Select Template'}
+          </Text>
+          <Ionicons name={showTemplate ? 'chevron-up' : 'chevron-down'} size={14} color={c.bg} />
+        </TouchableOpacity>
+        {showTemplate ? (
+          <View
+            style={{
+              backgroundColor: c.bgCard,
+              borderWidth: 1,
+              borderColor: c.border,
+              borderRadius: 10,
+              maxHeight: 220,
+              overflow: 'hidden',
+              marginBottom: 8,
+            }}
+          >
+            <ScrollView nestedScrollEnabled>
+              {templates.length === 0 ? (
+                <Text style={{ color: c.textMuted, padding: 14, fontSize: 12 }}>
+                  No templates for this sender.
+                </Text>
+              ) : (
+                templates.map((t) => (
+                  <TouchableOpacity
+                    key={t.id || t.name}
+                    onPress={() => {
+                      setTemplate(t);
+                      setMessageText(t.body || '');
+                      if (t.dltTemplateId) setDltId(t.dltTemplateId);
+                      setShowTemplate(false);
+                    }}
+                    style={{
+                      padding: 12,
+                      borderBottomWidth: 1,
+                      borderBottomColor: c.border,
+                      gap: 4,
+                    }}
+                  >
+                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{t.name}</Text>
+                    <Text style={{ color: c.textMuted, fontSize: 11 }} numberOfLines={1}>{t.body}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        ) : null}
+        <Text style={{ color: c.textMuted, fontSize: 11, marginBottom: 14 }}>Select a predefined message template.</Text>
+
+        <Field c={c} label={`Message Text   ${stats.length}/${stats.maxLength}  ·  Segments: ${stats.segments}  ·  Chars Left: ${stats.charsLeft}`}
+          hint="This is your SMS content preview. The text is auto-filled from the template.">
+          <TextInput
+            value={messageText}
+            onChangeText={setMessageText}
+            placeholder="Auto-filled from selected template…"
+            placeholderTextColor={c.textMuted}
+            multiline
+            style={[
+              inputStyle(c),
+              { minHeight: 110, textAlignVertical: 'top', paddingTop: 12 },
+            ]}
+          />
+        </Field>
+
+        <Row>
+          <Field c={c} label="Campaign Type *" flex>
+            <Dropdown
+              c={c}
+              placeholder="Pick"
+              value={campaignLabel}
+              open={showCampaignType}
+              onToggle={() => setShowCampaignType((v) => !v)}
+              options={CAMPAIGN_TYPES}
+              selectedId={campaignType}
+              onSelect={(opt) => { setCampaignType(opt.id); setShowCampaignType(false); }}
+            />
+          </Field>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>
+              Total Counts: {numberCount}
+            </Text>
+            <GradientButton
+              title="Upload Files"
+              icon="cloud-upload-outline"
+              variant="info"
+              size="sm"
+              onPress={() => Alert.alert('Upload Files', 'CSV / Excel upload coming soon.')}
+            />
+          </View>
+        </Row>
+
+        <Row>
+          <Field c={c} label="Group" hint="Select contact group for messaging." flex>
+            <Dropdown
+              c={c}
+              placeholder="Select Group"
+              value={group?.name || ''}
+              open={showGroup}
+              onToggle={() => setShowGroup((v) => !v)}
+              options={[]}
+              selectedId={group?.id}
+              onSelect={(opt) => { setGroup(opt); setShowGroup(false); }}
+            />
+          </Field>
+          <Field c={c} label="Group Range" hint="Range within the group" flex>
+            <View className="flex-row" style={{ gap: 6 }}>
+              <TextInput
+                value={groupFrom}
+                onChangeText={setGroupFrom}
+                placeholder="From"
+                placeholderTextColor={c.textMuted}
+                keyboardType="number-pad"
+                style={[inputStyle(c), { flex: 1 }]}
+              />
+              <Text style={{ color: c.textMuted, alignSelf: 'center' }}>to</Text>
+              <TextInput
+                value={groupTo}
+                onChangeText={setGroupTo}
+                placeholder="To"
+                placeholderTextColor={c.textMuted}
+                keyboardType="number-pad"
+                style={[inputStyle(c), { flex: 1 }]}
+              />
+            </View>
+          </Field>
+        </Row>
+
+        <Field c={c} label={`Numbers (Max: 5,000 numbers only)  ·  ${numberCount} entered`}
+          hint="Enter multiple numbers separated by commas.">
+          <TextInput
+            value={numbers}
+            onChangeText={setNumbers}
+            placeholder="Enter up to 5,000 comma-separated mobile numbers."
+            placeholderTextColor={c.textMuted}
+            multiline
+            style={[
+              inputStyle(c),
+              { minHeight: 90, textAlignVertical: 'top', paddingTop: 12 },
+            ]}
+          />
+        </Field>
+
+        {/* Contact & File Upload */}
+        <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', marginTop: 4, marginBottom: 8 }}>
+          Contact & File Upload
+        </Text>
+        <View
+          className="flex-row"
+          style={{
+            backgroundColor: c.bgCard,
+            borderWidth: 1,
+            borderColor: c.border,
+            borderRadius: 10,
+            padding: 8,
+            gap: 6,
+            marginBottom: 14,
+          }}
+        >
+          <Pill c={c} label="Total" value={numberCount} />
+          <Pill c={c} label="Duplicates" value={0} />
+          <Pill c={c} label="BlackList" value={0} />
+        </View>
+
+        <ToggleRow c={c} label="Remove Duplicates" value={removeDup} onChange={setRemoveDup} />
+        <ToggleRow c={c} label="Flash Sms"        value={flashSms}  onChange={setFlashSms} />
+        <ToggleRow c={c} label="Tiny Campaign"    value={tinyCampaign} onChange={setTinyCampaign} />
+        <ToggleRow c={c} label="Schedule Now"     value={schedule}  onChange={setSchedule} />
+
+        <View style={{ marginTop: 16 }}>
+          <GradientButton
+            title="Send Now"
+            icon="send"
+            loading={sending}
+            onPress={send}
+          />
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const inputStyle = (c) => ({
+  backgroundColor: c.bgCard,
+  borderWidth: 1,
+  borderColor: c.border,
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+  fontSize: 14,
+  color: c.text,
+  ...Platform.select({ web: { outlineStyle: 'none' } }),
+});
+
+const Field = ({ c, label, hint, icon, children, flex }) => (
+  <View style={{ marginBottom: 14, flex: flex ? 1 : undefined }}>
+    <View className="flex-row items-center mb-1.5" style={{ gap: 6 }}>
+      {icon ? <Ionicons name={icon} size={12} color={c.textMuted} /> : null}
+      <Text style={{ color: c.text, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+    </View>
+    {children}
+    {hint ? <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 6 }}>{hint}</Text> : null}
+  </View>
+);
+
+const Row = ({ children }) => (
+  <View className="flex-row" style={{ gap: 10 }}>{children}</View>
+);
+
+const Dropdown = ({ c, placeholder, value, open, onToggle, options, selectedId, onSelect }) => (
+  <>
+    <TouchableOpacity
+      onPress={onToggle}
+      activeOpacity={0.85}
+      style={{
+        ...inputStyle(c),
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+      }}
+    >
+      <Text numberOfLines={1} style={{ color: value ? c.text : c.textMuted, fontSize: 14, flex: 1 }}>
+        {value || placeholder}
+      </Text>
+      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
+    </TouchableOpacity>
+    {open ? (
+      <View
+        style={{
+          marginTop: 6,
+          backgroundColor: c.bgCard,
+          borderWidth: 1,
+          borderColor: c.border,
+          borderRadius: 10,
+          maxHeight: 220,
+          overflow: 'hidden',
+        }}
+      >
+        <ScrollView nestedScrollEnabled>
+          {options.length === 0 ? (
+            <Text style={{ color: c.textMuted, padding: 14, fontSize: 12 }}>No options.</Text>
+          ) : (
+            options.map((o) => {
+              const active = o.id === selectedId;
+              return (
+                <TouchableOpacity
+                  key={o.id}
+                  onPress={() => onSelect(o)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: c.border,
+                    backgroundColor: active ? c.primarySoft : 'transparent',
+                    gap: 10,
+                  }}
+                >
+                  <Ionicons
+                    name={active ? 'radio-button-on' : 'radio-button-off'}
+                    size={14}
+                    color={active ? c.primary : c.textMuted}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{o.label}</Text>
+                    {o.sub ? (
+                      <Text style={{ color: c.textMuted, fontSize: 10, fontFamily: 'monospace', marginTop: 2 }} numberOfLines={1}>
+                        {o.sub}
+                      </Text>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+      </View>
+    ) : null}
+  </>
+);
+
+const ToggleRow = ({ c, label, value, onChange }) => (
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: c.rule,
+    }}
+  >
+    <Switch
+      value={value}
+      onValueChange={onChange}
+      trackColor={{ false: c.bgInput, true: c.primary }}
+      thumbColor="#FFFFFF"
+    />
+    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', marginLeft: 12 }}>{label}</Text>
+  </View>
+);
+
+const Pill = ({ c, label, value }) => (
+  <View
+    style={{
+      flex: 1,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      backgroundColor: c.bgInput,
+      borderRadius: 8,
+      alignItems: 'center',
+    }}
+  >
+    <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{value}</Text>
+    <Text style={{ color: c.textMuted, fontSize: 10, marginTop: 2 }}>{label}</Text>
+  </View>
+);
