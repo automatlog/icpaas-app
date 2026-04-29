@@ -4,28 +4,63 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useFeed } from '../theme';
 
-import DashboardScreen from '../screens/DashboardScreen';
-import ProductIconsScreen from '../screens/ProductIconsScreen';
-import ReportScreen from '../screens/ReportScreen';
-import AgentScreen from '../screens/AgentScreen';
-import InboxScreen from '../screens/InboxScreen';
-import ChatScreen from '../screens/ChatScreen';
-import TemplatesScreen from '../screens/TemplatesScreen';
-import ConfigScreen from '../screens/ConfigScreen';
-import SendMessageScreen from '../screens/SendMessageScreen';
-import WabaChannelScreen from '../screens/WabaChannelScreen';
-import MediaLibraryScreen from '../screens/MediaLibraryScreen';
-import CampaignStep1Screen from '../screens/CampaignStep1Screen';
-import CampaignStep2Screen from '../screens/CampaignStep2Screen';
-import CampaignStep3Screen from '../screens/CampaignStep3Screen';
-import ChannelScreen from '../screens/ChannelScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
-import YouScreen from '../screens/YouScreen';
-import ApiDocsScreen from '../screens/ApiDocsScreen';
-import CampaignsListScreen from '../screens/CampaignsListScreen';
-import CampaignDetailScreen from '../screens/CampaignDetailScreen';
-import ContactsScreen from '../screens/ContactsScreen';
-import CreateTemplateScreen from '../screens/CreateTemplateScreen';
+// Shared screens (channel-agnostic)
+import DashboardScreen from '../screens/shared/DashboardScreen';
+import ProductIconsScreen from '../screens/shared/ProductIconsScreen';
+import ReportScreen from '../screens/shared/ReportScreen';
+import AgentScreen from '../screens/shared/AgentScreen';
+import ConfigScreen from '../screens/shared/ConfigScreen';
+import SendMessageScreen from '../screens/shared/SendMessageScreen';
+import MediaLibraryScreen from '../screens/shared/MediaLibraryScreen';
+import ChannelScreen from '../screens/shared/ChannelScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import YouScreen from '../screens/shared/YouScreen';
+import ApiDocsScreen from '../screens/shared/ApiDocsScreen';
+import ContactsScreen from '../screens/shared/ContactsScreen';
+
+// WhatsApp screens
+import WhatsAppInboxScreen from '../screens/whatsapp/InboxScreen';
+import WhatsAppChatScreen from '../screens/whatsapp/ChatScreen';
+import WhatsAppTemplatesScreen from '../screens/whatsapp/TemplatesScreen';
+import WhatsAppCreateTemplateScreen from '../screens/whatsapp/CreateTemplateScreen';
+import WabaChannelScreen from '../screens/whatsapp/WabaChannelScreen';
+import WhatsAppCampaignsList from '../screens/whatsapp/campaigns/CampaignsListScreen';
+import WhatsAppCampaignDetail from '../screens/whatsapp/campaigns/CampaignDetailScreen';
+import WhatsAppCampaignStep1 from '../screens/whatsapp/campaigns/CampaignStep1Screen';
+import WhatsAppCampaignStep2 from '../screens/whatsapp/campaigns/CampaignStep2Screen';
+import WhatsAppCampaignStep3 from '../screens/whatsapp/campaigns/CampaignStep3Screen';
+
+// RCS screens
+import RcsInboxScreen from '../screens/rcs/InboxScreen';
+import RcsChatScreen from '../screens/rcs/ChatScreen';
+import RcsBotIdScreen from '../screens/rcs/BotIdScreen';
+import RcsTemplatesScreen from '../screens/rcs/TemplatesScreen';
+import RcsCreateTemplateScreen from '../screens/rcs/CreateTemplateScreen';
+import RcsCampaignsList from '../screens/rcs/campaigns/CampaignsListScreen';
+import RcsCampaignDetail from '../screens/rcs/campaigns/CampaignDetailScreen';
+import RcsCampaignStep1 from '../screens/rcs/campaigns/CampaignStep1Screen';
+import RcsCampaignStep2 from '../screens/rcs/campaigns/CampaignStep2Screen';
+import RcsCampaignStep3 from '../screens/rcs/campaigns/CampaignStep3Screen';
+
+// SMS screens
+import SmsInboxScreen from '../screens/sms/InboxScreen';
+import SmsChatScreen from '../screens/sms/ChatScreen';
+import SmsSenderIdScreen from '../screens/sms/SenderIdScreen';
+import SmsTemplatesScreen from '../screens/sms/TemplatesScreen';
+import SmsCreateTemplateScreen from '../screens/sms/CreateTemplateScreen';
+import SmsCampaignsList from '../screens/sms/campaigns/CampaignsListScreen';
+import SmsCampaignDetail from '../screens/sms/campaigns/CampaignDetailScreen';
+import SmsCampaignStep1 from '../screens/sms/campaigns/CampaignStep1Screen';
+import SmsCampaignStep2 from '../screens/sms/campaigns/CampaignStep2Screen';
+import SmsCampaignStep3 from '../screens/sms/campaigns/CampaignStep3Screen';
+
+// Voice screens
+import VoiceCallerIdScreen from '../screens/voice/CallerIdScreen';
+import VoiceCampaignsList from '../screens/voice/campaigns/CampaignsListScreen';
+import VoiceCampaignDetail from '../screens/voice/campaigns/CampaignDetailScreen';
+import VoiceCampaignStep1 from '../screens/voice/campaigns/CampaignStep1Screen';
+import VoiceCampaignStep2 from '../screens/voice/campaigns/CampaignStep2Screen';
+import VoiceCampaignStep3 from '../screens/voice/campaigns/CampaignStep3Screen';
 
 const Stack = createNativeStackNavigator();
 
@@ -61,28 +96,74 @@ export default function AppNavigator() {
   return (
     <NavigationContainer theme={theme}>
       <Stack.Navigator initialRouteName="Dashboard" screenOptions={screenOptions}>
+        {/* Shared */}
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="ProductIcons" component={ProductIconsScreen} />
         <Stack.Screen name="Report" component={ReportScreen} />
         <Stack.Screen name="Agent" component={AgentScreen} />
-        <Stack.Screen name="Templates" component={TemplatesScreen} />
-        <Stack.Screen name="Inbox" component={InboxScreen} />
-        <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="Config" component={ConfigScreen} />
         <Stack.Screen name="Send" component={SendMessageScreen} />
-        <Stack.Screen name="WabaChannels" component={WabaChannelScreen} />
         <Stack.Screen name="MediaLibrary" component={MediaLibraryScreen} />
-        <Stack.Screen name="CampaignStep1" component={CampaignStep1Screen} />
-        <Stack.Screen name="CampaignStep2" component={CampaignStep2Screen} />
-        <Stack.Screen name="CampaignStep3" component={CampaignStep3Screen} />
         <Stack.Screen name="Channel" component={ChannelScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="You" component={YouScreen} />
         <Stack.Screen name="ApiDocs" component={ApiDocsScreen} />
-        <Stack.Screen name="CampaignsList" component={CampaignsListScreen} />
-        <Stack.Screen name="CampaignDetail" component={CampaignDetailScreen} />
         <Stack.Screen name="Contacts" component={ContactsScreen} />
-        <Stack.Screen name="CreateTemplate" component={CreateTemplateScreen} />
+
+        {/* WhatsApp */}
+        <Stack.Screen name="WhatsAppInbox" component={WhatsAppInboxScreen} />
+        <Stack.Screen name="WhatsAppChat" component={WhatsAppChatScreen} />
+        <Stack.Screen name="WhatsAppTemplates" component={WhatsAppTemplatesScreen} />
+        <Stack.Screen name="WhatsAppCreateTemplate" component={WhatsAppCreateTemplateScreen} />
+        <Stack.Screen name="WabaChannels" component={WabaChannelScreen} />
+        <Stack.Screen name="WhatsAppCampaignsList" component={WhatsAppCampaignsList} />
+        <Stack.Screen name="WhatsAppCampaignDetail" component={WhatsAppCampaignDetail} />
+        <Stack.Screen name="WhatsAppCampaignStep1" component={WhatsAppCampaignStep1} />
+        <Stack.Screen name="WhatsAppCampaignStep2" component={WhatsAppCampaignStep2} />
+        <Stack.Screen name="WhatsAppCampaignStep3" component={WhatsAppCampaignStep3} />
+
+        {/* RCS */}
+        <Stack.Screen name="RcsInbox" component={RcsInboxScreen} />
+        <Stack.Screen name="RcsChat" component={RcsChatScreen} />
+        <Stack.Screen name="RcsBotIds" component={RcsBotIdScreen} />
+        <Stack.Screen name="RcsTemplates" component={RcsTemplatesScreen} />
+        <Stack.Screen name="RcsCreateTemplate" component={RcsCreateTemplateScreen} />
+        <Stack.Screen name="RcsCampaignsList" component={RcsCampaignsList} />
+        <Stack.Screen name="RcsCampaignDetail" component={RcsCampaignDetail} />
+        <Stack.Screen name="RcsCampaignStep1" component={RcsCampaignStep1} />
+        <Stack.Screen name="RcsCampaignStep2" component={RcsCampaignStep2} />
+        <Stack.Screen name="RcsCampaignStep3" component={RcsCampaignStep3} />
+
+        {/* SMS */}
+        <Stack.Screen name="SmsInbox" component={SmsInboxScreen} />
+        <Stack.Screen name="SmsChat" component={SmsChatScreen} />
+        <Stack.Screen name="SmsSenderIds" component={SmsSenderIdScreen} />
+        <Stack.Screen name="SmsTemplates" component={SmsTemplatesScreen} />
+        <Stack.Screen name="SmsCreateTemplate" component={SmsCreateTemplateScreen} />
+        <Stack.Screen name="SmsCampaignsList" component={SmsCampaignsList} />
+        <Stack.Screen name="SmsCampaignDetail" component={SmsCampaignDetail} />
+        <Stack.Screen name="SmsCampaignStep1" component={SmsCampaignStep1} />
+        <Stack.Screen name="SmsCampaignStep2" component={SmsCampaignStep2} />
+        <Stack.Screen name="SmsCampaignStep3" component={SmsCampaignStep3} />
+
+        {/* Voice */}
+        <Stack.Screen name="VoiceCallerIds" component={VoiceCallerIdScreen} />
+        <Stack.Screen name="VoiceCampaignsList" component={VoiceCampaignsList} />
+        <Stack.Screen name="VoiceCampaignDetail" component={VoiceCampaignDetail} />
+        <Stack.Screen name="VoiceCampaignStep1" component={VoiceCampaignStep1} />
+        <Stack.Screen name="VoiceCampaignStep2" component={VoiceCampaignStep2} />
+        <Stack.Screen name="VoiceCampaignStep3" component={VoiceCampaignStep3} />
+
+        {/* Aliases for legacy route names so existing navigate('Inbox' / 'Chat' / 'Templates' / 'CreateTemplate' / 'CampaignStep1' / etc) keep working. Default to WhatsApp where ambiguous. */}
+        <Stack.Screen name="Inbox" component={WhatsAppInboxScreen} />
+        <Stack.Screen name="Chat" component={WhatsAppChatScreen} />
+        <Stack.Screen name="Templates" component={WhatsAppTemplatesScreen} />
+        <Stack.Screen name="CreateTemplate" component={WhatsAppCreateTemplateScreen} />
+        <Stack.Screen name="CampaignsList" component={WhatsAppCampaignsList} />
+        <Stack.Screen name="CampaignDetail" component={WhatsAppCampaignDetail} />
+        <Stack.Screen name="CampaignStep1" component={WhatsAppCampaignStep1} />
+        <Stack.Screen name="CampaignStep2" component={WhatsAppCampaignStep2} />
+        <Stack.Screen name="CampaignStep3" component={WhatsAppCampaignStep3} />
       </Stack.Navigator>
     </NavigationContainer>
   );
