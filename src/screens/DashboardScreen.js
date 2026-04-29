@@ -291,7 +291,7 @@ export function BottomTabBar({ c, navigation, active = 'home' }) {
       {/* Centered raised Campaign FAB */}
       <View className="items-center justify-center" style={{ flex: 1 }}>
         <TouchableOpacity
-          onPress={() => navigation.navigate('CampaignStep1')}
+          onPress={() => navigation.navigate('CampaignsList')}
           activeOpacity={0.88}
           className="w-14 h-14 rounded-full items-center justify-center"
           style={{

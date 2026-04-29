@@ -121,6 +121,15 @@ export default function TemplatesScreen({ navigation }) {
         <TouchableOpacity onPress={fetchTemplates} activeOpacity={0.7} className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: c.bgInput }}>
           <Ionicons name="refresh" size={16} color={c.text} />
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('CreateTemplate')}
+          activeOpacity={0.85}
+          className="rounded-[10px] flex-row items-center px-3 py-2 ml-2"
+          style={{ backgroundColor: c.primary, gap: 4 }}
+        >
+          <Ionicons name="add" size={14} color="#FFFFFF" />
+          <Text className="text-[12px] font-bold text-white">New</Text>
+        </TouchableOpacity>
       </View>
 
       <View className="flex-row items-center mb-3" style={{ gap: 6 }}>

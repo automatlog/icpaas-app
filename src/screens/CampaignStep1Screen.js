@@ -1,15 +1,16 @@
-// src/screens/CampaignStep1Screen.js — Make Campaign · Step 1 (matches Camapign screen1.png)
+// src/screens/CampaignStep1Screen.js — Campaign Launch · Step 1 (matches Camapign screen1.png)
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Switch,
   Platform, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Contacts from 'expo-contacts';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import { useSelector } from 'react-redux';
 import { useBrand } from '../theme';
 import { WhatsAppAPI } from '../services/api';
+import { selectGroups } from '../store/slices/groupsSlice';
+import AddRecipientsModal from './AddRecipientsModal';
+import ScheduleModal from './ScheduleModal';
 
 const fmtNow = () => {
   const d = new Date();
@@ -23,16 +24,20 @@ const countNumbers = (raw) =>
 export default function CampaignStep1Screen({ navigation, route }) {
   const c = useBrand();
   const draft = route?.params?.draft || {};
+  const groups = useSelector(selectGroups);
 
   const [name, setName] = useState(draft.name || fmtNow());
   const [channelId, setChannelId] = useState(draft.channelId || '');
   const [channels, setChannels] = useState([]);
   const [loadingCh, setLoadingCh] = useState(false);
   const [showChannels, setShowChannels] = useState(false);
+  const [showRecipients, setShowRecipients] = useState(false);
   const [numbers, setNumbers] = useState(draft.numbers || '');
   const [removeDup, setRemoveDup] = useState(draft.removeDup ?? true);
   const [removeBlack, setRemoveBlack] = useState(draft.removeBlack ?? true);
   const [scheduleNow, setScheduleNow] = useState(draft.scheduleNow ?? false);
+  const [schedTime, setSchedTime]     = useState(draft.schedTime || '');
+  const [showSchedule, setShowSchedule] = useState(false);
 
   useEffect(() => {
     setLoadingCh(true);
@@ -47,46 +52,8 @@ export default function CampaignStep1Screen({ navigation, route }) {
     if (!channelId) { Alert.alert('Required', 'Pick a WABA channel.'); return; }
     if (countNumbers(numbers) === 0) { Alert.alert('Required', 'Add recipient numbers.'); return; }
     navigation.navigate('CampaignStep2', {
-      draft: { ...draft, name: name.trim(), channelId, channels, numbers, removeDup, removeBlack, scheduleNow },
+      draft: { ...draft, name: name.trim(), channelId, channels, numbers, removeDup, removeBlack, scheduleNow, schedTime },
     });
-  };
-
-  const pickContacts = async () => {
-    try {
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status !== 'granted') { Alert.alert('Permission', 'Allow contacts access.'); return; }
-      const { data } = await Contacts.getContactsAsync({ fields: [Contacts.Fields.PhoneNumbers] });
-      const nums = data
-        .flatMap((p) => (p.phoneNumbers || []).map((n) => (n.number || '').replace(/[^\d+]/g, '')))
-        .filter(Boolean);
-      const merged = [...new Set([...countNumbers(numbers) ? numbers.split(/[\n,;\s]+/).map((s) => s.trim()).filter(Boolean) : [], ...nums])];
-      setNumbers(merged.join(', '));
-      Alert.alert('Imported', `Added ${nums.length} number${nums.length === 1 ? '' : 's'}.`);
-    } catch (e) {
-      Alert.alert('Contacts error', e?.message || 'Unable to read contacts.');
-    }
-  };
-
-  const uploadCsv = async () => {
-    try {
-      const res = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/plain', 'application/csv', '*/*'],
-        copyToCacheDirectory: true,
-      });
-      if (res.canceled) return;
-      const f = res.assets?.[0];
-      if (!f) return;
-      const body = await FileSystem.readAsStringAsync(f.uri, { encoding: 'utf8' });
-      const nums = body
-        .split(/[\r\n,;]+/)
-        .map((s) => s.trim().replace(/^["']|["']$/g, ''))
-        .filter((s) => /^\+?\d{6,15}$/.test(s));
-      const merged = [...new Set([...numbers.split(/[\n,;\s]+/).map((s) => s.trim()).filter(Boolean), ...nums])];
-      setNumbers(merged.join(', '));
-      Alert.alert('Imported', `Added ${nums.length} number${nums.length === 1 ? '' : 's'}.`);
-    } catch (e) {
-      Alert.alert('Upload failed', e?.message || 'Unable to parse file.');
-    }
   };
 
   const channelLabel = channels.find((x) => x.phoneNumberId === channelId)
@@ -95,7 +62,7 @@ export default function CampaignStep1Screen({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <Header c={c} navigation={navigation} title="Make Campaign" />
+      <Header c={c} navigation={navigation} title="Campaign Launch" />
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         <Stepper c={c} step={1} />
 
@@ -197,18 +164,52 @@ export default function CampaignStep1Screen({ navigation, route }) {
             </Text>
 
             <View className="flex-row mt-2.5" style={{ gap: 8 }}>
-              <PickerBtn c={c} icon="people" label="Group" onPress={pickContacts} />
-              <PickerBtn c={c} icon="cloud-upload-outline" label="Upload File" onPress={uploadCsv} />
+              <PickerBtn c={c} icon="people" label="Group" onPress={() => setShowRecipients(true)} />
             </View>
           </Field>
 
           <ToggleRow c={c} label="Remove Duplicates" value={removeDup} onValueChange={setRemoveDup} />
           <ToggleRow c={c} label="Remove BlackList" value={removeBlack} onValueChange={setRemoveBlack} />
-          <ToggleRow c={c} label="Schedule Now" value={scheduleNow} onValueChange={setScheduleNow} />
+          <ScheduleRow
+            c={c}
+            value={scheduleNow}
+            schedTime={schedTime}
+            onValueChange={(on) => {
+              setScheduleNow(on);
+              if (on) setShowSchedule(true);
+              else setSchedTime('');
+            }}
+            onEdit={() => setShowSchedule(true)}
+          />
         </Card>
 
         <PrimaryButton c={c} icon="hand-right" label="Next" onPress={next} />
       </ScrollView>
+
+      <AddRecipientsModal
+        visible={showRecipients}
+        onClose={() => setShowRecipients(false)}
+        onAdd={(nums) => {
+          const existing = numbers.split(/[\n,;\s]+/).map((s) => s.trim()).filter(Boolean);
+          const merged = [...new Set([...existing, ...nums])];
+          setNumbers(merged.join(', '));
+        }}
+      />
+
+      <ScheduleModal
+        visible={showSchedule}
+        initialValue={schedTime}
+        onClose={() => {
+          setShowSchedule(false);
+          // If user closed without confirming and nothing was scheduled before, flip the toggle off
+          if (!schedTime) setScheduleNow(false);
+        }}
+        onConfirm={(apiStr) => {
+          setSchedTime(apiStr);
+          setScheduleNow(true);
+          setShowSchedule(false);
+        }}
+      />
     </View>
   );
 }
@@ -339,6 +340,56 @@ function ToggleRow({ c, label, value, onValueChange }) {
         style={Platform.OS === 'ios' ? { transform: [{ scale: 0.9 }] } : {}}
       />
       <Text className="text-[13px] font-semibold" style={{ color: c.text }}>{label}</Text>
+    </View>
+  );
+}
+
+// Schedule row: toggle + chosen-time pill that taps to re-edit.
+function ScheduleRow({ c, value, schedTime, onValueChange, onEdit }) {
+  // Format yyyy-MM-dd HH:mm:ss → "27 Apr 2026 · 10:30 AM"
+  const display = (() => {
+    if (!schedTime) return '';
+    try {
+      const d = new Date(schedTime.replace(' ', 'T'));
+      if (Number.isNaN(d.getTime())) return schedTime;
+      const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `${date} · ${time}`;
+    } catch { return schedTime; }
+  })();
+
+  return (
+    <View className="py-2" style={{ gap: 8 }}>
+      <View className="flex-row items-center" style={{ gap: 10 }}>
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{ false: c.border, true: c.primary }}
+          thumbColor={'#FFFFFF'}
+          style={Platform.OS === 'ios' ? { transform: [{ scale: 0.9 }] } : {}}
+        />
+        <Text className="text-[13px] font-semibold flex-1" style={{ color: c.text }}>Schedule Now</Text>
+        {value ? (
+          <TouchableOpacity onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text className="text-[11px] font-bold" style={{ color: c.primary }}>{schedTime ? 'Edit' : 'Pick time'}</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      {value && schedTime ? (
+        <TouchableOpacity
+          onPress={onEdit}
+          activeOpacity={0.85}
+          className="flex-row items-center rounded-[10px] px-3 py-2.5"
+          style={{ backgroundColor: c.primarySoft, gap: 8 }}
+        >
+          <Ionicons name="calendar" size={13} color={c.primaryDeep} />
+          <Text className="text-[12px] font-bold" style={{ color: c.primaryDeep }} numberOfLines={1}>
+            Sends on {display}
+          </Text>
+          <View className="flex-1" />
+          <Ionicons name="pencil" size={12} color={c.primaryDeep} />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

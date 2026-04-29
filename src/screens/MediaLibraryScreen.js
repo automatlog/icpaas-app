@@ -9,11 +9,14 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../theme';
-import { VoiceAPI } from '../services/api';
+import { VoiceAPI, WhatsAppAPI, ChannelsAPI } from '../services/api';
 import { addMedia, updateMedia, removeMedia } from '../store/slices/mediaSlice';
 import { pushNotification } from '../store/slices/notificationsSlice';
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../services/toast';
+import {
+  validateForWhatsApp, MEDIA_KINDS, STICKER_ANIMATED_MAX, formatBytes, ALL_MIMES,
+} from '../services/waMediaSpec';
 
 const RETENTION_DAYS = 30;
 
@@ -84,7 +87,7 @@ export default function MediaLibraryScreen({ navigation }) {
   const upload = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'application/pdf', 'audio/*'],
+        type: ALL_MIMES,
         multiple: false,
         copyToCacheDirectory: true,
       });
@@ -92,30 +95,60 @@ export default function MediaLibraryScreen({ navigation }) {
       const file = res.assets?.[0];
       if (!file) return;
 
+      // 1. Validate against Meta WhatsApp Cloud API limits
+      const v = validateForWhatsApp({
+        mimeType: file.mimeType,
+        name: file.name,
+        size: file.size,
+      });
+      if (v.reason) {
+        toast.error('Invalid file', v.reason);
+        return;
+      }
+      const detectedKind = v.kind;
+      const mime = v.mime;
+
+      // 2. Pick a WhatsApp channel (use the first available)
+      let channelId;
+      let wabaBusinessId;
+      try {
+        const ch = await ChannelsAPI.getDefault();
+        channelId = ch?.phoneNumberId;
+        wabaBusinessId = ch?.wabaBusinessId;
+      } catch (e) {
+        toast.error('No WA channel', 'Save a gsauth token in Config first.');
+        return;
+      }
+
       setUploading(true);
-      const uploadRes = await VoiceAPI.uploadMedia({
-        uri: file.uri,
-        name: file.name || 'upload.bin',
-        type: file.mimeType || 'application/octet-stream',
+
+      // 3. Upload via WhatsApp Cloud API
+      const uploadRes = await WhatsAppAPI.uploadMedia({
+        phoneNumberId: channelId,
+        file: { uri: file.uri, name: file.name || 'upload', type: mime },
+        type: mime,
       });
 
-      const fileId = uploadRes?.fileId || uploadRes?.messageId;
-      if (!fileId) throw { message: uploadRes?.messageStatus || 'Upload failed' };
+      const fileId = uploadRes?.id || uploadRes?.fileId || uploadRes?.messageId;
+      if (!fileId) throw { message: uploadRes?.error?.message || 'Upload failed (no id returned)' };
 
       dispatch(addMedia({
-        fileId,
-        name: file.name || 'upload.bin',
+        fileId: String(fileId),
+        name: file.name || 'upload',
         sizeBytes: file.size || 0,
-        kind: guessKind(file.name || ''),
+        kind: detectedKind,
+        mime,
         url: uploadRes?.fileUrl || file.uri,
-        status: uploadRes?.messageStatus || 'Pending',
+        status: 'Approved',
+        channelId,
+        wabaBusinessId,
         uploadedAt: new Date().toISOString(),
       }));
       toast.success('Media uploaded', `${file.name || 'file'} (ID ${fileId})`);
       dispatch(pushNotification({
         kind: 'template-created',
         title: 'Media uploaded',
-        body: `${file.name || 'upload.bin'} (ID ${fileId}) is ${uploadRes?.messageStatus || 'Pending'}.`,
+        body: `${file.name || 'upload'} (ID ${fileId}) is ready (${MEDIA_KINDS[detectedKind].label}, ${formatBytes(file.size || 0)}).`,
       }));
     } catch (e) {
       toast.error('Upload failed', e?.message || 'Unknown error');
@@ -203,15 +236,31 @@ export default function MediaLibraryScreen({ navigation }) {
 
         {/* Top info banner */}
         <View
-          className="flex-row rounded-[10px] p-3 mb-3"
+          className="flex-row rounded-[10px] p-3 mb-2"
           style={{ backgroundColor: '#DBEAFE', gap: 10, borderWidth: 1, borderColor: '#BFDBFE' }}
         >
           <Ionicons name="information-circle" size={16} color="#1D4ED8" style={{ marginTop: 1 }} />
           <Text className="flex-1 text-[12px] leading-[18px]" style={{ color: '#1E40AF' }}>
             As per Meta (WhatsApp) media retention policies, only media files from the last{' '}
-            <Text className="font-bold">30 days</Text> are available in the Media Library. Older media is
-            automatically deleted. If required, please re-upload the media.
+            <Text className="font-bold">30 days</Text> are available. Older media is automatically deleted —
+            re-upload if needed.
           </Text>
+        </View>
+
+        {/* WhatsApp media upload limits */}
+        <View
+          className="rounded-[10px] p-3 mb-3"
+          style={{ backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border }}
+        >
+          <View className="flex-row items-center mb-2" style={{ gap: 6 }}>
+            <Ionicons name="shield-checkmark" size={13} color={c.primary} />
+            <Text className="text-[12px] font-bold" style={{ color: c.text }}>WhatsApp upload limits</Text>
+          </View>
+          <LimitRow c={c} icon="image"            label="Image"    formats="JPG, JPEG, PNG"           max="5 MB" />
+          <LimitRow c={c} icon="videocam"         label="Video"    formats="MP4, 3GPP"                max="16 MB" />
+          <LimitRow c={c} icon="musical-notes"    label="Audio"    formats="AAC, MP3, AMR, OGG, OPUS" max="16 MB" />
+          <LimitRow c={c} icon="document-text"    label="Document" formats="PDF, DOC(X), PPT(X), XLS(X), TXT" max="100 MB" />
+          <LimitRow c={c} icon="happy"            label="Sticker"  formats="WEBP (static / animated)" max="100 KB / 500 KB" last />
         </View>
 
         {/* Filter dropdown */}
@@ -286,6 +335,24 @@ export default function MediaLibraryScreen({ navigation }) {
       </ScrollView>
 
       <BottomTabBar c={c} navigation={navigation} active="you" />
+    </View>
+  );
+}
+
+function LimitRow({ c, icon, label, formats, max, last }) {
+  return (
+    <View
+      className="flex-row items-center py-1.5"
+      style={{ borderBottomWidth: last ? 0 : 1, borderBottomColor: c.rule, gap: 10 }}
+    >
+      <View className="w-7 h-7 rounded-full items-center justify-center" style={{ backgroundColor: c.bgInput }}>
+        <Ionicons name={icon} size={12} color={c.primary} />
+      </View>
+      <View className="flex-1">
+        <Text className="text-[11px] font-bold" style={{ color: c.text }}>{label}</Text>
+        <Text className="text-[10px]" style={{ color: c.textMuted }} numberOfLines={1}>{formats}</Text>
+      </View>
+      <Text className="text-[11px] font-mono font-bold" style={{ color: c.primary }}>{max}</Text>
     </View>
   );
 }

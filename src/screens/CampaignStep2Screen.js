@@ -1,5 +1,5 @@
-// src/screens/CampaignStep2Screen.js — Make Campaign · Step 2 (matches Camapign screen2.png)
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+// src/screens/CampaignStep2Screen.js — Campaign Launch · Step 2 (matches Camapign screen2.png)
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity, Platform, ActivityIndicator,
 } from 'react-native';
@@ -148,7 +148,7 @@ export default function CampaignStep2Screen({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <Header c={c} navigation={navigation} title="Make Campaign" />
+      <Header c={c} navigation={navigation} title="Campaign Launch" />
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         <Stepper c={c} step={2} />
 
@@ -195,6 +195,7 @@ export default function CampaignStep2Screen({ navigation, route }) {
             onToggle={() => setOpenDD(openDD === 'template' ? null : 'template')}
             options={filteredTemplates.map((t) => t.name || t.id)}
             onPick={onPickTemplate}
+            searchable
           />
 
           {/* Variable mapping */}
@@ -311,7 +312,19 @@ function Header({ c, navigation, title }) {
   );
 }
 
-function Dropdown({ c, icon, label, required, hint, value, placeholder, open, onToggle, options, onPick }) {
+function Dropdown({ c, icon, label, required, hint, value, placeholder, open, onToggle, options, onPick, searchable }) {
+  const [query, setQuery] = useState('');
+
+  // Reset query whenever the dropdown closes
+  useEffect(() => { if (!open) setQuery(''); }, [open]);
+
+  const filtered = useMemo(() => {
+    if (!searchable) return options;
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => String(o).toLowerCase().includes(q));
+  }, [options, query, searchable]);
+
   return (
     <View className="mb-3.5">
       <View className="flex-row items-center mb-1" style={{ gap: 6 }}>
@@ -332,23 +345,60 @@ function Dropdown({ c, icon, label, required, hint, value, placeholder, open, on
         </Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
       </TouchableOpacity>
-      {open && options.length > 0 ? (
+
+      {open && searchable ? (
+        <View
+          className="flex-row items-center mt-1.5 rounded-[10px] px-3"
+          style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bgInput, gap: 8 }}
+        >
+          <Ionicons name="search-outline" size={14} color={c.textMuted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={`Search ${label.toLowerCase()}…`}
+            placeholderTextColor={c.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            className="flex-1 text-[13px]"
+            style={[
+              { paddingVertical: Platform.OS === 'ios' ? 11 : 8, color: c.text },
+              Platform.select({ web: { outlineStyle: 'none' } }),
+            ]}
+          />
+          {query ? (
+            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={14} color={c.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
+      {open ? (
         <View
           className="rounded-[10px] mt-1.5 overflow-hidden"
-          style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bgCard }}
+          style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bgCard, maxHeight: 280 }}
         >
-          {options.map((opt, i) => (
-            <TouchableOpacity
-              key={String(opt) + i}
-              activeOpacity={0.8}
-              onPress={() => onPick(opt)}
-              className="px-3 py-3 flex-row items-center"
-              style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.rule }}
-            >
-              <Text className="flex-1 text-[13px]" style={{ color: c.text }}>{opt}</Text>
-              {value === opt ? <Ionicons name="checkmark" size={14} color={c.primary} /> : null}
-            </TouchableOpacity>
-          ))}
+          {filtered.length === 0 ? (
+            <View className="px-3 py-4 items-center">
+              <Text className="text-[12px] italic" style={{ color: c.textDim }}>
+                {searchable && query ? `No match for "${query}"` : 'No options'}
+              </Text>
+            </View>
+          ) : (
+            <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+              {filtered.map((opt, i) => (
+                <TouchableOpacity
+                  key={String(opt) + i}
+                  activeOpacity={0.8}
+                  onPress={() => onPick(opt)}
+                  className="px-3 py-3 flex-row items-center"
+                  style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.rule }}
+                >
+                  <Text className="flex-1 text-[13px]" style={{ color: c.text }} numberOfLines={1}>{opt}</Text>
+                  {value === opt ? <Ionicons name="checkmark" size={14} color={c.primary} /> : null}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
       ) : null}
     </View>

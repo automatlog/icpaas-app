@@ -348,6 +348,57 @@ export const WhatsAppAPI = {
     return api.post(`/${META_VERSION}/${wabaId}/message_templates`, template);
   },
 
+  // Build a Meta-compliant template body from the mobile composer fields.
+  // POST /v23.0/{wabaId}/message_templates
+  // Spec: https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates
+  buildCreatePayload: ({ name, language = 'en', category, headerText, headerExample, bodyText, bodyExamples = [], footerText, buttons = [] } = {}) => {
+    const components = [];
+
+    if (headerText && String(headerText).trim()) {
+      const hc = { type: 'HEADER', format: 'TEXT', text: String(headerText).trim() };
+      const hVarCount = (String(headerText).match(/\{\{\d+\}\}/g) || []).length;
+      if (hVarCount > 0 && headerExample) {
+        hc.example = { header_text: [String(headerExample)] };
+      }
+      components.push(hc);
+    }
+
+    if (bodyText && String(bodyText).trim()) {
+      const bc = { type: 'BODY', text: String(bodyText).trim() };
+      const bVarCount = (String(bodyText).match(/\{\{\d+\}\}/g) || []).length;
+      if (bVarCount > 0) {
+        const samples = (bodyExamples || []).slice(0, bVarCount).map((s) => String(s ?? ''));
+        while (samples.length < bVarCount) samples.push('Sample');
+        bc.example = { body_text: [samples] };
+      }
+      components.push(bc);
+    }
+
+    if (footerText && String(footerText).trim()) {
+      components.push({ type: 'FOOTER', text: String(footerText).trim() });
+    }
+
+    const usable = (buttons || []).filter((b) => b && b.text);
+    if (usable.length > 0) {
+      components.push({
+        type: 'BUTTONS',
+        buttons: usable.slice(0, 3).map((b) => {
+          const t = String(b.type || 'QUICK_REPLY').toUpperCase();
+          if (t === 'URL')          return { type: 'URL',         text: b.text, url: b.url || '' };
+          if (t === 'PHONE_NUMBER') return { type: 'PHONE_NUMBER', text: b.text, phone_number: b.phone || '' };
+          return                          { type: 'QUICK_REPLY', text: b.text };
+        }),
+      });
+    }
+
+    return {
+      name: String(name || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+      language: language || 'en',
+      category: String(category || 'MARKETING').toUpperCase(),
+      components,
+    };
+  },
+
   generateTemplateJson: ({ template, to = '{{to}}', defaultRegion = 'IN' }) => {
     const normalizedTo = normalizeForMessaging(to, defaultRegion) || to;
     return {
@@ -363,6 +414,32 @@ export const WhatsAppAPI = {
 
     return api.post(`/${META_VERSION}/${id}/messages`, payload);
   },
+
+  // Upload a media file to WhatsApp Cloud API.
+  // POST /v23.0/{phoneNumberId}/media
+  // multipart fields: file=<binary>, type=<mime>, messaging_product=whatsapp
+  uploadMedia: async ({ phoneNumberId, file, type } = {}) => {
+    const channel = phoneNumberId ? null : await ChannelsAPI.getDefault();
+    const id = phoneNumberId || channel.phoneNumberId;
+    if (!id) throw { message: 'Missing required field: phoneNumberId' };
+    if (!file?.uri) throw { message: 'Missing required field: file.uri' };
+
+    const form = new FormData();
+    form.append('file', {
+      uri: file.uri,
+      name: file.name || 'upload',
+      type: type || file.type || 'application/octet-stream',
+    });
+    form.append('type', type || file.type || 'application/octet-stream');
+    form.append('messaging_product', 'whatsapp');
+
+    return api.post(`/${META_VERSION}/${id}/media`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  // Get template or media metadata by ID — GET /v23.0/{id}
+  getMediaById: (id) => api.get(`/${META_VERSION}/${id}`),
 
   sendTemplate: async (params = {}) => {
     const channel = params.phoneNumberId ? null : await ChannelsAPI.getDefault();

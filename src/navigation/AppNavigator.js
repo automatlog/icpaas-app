@@ -22,6 +22,10 @@ import ChannelScreen from '../screens/ChannelScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import YouScreen from '../screens/YouScreen';
 import ApiDocsScreen from '../screens/ApiDocsScreen';
+import CampaignsListScreen from '../screens/CampaignsListScreen';
+import CampaignDetailScreen from '../screens/CampaignDetailScreen';
+import ContactsScreen from '../screens/ContactsScreen';
+import CreateTemplateScreen from '../screens/CreateTemplateScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -75,6 +79,10 @@ export default function AppNavigator() {
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="You" component={YouScreen} />
         <Stack.Screen name="ApiDocs" component={ApiDocsScreen} />
+        <Stack.Screen name="CampaignsList" component={CampaignsListScreen} />
+        <Stack.Screen name="CampaignDetail" component={CampaignDetailScreen} />
+        <Stack.Screen name="Contacts" component={ContactsScreen} />
+        <Stack.Screen name="CreateTemplate" component={CreateTemplateScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,4 +1,4 @@
-// src/screens/CampaignStep3Screen.js — Make Campaign · Step 3 (matches Camapign screen3.png)
+// src/screens/CampaignStep3Screen.js — Campaign Launch · Step 3 (matches Camapign screen3.png)
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator,
@@ -76,7 +76,8 @@ export default function CampaignStep3Screen({ navigation, route }) {
         total: numbers.length,
         sent,
         failed,
-        status: failed === numbers.length ? 'failed' : (failed > 0 ? 'stuck' : (draft.scheduleNow ? 'scheduled' : 'live')),
+        status: failed === numbers.length ? 'failed' : (failed > 0 ? 'stuck' : (draft.scheduleNow && draft.schedTime ? 'scheduled' : 'live')),
+        schedTime: draft.scheduleNow && draft.schedTime ? draft.schedTime : null,
         createdAt: new Date().toISOString(),
       }));
 
@@ -103,7 +104,7 @@ export default function CampaignStep3Screen({ navigation, route }) {
         }));
       }
 
-      navigation.navigate('Dashboard');
+      navigation.navigate('CampaignsList');
     } catch (e) {
       toast.error('Launch failed', e?.message || 'Unknown error');
       dispatch(pushNotification({
@@ -118,7 +119,7 @@ export default function CampaignStep3Screen({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <Header c={c} navigation={navigation} title="Make Campaign" />
+      <Header c={c} navigation={navigation} title="Campaign Launch" />
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         <Stepper c={c} step={3} />
 
@@ -138,6 +139,12 @@ export default function CampaignStep3Screen({ navigation, route }) {
             value={(draft.varSpec || []).length === 0
               ? 'None — template static'
               : `${Object.values(draft.values || {}).filter((v) => v).length} of ${(draft.varSpec || []).length} filled`}
+          />
+          <SummaryRow
+            c={c}
+            icon="time-outline"
+            label="Schedule"
+            value={draft.scheduleNow && draft.schedTime ? draft.schedTime : 'Send immediately'}
             last
           />
         </Card>

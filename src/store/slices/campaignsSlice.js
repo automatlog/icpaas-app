@@ -22,8 +22,35 @@ const campaignsSlice = createSlice({
       const { campaignId, status } = action.payload;
       return state.map((c) => (c.id === campaignId ? { ...c, status } : c));
     },
+    patchCampaign(state, action) {
+      const { id, patch } = action.payload || {};
+      return state.map((c) => (c.id === id ? { ...c, ...patch } : c));
+    },
+    removeCampaign(state, action) {
+      return state.filter((c) => c.id !== action.payload);
+    },
   },
 });
 
-export const { setCampaigns, upsertCampaign, updateCampaignStatus } = campaignsSlice.actions;
+export const {
+  setCampaigns,
+  upsertCampaign,
+  updateCampaignStatus,
+  patchCampaign,
+  removeCampaign,
+} = campaignsSlice.actions;
 export default campaignsSlice.reducer;
+
+// --- Selectors ---
+export const selectCampaigns = (s) => s.campaigns;
+export const selectCampaignById = (id) => (s) => s.campaigns.find((c) => c.id === id);
+
+// Status counts for the dashboard
+export const selectCampaignTotals = (s) => {
+  const list = s.campaigns;
+  const counts = { total: list.length, live: 0, scheduled: 0, completed: 0, failed: 0, stuck: 0 };
+  list.forEach((c) => {
+    if (counts[c.status] != null) counts[c.status] += 1;
+  });
+  return counts;
+};

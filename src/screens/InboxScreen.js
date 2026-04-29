@@ -89,11 +89,11 @@ export default function InboxScreen({ navigation }) {
 
   const unreadCount = conversations.filter((cv) => cv.unread > 0).length;
 
-  const rootBg = dark ? 'bg-bg' : 'bg-white';
-  const softBg = dark ? 'bg-bgSoft' : 'bg-[#F2F2F5]';
-  const textInk = dark ? 'text-ink' : 'text-[#0A0A0D]';
-  const textMuted = dark ? 'text-textMuted' : 'text-[#5C5C63]';
-  const textDim = dark ? 'text-textDim' : 'text-[#9A9AA2]';
+  const rootBg = dark ? 'bg-[#0A0A0D]' : 'bg-white';
+  const softBg = dark ? 'bg-[#141418]' : 'bg-[#F2F2F5]';
+  const textInk = dark ? 'text-white' : 'text-[#0A0A0D]';
+  const textMuted = dark ? 'text-[#9A9AA2]' : 'text-[#5C5C63]';
+  const textDim = dark ? 'text-[#5C5C63]' : 'text-[#9A9AA2]';
 
   return (
     <View className={`flex-1 ${rootBg}`}>
