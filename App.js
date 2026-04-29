@@ -8,8 +8,8 @@ import { Provider, useSelector, useDispatch } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 
 import AppNavigator from './src/navigation/AppNavigator';
-import LoginScreen from './src/screens/LoginScreen';
-import LoadingScreen from './src/screens/LoadingScreen';
+import LoginScreen from './src/screens/shared/LoginScreen';
+import LoadingScreen from './src/screens/shared/LoadingScreen';
 import { store, persistor } from './src/store';
 import { setHydrated } from './src/store/slices/hydratedSlice';
 import { Feed, LightFeed } from './src/theme';

@@ -1,8 +1,8 @@
-// src/screens/LoginScreen.js — Brand sign-in (matches Sign In.png / Sign In white.png)
+// src/screens/shared/LoginScreen.js — Brand sign-in (matches Sign In.png / Sign In white.png)
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
-  KeyboardAvoidingView, Platform, Alert, ScrollView,
+  KeyboardAvoidingView, Platform, Alert, ScrollView, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,15 +10,54 @@ import { useDispatch } from 'react-redux';
 import { useBrand } from '../../theme';
 import { login as loginThunk } from '../../store/slices/authSlice';
 
-const LOGO = require('../../logo-icon.png');
+const LOGO = require('../../../logo-icon.png');
+
+const FloatingIcon = ({ name, size, top, left, right, bottom, rotate, opacity = 0.12, duration = 3000, dark }) => {
+  const translateY = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, {
+          toValue: -20,
+          duration,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [translateY, duration]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top, left, right, bottom,
+        transform: [{ rotate: rotate || '0deg' }, { translateY }],
+        opacity,
+      }}
+    >
+      <Ionicons 
+        name={name} 
+        size={size} 
+        color={dark ? '#2094ab' : '#175a6e'} 
+      />
+    </Animated.View>
+  );
+};
 
 export default function LoginScreen() {
   const c = useBrand();
   const dark = c.scheme === 'dark';
   const dispatch = useDispatch();
 
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('omniuser');
+  const [password, setPassword] = useState('Omni@1234');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -34,122 +73,179 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: c.bg }}
+      style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1, paddingTop: Platform.OS === 'ios' ? 80 : 60, paddingHorizontal: 24, paddingBottom: 32 }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <LinearGradient
+        colors={[dark ? '#000000' : '#f0f4f5', dark ? '#0f171a' : '#ffffff']}
+        style={{ flex: 1 }}
       >
-        {/* Brand lockup — icon + wordmark */}
-        <View className="flex-row items-center justify-center mb-12" style={{ gap: 14 }}>
-          <View
-            className="w-[88px] h-[88px] rounded-[20px] items-center justify-center bg-white"
-            style={{ borderWidth: 1.5, borderColor: c.primary }}
-          >
-            <Image source={LOGO} className="w-[80px] h-[80px] rounded-[18px]" resizeMode="contain" />
-          </View>
-          <View>
-            <Text className="text-[34px] font-extrabold tracking-tight" style={{ color: c.text, fontFamily: 'System' }}>
-              icpaas<Text style={{ color: c.primary }}>.ai</Text>
-            </Text>
-            <Text
-              className="text-[12px] font-bold tracking-[3px] mt-1"
-              style={{ color: dark ? '#A78BFA' : '#7C3AED', letterSpacing: 3 }}
-            >
-              SMART TECHNOLOGY
-            </Text>
-          </View>
-        </View>
-
-        {/* Sign In headline + gradient underline */}
-        <View className="items-center mb-10">
-          <Text className="text-[44px] font-extrabold tracking-tight" style={{ color: c.text, fontFamily: 'System' }}>
-            Sign In
-          </Text>
-          <LinearGradient
-            colors={[c.gCtaA, c.gCtaB, c.gCtaC]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ width: 200, height: 3, borderRadius: 2, marginTop: 6 }}
-          />
-        </View>
-
-        {/* Username */}
-        <Text className="text-[15px] font-semibold mb-2" style={{ color: c.text }}>Username</Text>
-        <View
-          className="flex-row items-center rounded-[28px] px-5 mb-5"
-          style={{ backgroundColor: c.bgInput, gap: 12 }}
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Ionicons name="person-outline" size={18} color={c.textMuted} />
-          <TextInput
-            value={username}
-            onChangeText={setUsername}
-            placeholder="omniuser"
-            placeholderTextColor={c.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            className="flex-1 text-[15px]"
-            style={[
-              { paddingVertical: Platform.OS === 'ios' ? 18 : 14, color: c.text },
-              Platform.select({ web: { outlineStyle: 'none' } }),
-            ]}
-          />
-        </View>
+          {/* Background Decorative Icons (Reduced sizes for subtlety) */}
+          <FloatingIcon name="chatbubble-ellipses-outline" size={60} top={40} right={20} rotate="15deg" opacity={0.15} duration={4000} dark={dark} />
+          <FloatingIcon name="mail-outline" size={40} top={250} left={20} rotate="-15deg" opacity={0.12} duration={3500} dark={dark} />
+          <FloatingIcon name="call-outline" size={50} bottom={100} right={20} rotate="-20deg" opacity={0.15} duration={4500} dark={dark} />
+          <FloatingIcon name="paper-plane-outline" size={30} top={120} left={60} rotate="-10deg" opacity={0.1} duration={3000} dark={dark} />
+          <FloatingIcon name="phone-portrait-outline" size={70} bottom={20} left={20} rotate="10deg" opacity={0.12} duration={5000} dark={dark} />
 
-        {/* Password */}
-        <Text className="text-[15px] font-semibold mb-2" style={{ color: c.text }}>Password</Text>
-        <View
-          className="flex-row items-center rounded-[28px] px-5 mb-8"
-          style={{ backgroundColor: c.bgInput, gap: 12 }}
-        >
-          <Ionicons name="lock-closed-outline" size={18} color={c.textMuted} />
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••••••"
-            placeholderTextColor={c.textMuted}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            className="flex-1 text-[15px]"
-            style={[
-              { paddingVertical: Platform.OS === 'ios' ? 18 : 14, color: c.text },
-              Platform.select({ web: { outlineStyle: 'none' } }),
-            ]}
-          />
-        </View>
+          {/* Header Section */}
+          <View className="items-center" style={{ paddingTop: Platform.OS === 'ios' ? 100 : 70, paddingHorizontal: 24 }}>
+            {/* Brand icon - background removed for transparency */}
+            <Image 
+              source={LOGO} 
+              className="w-[100px] h-[100px]" 
+              resizeMode="contain" 
+            />
 
-        {/* Outline gradient Sign In button — bg interior with circle arrow */}
-        <TouchableOpacity onPress={handleLogin} disabled={loading} activeOpacity={0.85}>
-          <LinearGradient
-            colors={[c.gCtaA, c.gCtaB, c.gCtaC]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ borderRadius: 32, padding: 1.6 }}
-          >
-            <View
-              className="rounded-[30px] flex-row items-center justify-center"
-              style={{ backgroundColor: c.bg, paddingVertical: 16, gap: 12, opacity: loading ? 0.7 : 1 }}
-            >
-              <View
-                className="w-[28px] h-[28px] rounded-full items-center justify-center"
-                style={{ borderWidth: 1.5, borderColor: c.primaryMint }}
+            <View className="items-center">
+              <Text className="text-[34px] font-extrabold tracking-tight" style={{ color: c.text, fontFamily: 'System' }}>
+                icpaas<Text style={{ color: '#2094ab' }}>.ai</Text>
+              </Text>
+              <Text
+                className="text-[12px] font-bold tracking-[4px] mt-1"
+                style={{ color: '#2094ab', textTransform: 'uppercase' }}
               >
-                <Ionicons name="arrow-forward" size={14} color={c.primaryMint} />
-              </View>
-              <Text className="text-[16px] font-semibold" style={{ color: c.text }}>
-                {loading ? 'Signing in…' : 'Sign In'}
+                Smart Technology
               </Text>
             </View>
-          </LinearGradient>
-        </TouchableOpacity>
+          </View>
 
-        <Text className="text-center text-[13px] mt-5" style={{ color: c.textMuted }}>
-          Demo · omniuser / Omni@1234
-        </Text>
-      </ScrollView>
+          {/* Login Card */}
+          <View 
+            className="mx-6 mt-12 p-8 rounded-[40px] bg-white shadow-2xl"
+            style={{
+              backgroundColor: dark ? '#17171b' : '#ffffff',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 15 },
+              shadowOpacity: 0.08,
+              shadowRadius: 30,
+              elevation: 10,
+              borderWidth: dark ? 1 : 0,
+              borderColor: 'rgba(255,255,255,0.1)'
+            }}
+          >
+            <View className="mb-8">
+              <Text className="text-[32px] font-bold tracking-tight" style={{ color: c.text }}>
+                Welcome Back
+              </Text>
+              <View
+                className="w-12 h-[4px] rounded-full mt-2"
+                style={{ backgroundColor: '#2094ab' }}
+              />
+            </View>
+
+            {/* Input fields */}
+            <View style={{ gap: 20 }}>
+              <View>
+                <Text className="text-[14px] font-bold mb-2 ml-1" style={{ color: c.textMuted }}>USERNAME</Text>
+                <View
+                  className="flex-row items-center rounded-2xl px-5 border"
+                  style={{ 
+                    backgroundColor: dark ? '#1f1f24' : '#f8fafb', 
+                    borderColor: dark ? '#2d2d35' : '#e2e8f0',
+                    gap: 12 
+                  }}
+                >
+                  <Ionicons name="person-outline" size={20} color="#2094ab" />
+                  <TextInput
+                    value={username}
+                    onChangeText={setUsername}
+                    placeholder="Enter your username"
+                    placeholderTextColor={c.textDim}
+                    autoCapitalize="none"
+                    className="flex-1 text-[16px]"
+                    style={[
+                      { paddingVertical: 18, color: c.text },
+                      Platform.select({ web: { outlineStyle: 'none' } }),
+                    ]}
+                  />
+                </View>
+              </View>
+
+              <View>
+                <Text className="text-[14px] font-bold mb-2 ml-1" style={{ color: c.textMuted }}>PASSWORD</Text>
+                <View
+                  className="flex-row items-center rounded-2xl px-5 border"
+                  style={{ 
+                    backgroundColor: dark ? '#1f1f24' : '#f8fafb', 
+                    borderColor: dark ? '#2d2d35' : '#e2e8f0',
+                    gap: 12 
+                  }}
+                >
+                  <Ionicons name="lock-closed-outline" size={20} color="#2094ab" />
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="••••••••••••"
+                    placeholderTextColor={c.textDim}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    className="flex-1 text-[16px]"
+                    style={[
+                      { paddingVertical: 18, color: c.text },
+                      Platform.select({ web: { outlineStyle: 'none' } }),
+                    ]}
+                  />
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              onPress={handleLogin} 
+              disabled={loading} 
+              activeOpacity={0.8}
+              className="mt-10"
+            >
+              <LinearGradient
+                colors={['#2094abff', '#175a6eff']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ borderRadius: 20, shadowColor: '#2094ab', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 8 }}
+              >
+                <View
+                  className="flex-row items-center justify-center"
+                  style={{ paddingVertical: 18, gap: 12, opacity: loading ? 0.7 : 1 }}
+                >
+                  {loading ? (
+                    <Text className="text-[17px] font-bold text-white">Signing in...</Text>
+                  ) : (
+                    <>
+                      <Text className="text-[17px] font-bold text-white">Sign In</Text>
+                      <Ionicons name="arrow-forward" size={20} color="white" />
+                    </>
+                  )}
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          <View className="mt-8 items-center">
+            <TouchableOpacity className="mb-6">
+              <Text style={{ color: '#2094ab', fontWeight: '600' }}>Forgot password?</Text>
+            </TouchableOpacity>
+            
+          
+          </View>
+
+          {/* Footer Section */}
+          <View className="mt-auto pt-12 items-center opacity-40">
+            <Text style={{ color: c.text, fontSize: 12, fontWeight: '500', letterSpacing: 1 }}>
+              © 2026 ICPAAS
+            </Text>
+            <View className="flex-row items-center mt-2" style={{ gap: 8 }}>
+              <View className="w-1 h-1 rounded-full bg-current" style={{ backgroundColor: '#2094ab' }} />
+              <Text style={{ color: c.textMuted, fontSize: 10, letterSpacing: 2, textTransform: 'uppercase' }}>
+                Omnichannel Platform
+              </Text>
+              <View className="w-1 h-1 rounded-full bg-current" style={{ backgroundColor: '#2094ab' }} />
+            </View>
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </KeyboardAvoidingView>
   );
 }
