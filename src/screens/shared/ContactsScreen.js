@@ -19,6 +19,7 @@ import {
 import { setContacts as setContactsAction, upsertContact } from '../../store/slices/contactsSlice';
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
+import FormField from '../../components/FormField';
 
 const TABS = [
   { id: 'add',    label: 'Add Contact',    icon: 'person-add-outline' },
@@ -142,25 +143,25 @@ function AddContactTab({ c, onSave }) {
       <Card c={c}>
         <Title c={c} icon="person-circle" label="Contact details" />
 
-        <Field c={c} label="Full name" required icon="person-outline">
+        <FormField caps c={c} label="Full name" required icon="person-outline">
           <Input c={c} value={name} onChangeText={setName} placeholder="Rahul Mehra" />
-        </Field>
+        </FormField>
 
-        <Field c={c} label="Phone number" required icon="call-outline">
+        <FormField caps c={c} label="Phone number" required icon="call-outline">
           <Input c={c} value={phone} onChangeText={setPhone} placeholder="919876543210" keyboardType="phone-pad" />
-        </Field>
+        </FormField>
 
-        <Field c={c} label="Email" icon="mail-outline">
+        <FormField caps c={c} label="Email" icon="mail-outline">
           <Input c={c} value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" />
-        </Field>
+        </FormField>
 
-        <Field c={c} label="Company" icon="business-outline">
+        <FormField caps c={c} label="Company" icon="business-outline">
           <Input c={c} value={company} onChangeText={setCompany} placeholder="Acme Corp" />
-        </Field>
+        </FormField>
 
-        <Field c={c} label="Tags (comma separated)" icon="pricetags-outline">
+        <FormField caps c={c} label="Tags (comma separated)" icon="pricetags-outline">
           <Input c={c} value={tags} onChangeText={setTags} placeholder="lead, gold, mumbai" autoCapitalize="none" />
-        </Field>
+        </FormField>
       </Card>
 
       <View className="flex-row mt-2" style={{ gap: 8 }}>
@@ -393,10 +394,10 @@ function GroupsTab({ c, groups, dispatch }) {
       {showCreate ? (
         <Card c={c}>
           <Title c={c} icon="add-circle" label="Create group" />
-          <Field c={c} label="Group name" required>
+          <FormField caps c={c} label="Group name" required>
             <Input c={c} value={groupName} onChangeText={setGroupName} placeholder="VIP customers" />
-          </Field>
-          <Field c={c} label="Numbers (comma or newline separated)">
+          </FormField>
+          <FormField caps c={c} label="Numbers (comma or newline separated)">
             <Input
               c={c}
               value={numbersText}
@@ -405,7 +406,7 @@ function GroupsTab({ c, groups, dispatch }) {
               multiline
               minHeight={90}
             />
-          </Field>
+          </FormField>
           <TouchableOpacity
             onPress={create}
             activeOpacity={0.85}
@@ -488,19 +489,6 @@ function Title({ c, icon, label }) {
   );
 }
 
-function Field({ c, label, required, icon, children }) {
-  return (
-    <View className="mb-3">
-      <View className="flex-row items-center mb-1.5" style={{ gap: 6 }}>
-        {icon ? <Ionicons name={icon} size={12} color={c.textMuted} /> : null}
-        <Text className="text-[11px] font-bold uppercase tracking-widest" style={{ color: c.textMuted }}>
-          {label}{required ? <Text style={{ color: c.danger }}>  *</Text> : null}
-        </Text>
-      </View>
-      {children}
-    </View>
-  );
-}
 
 function Input({ c, value, onChangeText, placeholder, keyboardType, autoCapitalize, multiline, minHeight }) {
   return (

@@ -13,6 +13,7 @@ import { logout as logoutAction } from '../../store/slices/authSlice';
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
 import dialog from '../../services/dialog';
+import FormField from '../../components/FormField';
 
 const TABS = [
   { id: 'info',     label: 'Personal Info',     icon: 'person-circle-outline' },
@@ -152,19 +153,19 @@ export default function ProfileScreen({ navigation }) {
                 </View>
               </View>
 
-              <Field c={c} label="Username" icon="person-outline">
+              <FormField caps c={c} label="Username" icon="person-outline">
                 <TextInput value={username} onChangeText={setUsername} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="Wunder" autoCapitalize="none" />
-              </Field>
+              </FormField>
 
-              <Field c={c} label="Mobile Number" icon="call-outline">
+              <FormField caps c={c} label="Mobile Number" icon="call-outline">
                 <TextInput value={mobile} onChangeText={setMobile} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="919313197730" keyboardType="phone-pad" />
-              </Field>
+              </FormField>
 
-              <Field c={c} label="Email Address" icon="mail-outline">
+              <FormField caps c={c} label="Email Address" icon="mail-outline">
                 <TextInput value={email} onChangeText={setEmail} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="you@example.com" autoCapitalize="none" keyboardType="email-address" />
-              </Field>
+              </FormField>
 
-              <Field c={c} label="Permanent Address">
+              <FormField caps c={c} label="Permanent Address">
                 <TextInput
                   value={address}
                   onChangeText={setAddress}
@@ -176,21 +177,21 @@ export default function ProfileScreen({ navigation }) {
                   placeholderTextColor={c.textMuted}
                   placeholder="Street, area, landmark"
                 />
-              </Field>
+              </FormField>
 
               <View className="flex-row" style={{ gap: 8 }}>
-                <Field c={c} label="City" flex>
+                <FormField caps c={c} label="City" flex>
                   <TextInput value={city} onChangeText={setCity} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="—" />
-                </Field>
-                <Field c={c} label="State" flex>
+                </FormField>
+                <FormField caps c={c} label="State" flex>
                   <TextInput value={state} onChangeText={setState} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="—" />
-                </Field>
-                <Field c={c} label="Pin Code" flex>
+                </FormField>
+                <FormField caps c={c} label="Pin Code" flex>
                   <TextInput value={pin} onChangeText={setPin} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="—" keyboardType="number-pad" />
-                </Field>
+                </FormField>
               </View>
 
-              <Field c={c} label="Public API Key">
+              <FormField caps c={c} label="Public API Key">
                 <View className="flex-row items-center" style={{ gap: 8 }}>
                   <View
                     className="flex-1 rounded-[10px] px-3 py-3"
@@ -209,7 +210,7 @@ export default function ProfileScreen({ navigation }) {
                     <Ionicons name="copy" size={16} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
-              </Field>
+              </FormField>
             </View>
 
             {/* Quick Summary */}
@@ -280,17 +281,6 @@ const inputStyle = (c) => ({
   ...Platform.select({ web: { outlineStyle: 'none' } }),
 });
 
-function Field({ c, label, icon, children, flex }) {
-  return (
-    <View className="mb-3" style={flex ? { flex: 1 } : {}}>
-      <View className="flex-row items-center mb-1.5" style={{ gap: 6 }}>
-        {icon ? <Ionicons name={icon} size={11} color={c.textMuted} /> : null}
-        <Text className="text-[10px] font-bold uppercase tracking-widest" style={{ color: c.textMuted }}>{label}</Text>
-      </View>
-      {children}
-    </View>
-  );
-}
 
 function Row({ c, label, value, valueColor, last }) {
   return (

@@ -7,6 +7,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { WhatsAppAPI } from '../../services/api';
+import InfoRow from '../../components/InfoRow';
 
 const C = {
   dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0' },
@@ -129,22 +130,10 @@ export default function WabaChannelScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
 
-                <InfoRow
-                  label="Phone Number ID" value={ch.phoneNumberId}
-                  onCopy={() => copy(ch.phoneNumberId, 'Phone Number ID')}
-                  inputBg={inputBg} textInk={textInk} textMuted={textMuted} muted={c.muted}
-                />
-                <InfoRow
-                  label="WABA Business ID" value={ch.wabaBusinessId}
-                  onCopy={() => copy(ch.wabaBusinessId, 'WABA Business ID')}
-                  inputBg={inputBg} textInk={textInk} textMuted={textMuted} muted={c.muted}
-                />
+                <InfoRow c={c} label="Phone Number ID"  value={ch.phoneNumberId}   onCopy={() => copy(ch.phoneNumberId, 'Phone Number ID')} />
+                <InfoRow c={c} label="WABA Business ID" value={ch.wabaBusinessId}  onCopy={() => copy(ch.wabaBusinessId, 'WABA Business ID')} />
                 {ch.wabaNumber ? (
-                  <InfoRow
-                    label="WABA Number" value={ch.wabaNumber}
-                    onCopy={() => copy(ch.wabaNumber, 'WABA Number')}
-                    inputBg={inputBg} textInk={textInk} textMuted={textMuted} muted={c.muted}
-                  />
+                  <InfoRow c={c} label="WABA Number" value={ch.wabaNumber} onCopy={() => copy(ch.wabaNumber, 'WABA Number')} />
                 ) : null}
               </View>
             );
@@ -155,16 +144,3 @@ export default function WabaChannelScreen({ navigation }) {
   );
 }
 
-const InfoRow = ({ label, value, onCopy, inputBg, textInk, textMuted, muted }) => (
-  <View className="mb-2">
-    <Text className={`text-[10px] font-semibold uppercase tracking-widest mb-1 ${textMuted}`}>{label}</Text>
-    <View className={`flex-row items-center rounded-[14px] px-3 py-2.5 ${inputBg}`} style={{ gap: 8 }}>
-      <Text className={`flex-1 text-[12px] font-mono ${textInk}`} numberOfLines={1}>{value || '—'}</Text>
-      {value ? (
-        <TouchableOpacity onPress={onCopy} activeOpacity={0.7}>
-          <Ionicons name="copy-outline" size={14} color={muted} />
-        </TouchableOpacity>
-      ) : null}
-    </View>
-  </View>
-);

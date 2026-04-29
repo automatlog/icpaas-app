@@ -17,6 +17,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import { selectGroups, addGroup } from '../../store/slices/groupsSlice';
 import toast from '../../services/toast';
+import FormField from '../../components/FormField';
 
 const TABS = [
   { id: 'manual',   label: 'Manual',  icon: 'create-outline' },
@@ -160,20 +161,20 @@ function ManualTab({ c, commit, dispatch }) {
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
       {/* Single contact */}
       <Section c={c} icon="person-add" label="Add one contact" />
-      <Field c={c} label="Name (optional)">
+      <FormField caps c={c} label="Name (optional)">
         <Input c={c} value={name} onChangeText={setName} placeholder="Rahul Mehra" />
-      </Field>
-      <Field c={c} label="Phone number">
+      </FormField>
+      <FormField caps c={c} label="Phone number">
         <Input c={c} value={phone} onChangeText={setPhone} placeholder="919876543210" keyboardType="phone-pad" />
-      </Field>
+      </FormField>
       <PrimaryBtn c={c} icon="add" label="Add contact" onPress={addOne} />
 
       {/* Bulk paste */}
       <View style={{ height: 12 }} />
       <Section c={c} icon="documents" label="Paste many" />
-      <Field c={c} label="Numbers (comma or newline)">
+      <FormField caps c={c} label="Numbers (comma or newline)">
         <Input c={c} value={bulk} onChangeText={setBulk} placeholder="919876543210, 918765432109 …" multiline minHeight={90} />
-      </Field>
+      </FormField>
       <View className="flex-row" style={{ gap: 8 }}>
         <SecondaryBtn c={c} icon="add-circle" label="Add all" onPress={addBulk} />
       </View>
@@ -181,9 +182,9 @@ function ManualTab({ c, commit, dispatch }) {
       {/* Save as group */}
       <View style={{ height: 12 }} />
       <Section c={c} icon="people-circle" label="Save as group" />
-      <Field c={c} label="Group name">
+      <FormField caps c={c} label="Group name">
         <Input c={c} value={groupName} onChangeText={setGroupName} placeholder="VIP customers" />
-      </Field>
+      </FormField>
       <SecondaryBtn c={c} icon="save" label="Save group" onPress={saveAsGroup} />
     </ScrollView>
   );
@@ -692,15 +693,6 @@ function Section({ c, icon, label }) {
     <View className="flex-row items-center mb-2" style={{ gap: 6 }}>
       <Ionicons name={icon} size={13} color={c.primary} />
       <Text className="text-[13px] font-bold" style={{ color: c.text }}>{label}</Text>
-    </View>
-  );
-}
-
-function Field({ c, label, children }) {
-  return (
-    <View className="mb-2.5">
-      <Text className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: c.textMuted }}>{label}</Text>
-      {children}
     </View>
   );
 }

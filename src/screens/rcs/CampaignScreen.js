@@ -4,8 +4,8 @@
 // RCSAPI.sendTemplateAuto / RCSAPI.send for bulk delivery.
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, Switch,
-  ActivityIndicator, Platform, Alert,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  Platform, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
@@ -15,6 +15,9 @@ import { pushNotification } from '../../store/slices/notificationsSlice';
 import toast from '../../services/toast';
 import dialog from '../../services/dialog';
 import GradientButton from '../../components/GradientButton';
+import FormField, { inputStyle } from '../../components/FormField';
+import Dropdown from '../../components/Dropdown';
+import ToggleRow from '../../components/ToggleRow';
 
 const TEMPLATE_TYPES = [
   { id: '3',        label: 'Text Message' },
@@ -165,7 +168,7 @@ export default function CampaignScreen({ navigation }) {
           <Text className="text-[12px] font-semibold" style={{ color: c.primary }}>RCS Message</Text>
         </View>
 
-        <Field c={c} label="Campaign Name">
+        <FormField c={c} label="Campaign Name">
           <TextInput
             value={name}
             onChangeText={setName}
@@ -173,9 +176,9 @@ export default function CampaignScreen({ navigation }) {
             placeholderTextColor={c.textMuted}
             style={inputStyle(c)}
           />
-        </Field>
+        </FormField>
 
-        <Field c={c} label="Agent">
+        <FormField c={c} label="Agent">
           <Dropdown
             c={c}
             placeholder={loadingBots ? 'Loading agents…' : 'Select agent'}
@@ -190,9 +193,9 @@ export default function CampaignScreen({ navigation }) {
             selectedId={bot?.botId}
             onSelect={(opt) => { setBot(bots.find((x) => x.botId === opt.id) || null); setShowBot(false); }}
           />
-        </Field>
+        </FormField>
 
-        <Field c={c} label="Template Type">
+        <FormField c={c} label="Template Type">
           <Dropdown
             c={c}
             placeholder="Select type"
@@ -203,9 +206,9 @@ export default function CampaignScreen({ navigation }) {
             selectedId={templateType}
             onSelect={(opt) => { setTemplateType(opt.id); setShowType(false); }}
           />
-        </Field>
+        </FormField>
 
-        <Field c={c} label="Select Template">
+        <FormField c={c} label="Select Template">
           <Dropdown
             c={c}
             placeholder={loadingTemplates ? 'Loading templates…' : 'Select Template'}
@@ -216,9 +219,9 @@ export default function CampaignScreen({ navigation }) {
             selectedId={template?.name}
             onSelect={(opt) => { setTemplate(templates.find((x) => x.name === opt.id) || null); setShowTemplate(false); }}
           />
-        </Field>
+        </FormField>
 
-        <Field c={c} label="Campaign Type *">
+        <FormField c={c} label="Campaign Type *">
           <Dropdown
             c={c}
             placeholder="Pick"
@@ -232,7 +235,7 @@ export default function CampaignScreen({ navigation }) {
           <Text className="text-[11px] mt-1.5" style={{ color: c.textMuted }}>
             Select how messages will be sent.
           </Text>
-        </Field>
+        </FormField>
 
         <View className="flex-row" style={{ gap: 8, marginTop: 4, marginBottom: 14 }}>
           <GradientButton
@@ -281,7 +284,7 @@ export default function CampaignScreen({ navigation }) {
           })}
         </View>
 
-        <Field c={c} label={`Numbers (${numberCount})`} hint="Paste up to 5,000 numbers only.">
+        <FormField c={c} label={`Numbers (${numberCount})`} hint="Paste up to 5,000 numbers only.">
           <TextInput
             value={numbers}
             onChangeText={setNumbers}
@@ -293,7 +296,7 @@ export default function CampaignScreen({ navigation }) {
               { minHeight: 90, textAlignVertical: 'top', paddingTop: 12 },
             ]}
           />
-        </Field>
+        </FormField>
 
         <ToggleRow c={c} label="Remove Duplicate" value={removeDup} onChange={setRemoveDup} />
         <ToggleRow c={c} label="Remove BlackList" value={removeBlack} onChange={setRemoveBlack} />
@@ -322,115 +325,3 @@ export default function CampaignScreen({ navigation }) {
   );
 }
 
-const inputStyle = (c) => ({
-  backgroundColor: c.bgCard,
-  borderWidth: 1,
-  borderColor: c.border,
-  borderRadius: 10,
-  paddingHorizontal: 12,
-  paddingVertical: Platform.OS === 'ios' ? 12 : 10,
-  fontSize: 14,
-  color: c.text,
-  ...Platform.select({ web: { outlineStyle: 'none' } }),
-});
-
-const Field = ({ c, label, hint, children }) => (
-  <View style={{ marginBottom: 14 }}>
-    <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>{label}</Text>
-    {children}
-    {hint ? <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 6 }}>{hint}</Text> : null}
-  </View>
-);
-
-const Dropdown = ({ c, placeholder, value, open, onToggle, options, selectedId, onSelect }) => (
-  <>
-    <TouchableOpacity
-      onPress={onToggle}
-      activeOpacity={0.85}
-      style={{
-        ...inputStyle(c),
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 12,
-      }}
-    >
-      <Text numberOfLines={1} style={{ color: value ? c.text : c.textMuted, fontSize: 14, flex: 1 }}>
-        {value || placeholder}
-      </Text>
-      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
-    </TouchableOpacity>
-    {open ? (
-      <View
-        style={{
-          marginTop: 6,
-          backgroundColor: c.bgCard,
-          borderWidth: 1,
-          borderColor: c.border,
-          borderRadius: 10,
-          maxHeight: 220,
-          overflow: 'hidden',
-        }}
-      >
-        <ScrollView nestedScrollEnabled>
-          {options.length === 0 ? (
-            <Text style={{ color: c.textMuted, padding: 14, fontSize: 12 }}>No options.</Text>
-          ) : (
-            options.map((o) => {
-              const active = o.id === selectedId;
-              return (
-                <TouchableOpacity
-                  key={o.id}
-                  onPress={() => onSelect(o)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: 12,
-                    borderBottomWidth: 1,
-                    borderBottomColor: c.border,
-                    backgroundColor: active ? c.primarySoft : 'transparent',
-                    gap: 10,
-                  }}
-                >
-                  <Ionicons
-                    name={active ? 'radio-button-on' : 'radio-button-off'}
-                    size={14}
-                    color={active ? c.primary : c.textMuted}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{o.label}</Text>
-                    {o.sub ? (
-                      <Text style={{ color: c.textMuted, fontSize: 10, fontFamily: 'monospace', marginTop: 2 }} numberOfLines={1}>
-                        {o.sub}
-                      </Text>
-                    ) : null}
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
-      </View>
-    ) : null}
-  </>
-);
-
-const ToggleRow = ({ c, label, value, onChange }) => (
-  <View
-    style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: c.rule,
-    }}
-  >
-    <Switch
-      value={value}
-      onValueChange={onChange}
-      trackColor={{ false: c.bgInput, true: c.primary }}
-      thumbColor="#FFFFFF"
-    />
-    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', marginLeft: 12 }}>{label}</Text>
-  </View>
-);

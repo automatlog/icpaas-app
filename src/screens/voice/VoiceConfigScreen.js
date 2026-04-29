@@ -4,10 +4,11 @@
 // dedicated manager (placeholders for now — wire as endpoints come online).
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Platform, useColorScheme,
+  View, Text, ScrollView, TouchableOpacity, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../../theme';
+import SectionHeader from '../../components/SectionHeader';
 
 const SYSTEM_CONFIG = [
   { id: 'voiceFiles',   label: 'Voice Files',     desc: 'Add Description Here.', icon: 'musical-notes',          tint: '#FED7AA', fg: '#C2410C' },
@@ -67,21 +68,6 @@ export default function VoiceConfigScreen({ navigation }) {
     </View>
   );
 }
-
-const SectionHeader = ({ c, icon, title }) => (
-  <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
-    <View
-      style={{
-        width: 26, height: 26, borderRadius: 13,
-        backgroundColor: c.primarySoft,
-        alignItems: 'center', justifyContent: 'center',
-      }}
-    >
-      <Ionicons name={icon} size={14} color={c.primary} />
-    </View>
-    <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{title}</Text>
-  </View>
-);
 
 const ConfigCard = ({ c, item, onPress }) => (
   <TouchableOpacity

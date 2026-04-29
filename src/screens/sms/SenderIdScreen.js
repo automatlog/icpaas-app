@@ -7,6 +7,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { SMSAPI } from '../../services/api';
+import InfoRow from '../../components/InfoRow';
 
 const C = {
   dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0' },
@@ -127,21 +128,9 @@ export default function SenderIdScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
 
-                <InfoRow
-                  label="Sender ID" value={s.senderId}
-                  onCopy={() => copy(s.senderId, 'Sender ID')}
-                  inputBg={inputBg} textInk={textInk} textMuted={textMuted} muted={c.muted}
-                />
-                <InfoRow
-                  label="Entity ID (PE ID)" value={s.entityId}
-                  onCopy={() => copy(s.entityId, 'Entity ID')}
-                  inputBg={inputBg} textInk={textInk} textMuted={textMuted} muted={c.muted}
-                />
-                <InfoRow
-                  label="Hash chain ID" value={s.hashChainId}
-                  onCopy={() => copy(s.hashChainId, 'Hash chain')}
-                  inputBg={inputBg} textInk={textInk} textMuted={textMuted} muted={c.muted}
-                />
+                <InfoRow c={c} label="Sender ID"        value={s.senderId}    onCopy={() => copy(s.senderId, 'Sender ID')} />
+                <InfoRow c={c} label="Entity ID (PE ID)" value={s.entityId}    onCopy={() => copy(s.entityId, 'Entity ID')} />
+                <InfoRow c={c} label="Hash chain ID"     value={s.hashChainId} onCopy={() => copy(s.hashChainId, 'Hash chain')} />
               </View>
             );
           })
@@ -151,16 +140,3 @@ export default function SenderIdScreen({ navigation }) {
   );
 }
 
-const InfoRow = ({ label, value, onCopy, inputBg, textInk, textMuted, muted }) => (
-  <View className="mb-2">
-    <Text className={`text-[10px] font-semibold uppercase tracking-widest mb-1 ${textMuted}`}>{label}</Text>
-    <View className={`flex-row items-center rounded-[14px] px-3 py-2.5 ${inputBg}`} style={{ gap: 8 }}>
-      <Text className={`flex-1 text-[12px] font-mono ${textInk}`} numberOfLines={1}>{value || '—'}</Text>
-      {value ? (
-        <TouchableOpacity onPress={onCopy} activeOpacity={0.7}>
-          <Ionicons name="copy-outline" size={14} color={muted} />
-        </TouchableOpacity>
-      ) : null}
-    </View>
-  </View>
-);

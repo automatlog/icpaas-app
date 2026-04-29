@@ -2,9 +2,9 @@
 // Mirrors UI image/Voice Campaign Screen.png. Picks voice plan, caller ID,
 // optional OBD flow / DTMF mode, sound file, and recipient list, then
 // dispatches via VoiceAPI.makeCall (icpaas.in /Voice/OgCall/MakeCall).
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, Switch,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
   Platform, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,11 @@ import { pushNotification } from '../../store/slices/notificationsSlice';
 import toast from '../../services/toast';
 import dialog from '../../services/dialog';
 import GradientButton from '../../components/GradientButton';
+import FormField, { inputStyle } from '../../components/FormField';
+import Dropdown from '../../components/Dropdown';
+import ToggleRow from '../../components/ToggleRow';
+import SectionHeader from '../../components/SectionHeader';
+import Pill from '../../components/Pill';
 
 const VOICE_PLANS = [
   { id: '15s', label: '15-second pulse · ₹0.18/pulse' },
@@ -140,7 +145,7 @@ export default function CampaignScreen({ navigation }) {
 
         <SectionHeader c={c} icon="megaphone-outline" title="Campaign Details" />
 
-        <Field
+        <FormField
           c={c}
           label="Campaign Name *"
           hint="User-defined campaign name (default: current timestamp)."
@@ -152,9 +157,9 @@ export default function CampaignScreen({ navigation }) {
             placeholderTextColor={c.textMuted}
             style={inputStyle(c)}
           />
-        </Field>
+        </FormField>
 
-        <Field
+        <FormField
           c={c}
           label="Voice Plan *"
           hint="Voice plans operate on a 15-sec or 30-sec pulse."
@@ -169,9 +174,9 @@ export default function CampaignScreen({ navigation }) {
             selectedId={plan}
             onSelect={(opt) => { setPlan(opt.id); setShowPlan(false); }}
           />
-        </Field>
+        </FormField>
 
-        <Field
+        <FormField
           c={c}
           label="Caller ID *"
           hint="Caller ID assigned to the user."
@@ -186,7 +191,7 @@ export default function CampaignScreen({ navigation }) {
             selectedId={callerId}
             onSelect={(opt) => { setCallerId(opt.id); setShowCaller(false); }}
           />
-        </Field>
+        </FormField>
 
         <ToggleRow
           c={c}
@@ -203,7 +208,7 @@ export default function CampaignScreen({ navigation }) {
           onChange={setIsDtmfFile}
         />
 
-        <Field c={c} label="Sound File">
+        <FormField c={c} label="Sound File">
           <Dropdown
             c={c}
             placeholder="Select Sound File"
@@ -214,7 +219,7 @@ export default function CampaignScreen({ navigation }) {
             selectedId={soundFile?.id}
             onSelect={(opt) => { setSoundFile(mediaFiles.find((m) => m.id === opt.id)); setShowSound(false); }}
           />
-        </Field>
+        </FormField>
 
         <SectionHeader c={c} icon="people-outline" title="Contact & File Upload" right={
           <View className="flex-row" style={{ gap: 6 }}>
@@ -224,7 +229,7 @@ export default function CampaignScreen({ navigation }) {
           </View>
         } />
 
-        <Field c={c} label="Numbers" hint="Enter multiple numbers separated by commas.">
+        <FormField c={c} label="Numbers" hint="Enter multiple numbers separated by commas.">
           <TextInput
             value={numbers}
             onChangeText={setNumbers}
@@ -236,7 +241,7 @@ export default function CampaignScreen({ navigation }) {
               { minHeight: 90, textAlignVertical: 'top', paddingTop: 12 },
             ]}
           />
-        </Field>
+        </FormField>
 
         <View className="flex-row" style={{ gap: 10, marginBottom: 12 }}>
           <View style={{ flex: 1 }}>
@@ -249,7 +254,7 @@ export default function CampaignScreen({ navigation }) {
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Field c={c} label="Group">
+            <FormField c={c} label="Group">
               <Dropdown
                 c={c}
                 placeholder="Select Groups"
@@ -260,11 +265,11 @@ export default function CampaignScreen({ navigation }) {
                 selectedId={group?.id || group?.name}
                 onSelect={(opt) => { setGroup(groups.find((g) => (g.id || g.name) === opt.id)); setShowGroup(false); }}
               />
-            </Field>
+            </FormField>
           </View>
         </View>
 
-        <Field
+        <FormField
           c={c}
           label="Group Range"
           hint="Enter the starting and ending group IDs to pick contacts within the range."
@@ -288,7 +293,7 @@ export default function CampaignScreen({ navigation }) {
               style={[inputStyle(c), { flex: 1 }]}
             />
           </View>
-        </Field>
+        </FormField>
 
         <ToggleRow c={c} label="Remove Duplicates" value={removeDup} onChange={setRemoveDup} />
         <ToggleRow c={c} label="Schedule Now"     value={schedule}  onChange={setSchedule} />
@@ -318,163 +323,3 @@ export default function CampaignScreen({ navigation }) {
   );
 }
 
-const inputStyle = (c) => ({
-  backgroundColor: c.bgCard,
-  borderWidth: 1,
-  borderColor: c.border,
-  borderRadius: 10,
-  paddingHorizontal: 12,
-  paddingVertical: Platform.OS === 'ios' ? 12 : 10,
-  fontSize: 14,
-  color: c.text,
-  ...Platform.select({ web: { outlineStyle: 'none' } }),
-});
-
-const Field = ({ c, label, hint, children }) => (
-  <View style={{ marginBottom: 14 }}>
-    <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>{label}</Text>
-    {children}
-    {hint ? <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 6 }}>{hint}</Text> : null}
-  </View>
-);
-
-const SectionHeader = ({ c, icon, title, right }) => (
-  <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
-    <View
-      style={{
-        width: 26, height: 26, borderRadius: 13,
-        backgroundColor: c.primarySoft,
-        alignItems: 'center', justifyContent: 'center',
-      }}
-    >
-      <Ionicons name={icon} size={14} color={c.primary} />
-    </View>
-    <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', flex: 1 }}>{title}</Text>
-    {right || null}
-  </View>
-);
-
-const Dropdown = ({ c, placeholder, value, open, onToggle, options, selectedId, onSelect }) => (
-  <>
-    <TouchableOpacity
-      onPress={onToggle}
-      activeOpacity={0.85}
-      style={{
-        ...inputStyle(c),
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 12,
-      }}
-    >
-      <Text numberOfLines={1} style={{ color: value ? c.text : c.textMuted, fontSize: 14, flex: 1 }}>
-        {value || placeholder}
-      </Text>
-      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
-    </TouchableOpacity>
-    {open ? (
-      <View
-        style={{
-          marginTop: 6,
-          backgroundColor: c.bgCard,
-          borderWidth: 1,
-          borderColor: c.border,
-          borderRadius: 10,
-          maxHeight: 220,
-          overflow: 'hidden',
-        }}
-      >
-        <ScrollView nestedScrollEnabled>
-          {options.length === 0 ? (
-            <Text style={{ color: c.textMuted, padding: 14, fontSize: 12 }}>No options.</Text>
-          ) : (
-            options.map((o) => {
-              const active = o.id === selectedId;
-              return (
-                <TouchableOpacity
-                  key={o.id}
-                  onPress={() => onSelect(o)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: 12,
-                    borderBottomWidth: 1,
-                    borderBottomColor: c.border,
-                    backgroundColor: active ? c.primarySoft : 'transparent',
-                    gap: 10,
-                  }}
-                >
-                  <Ionicons
-                    name={active ? 'radio-button-on' : 'radio-button-off'}
-                    size={14}
-                    color={active ? c.primary : c.textMuted}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{o.label}</Text>
-                    {o.sub ? (
-                      <Text style={{ color: c.textMuted, fontSize: 10, marginTop: 2 }} numberOfLines={1}>{o.sub}</Text>
-                    ) : null}
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
-      </View>
-    ) : null}
-  </>
-);
-
-const ToggleRow = ({ c, label, help, value, onChange }) => (
-  <View
-    style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: c.rule,
-      gap: 10,
-    }}
-  >
-    <Switch
-      value={value}
-      onValueChange={onChange}
-      trackColor={{ false: c.bgInput, true: c.primary }}
-      thumbColor="#FFFFFF"
-    />
-    <View style={{ flex: 1 }}>
-      <View className="flex-row items-center" style={{ gap: 6 }}>
-        <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{label}</Text>
-        {help ? (
-          <View
-            style={{
-              width: 14, height: 14, borderRadius: 7,
-              backgroundColor: c.bgInput,
-              alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="help" size={9} color={c.textMuted} />
-          </View>
-        ) : null}
-      </View>
-      {help ? <Text style={{ color: c.textMuted, fontSize: 10, marginTop: 2 }}>{help}</Text> : null}
-    </View>
-  </View>
-);
-
-const Pill = ({ bg, fg, label, value }) => (
-  <View
-    style={{
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      backgroundColor: bg,
-      borderRadius: 6,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    }}
-  >
-    <Text style={{ color: fg, fontSize: 10, fontWeight: '600' }}>{label}:</Text>
-    <Text style={{ color: fg, fontSize: 11, fontWeight: '800' }}>{value}</Text>
-  </View>
-);

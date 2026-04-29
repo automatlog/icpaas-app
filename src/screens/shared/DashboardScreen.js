@@ -149,28 +149,43 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Performance callout */}
-        <View
+        {/* Wallet balance callout — live from BalanceAPI.getBalance() */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('Config')}
           className="flex-row items-center rounded-[16px] p-3.5 mt-2"
           style={{ backgroundColor: c.primarySoft, gap: 12 }}
         >
           <View
-            className="w-9 h-9 rounded-full items-center justify-center"
+            className="w-10 h-10 rounded-full items-center justify-center"
             style={{ backgroundColor: c.primary }}
           >
-            <Ionicons name="trending-up" size={18} color="#FFFFFF" />
+            <Ionicons name="wallet" size={18} color="#FFFFFF" />
           </View>
           <View className="flex-1">
-            <Text className="text-[13px] font-bold" style={{ color: c.primaryDeep }}>Great job!</Text>
-            <Text className="text-[11px]" style={{ color: c.primaryDeep }}>Your performance is higher than yesterday.</Text>
+            <Text className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: c.primaryDeep, opacity: 0.75 }}>
+              Wallet Balance
+            </Text>
+            {loading ? (
+              <ActivityIndicator size="small" color={c.primaryDeep} style={{ alignSelf: 'flex-start', marginTop: 2 }} />
+            ) : (
+              <Text className="text-[20px] font-extrabold mt-0.5" style={{ color: c.primaryDeep }}>
+                {balance == null
+                  ? '—'
+                  : `₹${Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </Text>
+            )}
           </View>
           <TouchableOpacity
-            className="rounded-[10px] px-3 py-1.5"
-            style={{ backgroundColor: c.primary }}
+            onPress={() => navigation.navigate('Config')}
+            activeOpacity={0.85}
+            className="rounded-[10px] flex-row items-center px-3 py-2"
+            style={{ backgroundColor: c.primary, gap: 4 }}
           >
-            <Text className="text-[11px] font-bold text-white">View Analytics</Text>
+            <Ionicons name="add" size={12} color="#FFFFFF" />
+            <Text className="text-[11px] font-bold text-white">Top up</Text>
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
 
         {/* Channels */}
         <View className="flex-row items-center justify-between mt-6 mb-3">

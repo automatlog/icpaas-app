@@ -13,6 +13,7 @@ import { WhatsAppAPI, ChannelsAPI } from '../../services/api';
 import { pushNotification } from '../../store/slices/notificationsSlice';
 import { BottomTabBar } from '../shared/DashboardScreen';
 import toast from '../../services/toast';
+import FormField from '../../components/FormField';
 
 const CATEGORIES = [
   { id: 'MARKETING',     label: 'Marketing',     icon: 'megaphone',           desc: 'Promos, offers, retargeting.' },
@@ -219,10 +220,10 @@ export default function CreateTemplateScreen({ navigation, route }) {
 
         {/* Name + language */}
         <Section c={c} icon="text" label="Template basics">
-          <Field c={c} label="Template name" required hint="lowercase + underscores; e.g. order_update_v1">
+          <FormField caps c={c} label="Template name" required hint="lowercase + underscores; e.g. order_update_v1">
             <Input c={c} value={name} onChangeText={(v) => setName(v.toLowerCase().replace(/\s+/g, '_'))} placeholder="order_update_v1" autoCapitalize="none" />
-          </Field>
-          <Field c={c} label="Language" hint="Locale code per Meta">
+          </FormField>
+          <FormField caps c={c} label="Language" hint="Locale code per Meta">
             <DropdownTrigger c={c} value={language} icon="globe-outline" open={showLang} onPress={() => setShowLang((v) => !v)} />
             {showLang ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginTop: 6 }}>
@@ -239,7 +240,7 @@ export default function CreateTemplateScreen({ navigation, route }) {
                 ))}
               </ScrollView>
             ) : null}
-          </Field>
+          </FormField>
         </Section>
 
         {/* Category */}
@@ -279,13 +280,13 @@ export default function CreateTemplateScreen({ navigation, route }) {
         <Section c={c} icon="layers" label="Header (optional)" toggleValue={useHeader} onToggle={setUseHeader}>
           {useHeader ? (
             <>
-              <Field c={c} label="Header text" hint="Up to 60 chars · max one {{1}} variable">
+              <FormField caps c={c} label="Header text" hint="Up to 60 chars · max one {{1}} variable">
                 <Input c={c} value={headerText} onChangeText={setHeaderText} placeholder="Hello {{1}}!" />
-              </Field>
+              </FormField>
               {headerVarCount > 0 ? (
-                <Field c={c} label="{{1}} example value" required>
+                <FormField caps c={c} label="{{1}} example value" required>
                   <Input c={c} value={headerExample} onChangeText={setHeaderExample} placeholder="David" />
-                </Field>
+                </FormField>
               ) : null}
             </>
           ) : null}
@@ -293,9 +294,9 @@ export default function CreateTemplateScreen({ navigation, route }) {
 
         {/* Body */}
         <Section c={c} icon="document-text" label="Body" required>
-          <Field c={c} label="Body text" required hint="Up to 1024 chars. Use {{1}}, {{2}}, … for variables.">
+          <FormField caps c={c} label="Body text" required hint="Up to 1024 chars. Use {{1}}, {{2}}, … for variables.">
             <Input c={c} value={bodyText} onChangeText={setBodyText} placeholder="Hi {{1}}, your order #{{2}} ships on {{3}}." multiline minHeight={110} />
-          </Field>
+          </FormField>
           {bodyVarCount > 0 ? (
             <View>
               <Text className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: c.textMuted }}>
@@ -319,9 +320,9 @@ export default function CreateTemplateScreen({ navigation, route }) {
         {/* Footer */}
         <Section c={c} icon="chatbox-ellipses-outline" label="Footer (optional)" toggleValue={useFooter} onToggle={setUseFooter}>
           {useFooter ? (
-            <Field c={c} label="Footer text" hint="Up to 60 chars · no variables">
+            <FormField caps c={c} label="Footer text" hint="Up to 60 chars · no variables">
               <Input c={c} value={footerText} onChangeText={setFooterText} placeholder="Reply STOP to opt out" />
-            </Field>
+            </FormField>
           ) : null}
         </Section>
 
@@ -338,18 +339,18 @@ export default function CreateTemplateScreen({ navigation, route }) {
                     <Ionicons name="close-circle" size={16} color={c.danger} />
                   </TouchableOpacity>
                 </View>
-                <Field c={c} label="Button label">
+                <FormField caps c={c} label="Button label">
                   <Input c={c} value={b.text} onChangeText={(v) => updateButton(i, { text: v })} placeholder="Visit shop" />
-                </Field>
+                </FormField>
                 {t === 'URL' ? (
-                  <Field c={c} label="URL">
+                  <FormField caps c={c} label="URL">
                     <Input c={c} value={b.url} onChangeText={(v) => updateButton(i, { url: v })} placeholder="https://example.com" autoCapitalize="none" />
-                  </Field>
+                  </FormField>
                 ) : null}
                 {t === 'PHONE_NUMBER' ? (
-                  <Field c={c} label="Phone">
+                  <FormField caps c={c} label="Phone">
                     <Input c={c} value={b.phone} onChangeText={(v) => updateButton(i, { phone: v })} placeholder="+919876543210" keyboardType="phone-pad" />
-                  </Field>
+                  </FormField>
                 ) : null}
               </View>
             );
@@ -440,17 +441,6 @@ function Section({ c, icon, label, required, toggleValue, onToggle, children }) 
   );
 }
 
-function Field({ c, label, required, hint, children }) {
-  return (
-    <View className="mb-2.5">
-      <Text className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: c.textMuted }}>
-        {label}{required ? <Text style={{ color: c.danger }}>  *</Text> : null}
-      </Text>
-      {children}
-      {hint ? <Text className="text-[10px] mt-1" style={{ color: c.textDim }}>{hint}</Text> : null}
-    </View>
-  );
-}
 
 function Input({ c, value, onChangeText, placeholder, keyboardType, autoCapitalize, multiline, minHeight }) {
   return (

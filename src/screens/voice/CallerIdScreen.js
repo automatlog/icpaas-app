@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
+import InfoRow from '../../components/InfoRow';
 
 const C = {
   dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0' },
@@ -89,15 +90,7 @@ export default function CallerIdScreen({ navigation }) {
                   </View>
                 </View>
 
-                <View className="mb-2">
-                  <Text className={`text-[10px] font-semibold uppercase tracking-widest mb-1 ${textMuted}`}>Caller ID</Text>
-                  <View className={`flex-row items-center rounded-[14px] px-3 py-2.5 ${inputBg}`} style={{ gap: 8 }}>
-                    <Text className={`flex-1 text-[12px] font-mono ${textInk}`} numberOfLines={1}>{cid.id}</Text>
-                    <TouchableOpacity onPress={() => copy(cid.id, 'Caller ID')} activeOpacity={0.7}>
-                      <Ionicons name="copy-outline" size={14} color={c.muted} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <InfoRow c={c} label="Caller ID" value={cid.id} onCopy={() => copy(cid.id, 'Caller ID')} />
               </View>
             );
           })

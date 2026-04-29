@@ -3,8 +3,8 @@
 // DLT template ID, then sends bulk SMS via SMSAPI.send.
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, Switch,
-  ActivityIndicator, Platform, Alert,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  Platform, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
@@ -14,6 +14,10 @@ import { pushNotification } from '../../store/slices/notificationsSlice';
 import toast from '../../services/toast';
 import dialog from '../../services/dialog';
 import GradientButton from '../../components/GradientButton';
+import FormField, { inputStyle } from '../../components/FormField';
+import Dropdown from '../../components/Dropdown';
+import ToggleRow from '../../components/ToggleRow';
+import Pill from '../../components/Pill';
 
 const ROUTES = [
   { id: 'master',        label: 'Master' },
@@ -189,7 +193,7 @@ export default function CampaignScreen({ navigation }) {
           <View style={{ width: 36 }} />
         </View>
 
-        <Field
+        <FormField
           c={c}
           label="Campaign Name *"
           icon="megaphone-outline"
@@ -202,10 +206,10 @@ export default function CampaignScreen({ navigation }) {
             placeholderTextColor={c.textMuted}
             style={inputStyle(c)}
           />
-        </Field>
+        </FormField>
 
         <Row>
-          <Field c={c} label="Route *" hint="Select the route for delivering messages." flex>
+          <FormField c={c} label="Route *" hint="Select the route for delivering messages." flex>
             <Dropdown
               c={c}
               placeholder="Pick route"
@@ -216,8 +220,8 @@ export default function CampaignScreen({ navigation }) {
               selectedId={route}
               onSelect={(opt) => { setRoute(opt.id); setShowRoute(false); }}
             />
-          </Field>
-          <Field c={c} label="SenderId *" hint="Enter a valid 6-character SenderID from this list." flex>
+          </FormField>
+          <FormField c={c} label="SenderId *" hint="Enter a valid 6-character SenderID from this list." flex>
             <Dropdown
               c={c}
               placeholder={loadingSenders ? 'Loading…' : 'Pick sender'}
@@ -228,11 +232,11 @@ export default function CampaignScreen({ navigation }) {
               selectedId={sender?.senderId}
               onSelect={(opt) => { setSender(senders.find((x) => x.senderId === opt.id) || null); setShowSender(false); }}
             />
-          </Field>
+          </FormField>
         </Row>
 
         <Row>
-          <Field c={c} label="Language" hint="Select preferred language." flex>
+          <FormField c={c} label="Language" hint="Select preferred language." flex>
             <Dropdown
               c={c}
               placeholder="Pick"
@@ -243,8 +247,8 @@ export default function CampaignScreen({ navigation }) {
               selectedId={language}
               onSelect={(opt) => { setLanguage(opt.id); setShowLanguage(false); }}
             />
-          </Field>
-          <Field c={c} label="DLT TemplateId *" hint="Enter the DLT-approved template ID" flex>
+          </FormField>
+          <FormField c={c} label="DLT TemplateId *" hint="Enter the DLT-approved template ID" flex>
             <TextInput
               value={dltId}
               onChangeText={setDltId}
@@ -253,7 +257,7 @@ export default function CampaignScreen({ navigation }) {
               keyboardType="number-pad"
               style={[inputStyle(c), { fontFamily: 'monospace' }]}
             />
-          </Field>
+          </FormField>
         </Row>
 
         {/* Select Template (full-width dark button) */}
@@ -321,7 +325,7 @@ export default function CampaignScreen({ navigation }) {
         ) : null}
         <Text style={{ color: c.textMuted, fontSize: 11, marginBottom: 14 }}>Select a predefined message template.</Text>
 
-        <Field c={c} label={`Message Text   ${stats.length}/${stats.maxLength}  ·  Segments: ${stats.segments}  ·  Chars Left: ${stats.charsLeft}`}
+        <FormField c={c} label={`Message Text   ${stats.length}/${stats.maxLength}  ·  Segments: ${stats.segments}  ·  Chars Left: ${stats.charsLeft}`}
           hint="This is your SMS content preview. The text is auto-filled from the template.">
           <TextInput
             value={messageText}
@@ -334,10 +338,10 @@ export default function CampaignScreen({ navigation }) {
               { minHeight: 110, textAlignVertical: 'top', paddingTop: 12 },
             ]}
           />
-        </Field>
+        </FormField>
 
         <Row>
-          <Field c={c} label="Campaign Type *" flex>
+          <FormField c={c} label="Campaign Type *" flex>
             <Dropdown
               c={c}
               placeholder="Pick"
@@ -348,7 +352,7 @@ export default function CampaignScreen({ navigation }) {
               selectedId={campaignType}
               onSelect={(opt) => { setCampaignType(opt.id); setShowCampaignType(false); }}
             />
-          </Field>
+          </FormField>
           <View style={{ flex: 1 }}>
             <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>
               Total Counts: {numberCount}
@@ -364,7 +368,7 @@ export default function CampaignScreen({ navigation }) {
         </Row>
 
         <Row>
-          <Field c={c} label="Group" hint="Select contact group for messaging." flex>
+          <FormField c={c} label="Group" hint="Select contact group for messaging." flex>
             <Dropdown
               c={c}
               placeholder="Select Group"
@@ -375,8 +379,8 @@ export default function CampaignScreen({ navigation }) {
               selectedId={group?.id}
               onSelect={(opt) => { setGroup(opt); setShowGroup(false); }}
             />
-          </Field>
-          <Field c={c} label="Group Range" hint="Range within the group" flex>
+          </FormField>
+          <FormField c={c} label="Group Range" hint="Range within the group" flex>
             <View className="flex-row" style={{ gap: 6 }}>
               <TextInput
                 value={groupFrom}
@@ -396,10 +400,10 @@ export default function CampaignScreen({ navigation }) {
                 style={[inputStyle(c), { flex: 1 }]}
               />
             </View>
-          </Field>
+          </FormField>
         </Row>
 
-        <Field c={c} label={`Numbers (Max: 5,000 numbers only)  ·  ${numberCount} entered`}
+        <FormField c={c} label={`Numbers (Max: 5,000 numbers only)  ·  ${numberCount} entered`}
           hint="Enter multiple numbers separated by commas.">
           <TextInput
             value={numbers}
@@ -412,7 +416,7 @@ export default function CampaignScreen({ navigation }) {
               { minHeight: 90, textAlignVertical: 'top', paddingTop: 12 },
             ]}
           />
-        </Field>
+        </FormField>
 
         {/* Contact & File Upload */}
         <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', marginTop: 4, marginBottom: 8 }}>
@@ -430,9 +434,9 @@ export default function CampaignScreen({ navigation }) {
             marginBottom: 14,
           }}
         >
-          <Pill c={c} label="Total" value={numberCount} />
-          <Pill c={c} label="Duplicates" value={0} />
-          <Pill c={c} label="BlackList" value={0} />
+          <Pill c={c} layout="stacked" label="Total" value={numberCount} />
+          <Pill c={c} layout="stacked" label="Duplicates" value={0} />
+          <Pill c={c} layout="stacked" label="BlackList" value={0} />
         </View>
 
         <ToggleRow c={c} label="Remove Duplicates" value={removeDup} onChange={setRemoveDup} />
@@ -453,138 +457,6 @@ export default function CampaignScreen({ navigation }) {
   );
 }
 
-const inputStyle = (c) => ({
-  backgroundColor: c.bgCard,
-  borderWidth: 1,
-  borderColor: c.border,
-  borderRadius: 10,
-  paddingHorizontal: 12,
-  paddingVertical: Platform.OS === 'ios' ? 12 : 10,
-  fontSize: 14,
-  color: c.text,
-  ...Platform.select({ web: { outlineStyle: 'none' } }),
-});
-
-const Field = ({ c, label, hint, icon, children, flex }) => (
-  <View style={{ marginBottom: 14, flex: flex ? 1 : undefined }}>
-    <View className="flex-row items-center mb-1.5" style={{ gap: 6 }}>
-      {icon ? <Ionicons name={icon} size={12} color={c.textMuted} /> : null}
-      <Text style={{ color: c.text, fontSize: 12, fontWeight: '600' }}>{label}</Text>
-    </View>
-    {children}
-    {hint ? <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 6 }}>{hint}</Text> : null}
-  </View>
-);
-
 const Row = ({ children }) => (
   <View className="flex-row" style={{ gap: 10 }}>{children}</View>
-);
-
-const Dropdown = ({ c, placeholder, value, open, onToggle, options, selectedId, onSelect }) => (
-  <>
-    <TouchableOpacity
-      onPress={onToggle}
-      activeOpacity={0.85}
-      style={{
-        ...inputStyle(c),
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 12,
-      }}
-    >
-      <Text numberOfLines={1} style={{ color: value ? c.text : c.textMuted, fontSize: 14, flex: 1 }}>
-        {value || placeholder}
-      </Text>
-      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
-    </TouchableOpacity>
-    {open ? (
-      <View
-        style={{
-          marginTop: 6,
-          backgroundColor: c.bgCard,
-          borderWidth: 1,
-          borderColor: c.border,
-          borderRadius: 10,
-          maxHeight: 220,
-          overflow: 'hidden',
-        }}
-      >
-        <ScrollView nestedScrollEnabled>
-          {options.length === 0 ? (
-            <Text style={{ color: c.textMuted, padding: 14, fontSize: 12 }}>No options.</Text>
-          ) : (
-            options.map((o) => {
-              const active = o.id === selectedId;
-              return (
-                <TouchableOpacity
-                  key={o.id}
-                  onPress={() => onSelect(o)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: 12,
-                    borderBottomWidth: 1,
-                    borderBottomColor: c.border,
-                    backgroundColor: active ? c.primarySoft : 'transparent',
-                    gap: 10,
-                  }}
-                >
-                  <Ionicons
-                    name={active ? 'radio-button-on' : 'radio-button-off'}
-                    size={14}
-                    color={active ? c.primary : c.textMuted}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{o.label}</Text>
-                    {o.sub ? (
-                      <Text style={{ color: c.textMuted, fontSize: 10, fontFamily: 'monospace', marginTop: 2 }} numberOfLines={1}>
-                        {o.sub}
-                      </Text>
-                    ) : null}
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
-      </View>
-    ) : null}
-  </>
-);
-
-const ToggleRow = ({ c, label, value, onChange }) => (
-  <View
-    style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: c.rule,
-    }}
-  >
-    <Switch
-      value={value}
-      onValueChange={onChange}
-      trackColor={{ false: c.bgInput, true: c.primary }}
-      thumbColor="#FFFFFF"
-    />
-    <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', marginLeft: 12 }}>{label}</Text>
-  </View>
-);
-
-const Pill = ({ c, label, value }) => (
-  <View
-    style={{
-      flex: 1,
-      paddingVertical: 8,
-      paddingHorizontal: 10,
-      backgroundColor: c.bgInput,
-      borderRadius: 8,
-      alignItems: 'center',
-    }}
-  >
-    <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{value}</Text>
-    <Text style={{ color: c.textMuted, fontSize: 10, marginTop: 2 }}>{label}</Text>
-  </View>
 );
