@@ -17,6 +17,7 @@ import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import YouScreen from '../screens/shared/YouScreen';
 import ApiDocsScreen from '../screens/shared/ApiDocsScreen';
 import ContactsScreen from '../screens/shared/ContactsScreen';
+import ForgotPasswordScreen from '../screens/shared/ForgotPasswordScreen';
 
 // WhatsApp screens
 import WhatsAppInboxScreen from '../screens/whatsapp/InboxScreen';
@@ -109,6 +110,7 @@ export default function AppNavigator() {
         <Stack.Screen name="You" component={YouScreen} />
         <Stack.Screen name="ApiDocs" component={ApiDocsScreen} />
         <Stack.Screen name="Contacts" component={ContactsScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 
         {/* WhatsApp */}
         <Stack.Screen name="WhatsAppInbox" component={WhatsAppInboxScreen} />

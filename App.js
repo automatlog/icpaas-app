@@ -8,7 +8,7 @@ import { Provider, useSelector, useDispatch } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 
 import AppNavigator from './src/navigation/AppNavigator';
-import LoginScreen from './src/screens/shared/LoginScreen';
+import AuthNavigator from './src/navigation/AuthNavigator';
 import LoadingScreen from './src/screens/shared/LoadingScreen';
 import { store, persistor } from './src/store';
 import { setHydrated } from './src/store/slices/hydratedSlice';
@@ -49,7 +49,7 @@ function AppInner() {
     <SafeAreaProvider>
       <StatusBar barStyle={barStyle} backgroundColor={c.bg} />
       <View style={rootStyle}>
-        {isLoggedIn && isHydrated ? <AppNavigator /> : <LoginScreen />}
+        {isLoggedIn && isHydrated ? <AppNavigator /> : <AuthNavigator />}
       </View>
       <FlashMessage position="top" />
     </SafeAreaProvider>
