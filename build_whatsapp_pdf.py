@@ -83,26 +83,20 @@ note = ParagraphStyle(
     "Note", parent=styles["Normal"], fontSize=9, textColor=MID,
     fontName="Helvetica-Oblique", leftIndent=14, spaceAfter=8,
 )
-code_style = ParagraphStyle(
-    "Code", parent=styles["Code"], fontName="Courier", fontSize=8.2,
-    textColor=DARK, leading=11, leftIndent=0, rightIndent=0,
-    spaceBefore=4, spaceAfter=4,
-)
+def _code_style(bg):
+    return ParagraphStyle(
+        f"Code_{bg.hexval()}", parent=styles["Code"], fontName="Courier", fontSize=8.2,
+        textColor=DARK, leading=11,
+        leftIndent=8, rightIndent=8,
+        spaceBefore=6, spaceAfter=10,
+        backColor=bg, borderColor=LIGHT, borderWidth=0.6,
+        borderPadding=(8, 8, 8, 8),
+    )
 
 
 def code_block(code: str, bg=CODE_BG):
-    """Render a fixed-width code block inside a single-cell shaded table."""
-    pre = Preformatted(code, code_style)
-    tbl = Table([[pre]], colWidths=[6.5 * inch])
-    tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), bg),
-        ("BOX", (0, 0), (-1, -1), 0.6, LIGHT),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-    ]))
-    return tbl
+    """Render a fixed-width code block that splits across pages if needed."""
+    return Preformatted(code, _code_style(bg))
 
 
 def info_table(rows):
@@ -154,7 +148,9 @@ cover_box = Table(
         "&bull; API key setup &amp; authentication<br/>"
         "&bull; Create templates with TEXT, IMAGE, VIDEO, DOCUMENT, LOCATION headers<br/>"
         "&bull; Interactive buttons: Quick Reply, URL, Phone, Copy Code<br/>"
-        "&bull; Send messages using approved templates<br/>"
+        "&bull; Carousel and Flow templates<br/>"
+        "&bull; Send templates with every header type, carousel cards, and flows<br/>"
+        "&bull; Conversation API: free-form text, image, document, video, audio, replies<br/>"
         "&bull; Webhook configuration for inbound events<br/>"
         "&bull; Template lifecycle: Get, Get by ID, Edit, Delete<br/>"
         "&bull; Channel management &amp; additional APIs (wallet, media)",
@@ -187,11 +183,19 @@ toc = [
     ["", "    3.4  Template with DOCUMENT Header"],
     ["", "    3.5  Template with LOCATION Header"],
     ["", "    3.6  Templates with Buttons (Quick Reply, URL, Phone, Copy Code)"],
-    ["4.", "Send Message API"],
-    ["5.", "Webhook Configuration"],
-    ["6.", "Template Management Endpoints (Get, Get by ID, Edit, Delete)"],
-    ["7.", "Channel Management"],
-    ["8.", "Additional APIs (Wallet Balance, Media Upload)"],
+    ["", "    3.7  Carousel Template"],
+    ["", "    3.8  Flow Template"],
+    ["4.", "Send Template Message API"],
+    ["", "    4.1  TEXT / IMAGE / VIDEO / DOCUMENT / LOCATION header sends"],
+    ["", "    4.2  Send Carousel Template"],
+    ["", "    4.3  Send Template that triggers a Flow"],
+    ["5.", "Conversation API (Free-form Messages)"],
+    ["", "    5.1  Text  /  5.2  Image  /  5.3  Document"],
+    ["", "    5.4  Video  /  5.5  Audio  /  5.6  Reply with context"],
+    ["6.", "Webhook Configuration"],
+    ["7.", "Template Management Endpoints (Get, Get by ID, Edit, Delete)"],
+    ["8.", "Channel Management"],
+    ["9.", "Additional APIs (Wallet Balance, Media Upload)"],
 ]
 toc_tbl = Table(toc, colWidths=[0.6 * inch, 5.9 * inch])
 toc_tbl.setStyle(TableStyle([
@@ -346,7 +350,7 @@ story.append(code_block("""curl --location --globoff 'https://{{Your domain name
 story.append(callout(
     "<b>Note &mdash; media handle vs. media ID:</b><br/>"
     "&bull; <b>At template creation</b>, <font face='Courier'>header_handle</font> accepts a public URL "
-    "<i>or</i> a media ID returned by the Media Upload API (section 8.2). Upload first, then reference "
+    "<i>or</i> a media ID returned by the Media Upload API (section 9.2). Upload first, then reference "
     "the returned <font face='Courier'>id</font> here.<br/>"
     "&bull; <b>At send time</b>, the header parameter switches to "
     "<font face='Courier'>{ \"type\": \"image\", \"image\": { \"id\": \"&lt;MEDIA_ID&gt;\" } }</font> "
@@ -387,7 +391,7 @@ story.append(callout(
     "<b>Note &mdash; media handle vs. media ID:</b><br/>"
     "&bull; Video must be MP4, max 16&nbsp;MB.<br/>"
     "&bull; <b>At template creation</b>, <font face='Courier'>header_handle</font> accepts a public URL "
-    "<i>or</i> a media ID from the Media Upload API (section 8.2).<br/>"
+    "<i>or</i> a media ID from the Media Upload API (section 9.2).<br/>"
     "&bull; <b>At send time</b>, pass the media ID as "
     "<font face='Courier'>{ \"type\": \"video\", \"video\": { \"id\": \"&lt;MEDIA_ID&gt;\" } }</font>."
 ))
@@ -426,7 +430,7 @@ story.append(callout(
     "<b>Note &mdash; media handle vs. media ID:</b><br/>"
     "&bull; Supported: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX (max 100&nbsp;MB).<br/>"
     "&bull; <b>At template creation</b>, <font face='Courier'>header_handle</font> accepts a public URL "
-    "<i>or</i> a media ID from the Media Upload API (section 8.2).<br/>"
+    "<i>or</i> a media ID from the Media Upload API (section 9.2).<br/>"
     "&bull; <b>At send time</b>, pass the media ID as "
     "<font face='Courier'>{ \"type\": \"document\", \"document\": { \"id\": \"&lt;MEDIA_ID&gt;\", "
     "\"filename\": \"invoice.pdf\" } }</font>."
@@ -461,7 +465,7 @@ story.append(code_block("""curl --location --globoff 'https://{{Your domain name
 }'""", bg=CREATE_BG))
 story.append(callout(
     "<b>Note:</b> Latitude, longitude, name, and address are supplied at <i>send</i> time, "
-    "not during template creation (see section 4.2)."
+    "not during template creation (see section 4.5)."
 ))
 story.append(PageBreak())
 
@@ -596,8 +600,156 @@ story.append(code_block("""curl --location --globoff 'https://{{Your domain name
 }'""", bg=CREATE_BG))
 story.append(PageBreak())
 
+# 3.7 CAROUSEL TEMPLATE
+story.append(Paragraph("3.7 Create Carousel Template", h2))
+story.append(Paragraph(
+    "A carousel template displays a single text bubble followed by up to ten horizontally "
+    "scrollable cards. Every card must share the same media header format and the same "
+    "button combination. Cards can include up to two buttons each (Quick Reply, URL, or "
+    "Phone Number).",
+    body,
+))
+story.append(callout(
+    "<b>Rules:</b> the message bubble (top BODY) is text-only and may contain variables. "
+    "All cards must use the same header <i>format</i> (all IMAGE or all VIDEO) and the same "
+    "button types in the same order. Maximum 10 cards per carousel."
+))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{wabaId}}/message_templates' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "name": "summer_collection_carousel",
+  "language": "en_US",
+  "category": "MARKETING",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hi {{1}}! Check out our latest arrivals.",
+      "example": { "body_text": [["Pablo"]] }
+    },
+    {
+      "type": "CAROUSEL",
+      "cards": [
+        {
+          "components": [
+            {
+              "type": "HEADER",
+              "format": "IMAGE",
+              "example": {
+                "header_handle": ["https://example.com/products/card1.jpg"]
+              }
+            },
+            {
+              "type": "BODY",
+              "text": "Premium headphones with {{1}} discount.",
+              "example": { "body_text": [["20%"]] }
+            },
+            {
+              "type": "BUTTONS",
+              "buttons": [
+                { "type": "QUICK_REPLY", "text": "More info" },
+                {
+                  "type": "URL",
+                  "text": "Buy now",
+                  "url": "https://example.com/p/{{1}}",
+                  "example": ["headphones"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "components": [
+            {
+              "type": "HEADER",
+              "format": "IMAGE",
+              "example": {
+                "header_handle": ["https://example.com/products/card2.jpg"]
+              }
+            },
+            {
+              "type": "BODY",
+              "text": "Smart watch with {{1}} discount.",
+              "example": { "body_text": [["30%"]] }
+            },
+            {
+              "type": "BUTTONS",
+              "buttons": [
+                { "type": "QUICK_REPLY", "text": "More info" },
+                {
+                  "type": "URL",
+                  "text": "Buy now",
+                  "url": "https://example.com/p/{{1}}",
+                  "example": ["smartwatch"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}'""", bg=CREATE_BG))
+story.append(PageBreak())
+
+# 3.8 FLOW TEMPLATE
+story.append(Paragraph("3.8 Create Flow Template", h2))
+story.append(Paragraph(
+    "A flow template embeds a WhatsApp Flow behind a CTA button. The recipient taps the "
+    "button to open a multi-screen interactive form (sign-up, appointment booking, lead "
+    "capture, etc.). The Flow itself must already be created and <b>published</b> in the "
+    "WhatsApp Manager before it can be referenced here.",
+    body,
+))
+story.append(callout(
+    "<b>Required Flow button fields:</b> "
+    "<font face='Courier'>flow_id</font> (published flow ID), "
+    "<font face='Courier'>navigate_screen</font> (ID of the first screen to open &mdash; required when "
+    "<font face='Courier'>flow_action</font> is <font face='Courier'>navigate</font>), "
+    "<font face='Courier'>flow_action</font> "
+    "(<font face='Courier'>navigate</font> for static flows or <font face='Courier'>data_exchange</font> "
+    "for dynamic flows that fetch screens from your endpoint)."
+))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{wabaId}}/message_templates' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "name": "appointment_booking",
+  "language": "en_US",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "TEXT",
+      "text": "Book your appointment"
+    },
+    {
+      "type": "BODY",
+      "text": "Hi {{1}}, tap below to choose a time that works for you.",
+      "example": { "body_text": [["Pablo"]] }
+    },
+    {
+      "type": "FOOTER",
+      "text": "We will confirm by SMS"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "FLOW",
+          "text": "Book now",
+          "flow_id": "<FLOW_ID>",
+          "navigate_screen": "BOOKING_SCREEN",
+          "flow_action": "navigate"
+        }
+      ]
+    }
+  ]
+}'""", bg=CREATE_BG))
+story.append(PageBreak())
+
 # ---------- 4. SEND MESSAGE ----------
-story.append(Paragraph("4. Send Message API", h1))
+story.append(Paragraph("4. Send Template Message API", h1))
 story.append(Paragraph(
     "Once a template is approved, send it to a recipient using this endpoint. The payload "
     "varies depending on the template's components (header type, body variables, button "
@@ -614,7 +766,7 @@ story.append(info_table([
 story.append(Spacer(1, 0.1 * inch))
 story.append(callout(
     "<b>Using media IDs at send time:</b> for templates with IMAGE / VIDEO / DOCUMENT headers, "
-    "first upload the file via the Media Upload API (section 8.2) to receive a media "
+    "first upload the file via the Media Upload API (section 9.2) to receive a media "
     "<font face='Courier'>id</font>. Pass that id under the header parameter, e.g. "
     "<font face='Courier'>{ \"type\": \"image\", \"image\": { \"id\": \"&lt;MEDIA_ID&gt;\" } }</font>. "
     "The same media ID can be reused across multiple sends; alternatively a public "
@@ -622,7 +774,36 @@ story.append(callout(
 ))
 story.append(Spacer(1, 0.1 * inch))
 
-story.append(Paragraph("4.1 Send Template with IMAGE Header", h2))
+story.append(Paragraph("4.1 Send Template with TEXT Header", h2))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "91XXXXXXXXXX",
+  "type": "template",
+  "template": {
+    "name": "welcome_message",
+    "language": { "code": "en_US" },
+    "components": [
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "text": "Pablo" }
+        ]
+      }
+    ]
+  }
+}'""", bg=SEND_BG))
+story.append(callout(
+    "<b>Tip:</b> if your TEXT header itself contains a variable like "
+    "<font face='Courier'>{{1}}</font>, add a <font face='Courier'>header</font> component "
+    "with a <font face='Courier'>{ \"type\": \"text\", \"text\": \"...\" }</font> parameter."
+))
+story.append(PageBreak())
+
+story.append(Paragraph("4.2 Send Template with IMAGE Header", h2))
 story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
 --header 'Authorization: Bearer {{User-Access-Token}}' \\
 --header 'Content-Type: application/json' \\
@@ -638,7 +819,7 @@ story.append(code_block("""curl --location --globoff 'https://{{Your domain name
       {
         "type": "header",
         "parameters": [
-          { "type": "image", "image": { "id": "1234567890" } }
+          { "type": "image", "image": { "id": "<MEDIA_ID>" } }
         ]
       },
       {
@@ -651,9 +832,92 @@ story.append(code_block("""curl --location --globoff 'https://{{Your domain name
     ]
   }
 }'""", bg=SEND_BG))
+story.append(callout(
+    "Replace <font face='Courier'>{ \"id\": \"&lt;MEDIA_ID&gt;\" }</font> with "
+    "<font face='Courier'>{ \"link\": \"https://example.com/img.jpg\" }</font> if you prefer "
+    "a public URL over an uploaded media ID."
+))
 story.append(PageBreak())
 
-story.append(Paragraph("4.2 Send Template with LOCATION Header", h2))
+story.append(Paragraph("4.3 Send Template with VIDEO Header", h2))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "91XXXXXXXXXX",
+  "type": "template",
+  "template": {
+    "name": "tutorial_video",
+    "language": { "code": "en_US" },
+    "components": [
+      {
+        "type": "header",
+        "parameters": [
+          { "type": "video", "video": { "id": "<MEDIA_ID>" } }
+        ]
+      },
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "text": "5-minute" }
+        ]
+      }
+    ]
+  }
+}'""", bg=SEND_BG))
+story.append(PageBreak())
+
+story.append(Paragraph("4.4 Send Template with DOCUMENT Header", h2))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "91XXXXXXXXXX",
+  "type": "template",
+  "template": {
+    "name": "invoice_delivery",
+    "language": { "code": "en_US" },
+    "components": [
+      {
+        "type": "header",
+        "parameters": [
+          {
+            "type": "document",
+            "document": {
+              "id": "<MEDIA_ID>",
+              "filename": "invoice-INV-2026-001.pdf"
+            }
+          }
+        ]
+      },
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "text": "INV-2026-001" },
+          { "type": "currency",
+            "currency": {
+              "fallback_value": "$1,250.00",
+              "code": "USD",
+              "amount_1000": 1250000
+            }
+          }
+        ]
+      }
+    ]
+  }
+}'""", bg=SEND_BG))
+story.append(callout(
+    "<b>Note:</b> for monetary values use a <font face='Courier'>currency</font> parameter so "
+    "WhatsApp can render the amount per the recipient's locale; "
+    "<font face='Courier'>amount_1000</font> is the value multiplied by 1000."
+))
+story.append(PageBreak())
+
+story.append(Paragraph("4.5 Send Template with LOCATION Header", h2))
 story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
 --header 'Authorization: Bearer {{User-Access-Token}}' \\
 --header 'Content-Type: application/json' \\
@@ -690,6 +954,141 @@ story.append(code_block("""curl --location --globoff 'https://{{Your domain name
     ]
   }
 }'""", bg=SEND_BG))
+story.append(PageBreak())
+
+story.append(Paragraph("4.6 Send Carousel Template", h2))
+story.append(Paragraph(
+    "Each card carries its own <font face='Courier'>card_index</font> (zero-based) and lists "
+    "only the components whose values change at send time &mdash; typically the header media "
+    "and the URL/quick-reply button payloads.",
+    body,
+))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "91XXXXXXXXXX",
+  "type": "template",
+  "template": {
+    "name": "summer_collection_carousel",
+    "language": { "code": "en_US" },
+    "components": [
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "text": "Pablo" }
+        ]
+      },
+      {
+        "type": "carousel",
+        "cards": [
+          {
+            "card_index": 0,
+            "components": [
+              {
+                "type": "header",
+                "parameters": [
+                  { "type": "image", "image": { "id": "<MEDIA_ID_1>" } }
+                ]
+              },
+              {
+                "type": "body",
+                "parameters": [
+                  { "type": "text", "text": "20%" }
+                ]
+              },
+              {
+                "type": "button",
+                "sub_type": "url",
+                "index": "1",
+                "parameters": [
+                  { "type": "text", "text": "headphones" }
+                ]
+              }
+            ]
+          },
+          {
+            "card_index": 1,
+            "components": [
+              {
+                "type": "header",
+                "parameters": [
+                  { "type": "image", "image": { "id": "<MEDIA_ID_2>" } }
+                ]
+              },
+              {
+                "type": "body",
+                "parameters": [
+                  { "type": "text", "text": "30%" }
+                ]
+              },
+              {
+                "type": "button",
+                "sub_type": "url",
+                "index": "1",
+                "parameters": [
+                  { "type": "text", "text": "smartwatch" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}'""", bg=SEND_BG))
+story.append(PageBreak())
+
+story.append(Paragraph("4.7 Send Template that Triggers a Flow", h2))
+story.append(Paragraph(
+    "Templates created with a FLOW button (section 3.8) are sent with a "
+    "<font face='Courier'>button</font> component using "
+    "<font face='Courier'>sub_type: \"flow\"</font>. The "
+    "<font face='Courier'>flow_token</font> is your opaque identifier echoed back in the "
+    "Flow's data-exchange webhooks; <font face='Courier'>flow_action_data</font> "
+    "pre-populates fields on the first screen.",
+    body,
+))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "91XXXXXXXXXX",
+  "type": "template",
+  "template": {
+    "name": "appointment_booking",
+    "language": { "code": "en_US" },
+    "components": [
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "text": "Pablo" }
+        ]
+      },
+      {
+        "type": "button",
+        "sub_type": "flow",
+        "index": "0",
+        "parameters": [
+          {
+            "type": "action",
+            "action": {
+              "flow_token": "user-12345-session-abc",
+              "flow_action_data": {
+                "customer_name": "Pablo",
+                "customer_phone": "+91XXXXXXXXXX"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}'""", bg=SEND_BG))
 story.append(Spacer(1, 0.15 * inch))
 
 story.append(Paragraph("Success response", h3))
@@ -712,8 +1111,157 @@ story.append(code_block("""{
 }"""))
 story.append(PageBreak())
 
-# ---------- 5. WEBHOOK ----------
-story.append(Paragraph("5. Webhook Configuration", h1))
+# ---------- 5. CONVERSATION API (FREE-FORM) ----------
+story.append(Paragraph("5. Conversation API &mdash; Free-form Messages", h1))
+story.append(Paragraph(
+    "Once a user has messaged your number within the 24-hour customer-service window, you can "
+    "reply with non-template (free-form) messages. Same endpoint as templates, different "
+    "<font face='Courier'>type</font> values.",
+    body,
+))
+story.append(info_table([
+    ["Endpoint", "POST /{version}/{phoneNumberId}/messages"],
+    ["Method", "POST"],
+    ["Headers", "Authorization: Bearer {{User-Access-Token}}"],
+    ["", "Content-Type: application/json"],
+]))
+story.append(callout(
+    "<b>24-hour window:</b> free-form messages can only be sent within 24 hours of the "
+    "recipient's last inbound message. After that, you must initiate with an approved template."
+))
+story.append(Spacer(1, 0.1 * inch))
+
+# 5.1 TEXT
+story.append(Paragraph("5.1 Send Text Message", h2))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "91XXXXXXXXXX",
+  "type": "text",
+  "text": {
+    "preview_url": true,
+    "body": "Thanks for reaching out! Visit https://example.com for more info."
+  }
+}'""", bg=SEND_BG))
+story.append(callout(
+    "<b>preview_url:</b> set to <font face='Courier'>true</font> to render link previews. "
+    "WhatsApp uses the first URL in the body."
+))
+story.append(PageBreak())
+
+# 5.2 IMAGE
+story.append(Paragraph("5.2 Send Image Message", h2))
+story.append(Paragraph("By media ID (recommended &mdash; upload via section 9.2 first):", h3))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "91XXXXXXXXXX",
+  "type": "image",
+  "image": {
+    "id": "<MEDIA_ID>",
+    "caption": "Here is the product photo you asked about."
+  }
+}'""", bg=SEND_BG))
+story.append(Paragraph("By public URL:", h3))
+story.append(code_block("""--data '{
+  "messaging_product": "whatsapp",
+  "to": "91XXXXXXXXXX",
+  "type": "image",
+  "image": {
+    "link": "https://example.com/photo.jpg",
+    "caption": "Here is the product photo you asked about."
+  }
+}'""", bg=SEND_BG))
+story.append(PageBreak())
+
+# 5.3 DOCUMENT
+story.append(Paragraph("5.3 Send Document Message", h2))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "91XXXXXXXXXX",
+  "type": "document",
+  "document": {
+    "id": "<MEDIA_ID>",
+    "filename": "invoice-INV-2026-001.pdf",
+    "caption": "Your invoice is attached."
+  }
+}'""", bg=SEND_BG))
+story.append(callout(
+    "<b>filename:</b> what the recipient sees and what gets used when they download. Always "
+    "include it for documents &mdash; it also influences how WhatsApp renders the document tile."
+))
+story.append(Spacer(1, 0.1 * inch))
+
+# 5.4 VIDEO
+story.append(Paragraph("5.4 Send Video Message", h2))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "to": "91XXXXXXXXXX",
+  "type": "video",
+  "video": {
+    "id": "<MEDIA_ID>",
+    "caption": "Quick walkthrough of the new feature."
+  }
+}'""", bg=SEND_BG))
+story.append(PageBreak())
+
+# 5.5 AUDIO
+story.append(Paragraph("5.5 Send Audio Message", h2))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "to": "91XXXXXXXXXX",
+  "type": "audio",
+  "audio": {
+    "id": "<MEDIA_ID>"
+  }
+}'""", bg=SEND_BG))
+story.append(callout(
+    "Audio messages do not support captions. Use OGG/Opus for voice notes (auto-played in-app); "
+    "MP3/AAC for music or longer audio."
+))
+story.append(Spacer(1, 0.1 * inch))
+
+# 5.6 REPLY WITH CONTEXT
+story.append(Paragraph("5.6 Reply Quoting an Inbound Message", h2))
+story.append(Paragraph(
+    "Quote the user's previous message by adding a <font face='Courier'>context.message_id</font> "
+    "field. Works with any message type.",
+    body,
+))
+story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{phoneNumberId}}/messages' \\
+--header 'Authorization: Bearer {{User-Access-Token}}' \\
+--header 'Content-Type: application/json' \\
+--data '{
+  "messaging_product": "whatsapp",
+  "to": "91XXXXXXXXXX",
+  "context": {
+    "message_id": "wamid.HBgMOTE..."
+  },
+  "type": "text",
+  "text": {
+    "body": "Got it &mdash; processing your refund now."
+  }
+}'""", bg=SEND_BG))
+story.append(PageBreak())
+
+# ---------- 6. WEBHOOK ----------
+story.append(Paragraph("6. Webhook Configuration", h1))
 story.append(Paragraph(
     "Inbound messages and delivery events are pushed to your configured Webhook URL. Configure "
     "the endpoint to acknowledge receipt with HTTP 200 within a few seconds &mdash; do heavy "
@@ -741,14 +1289,14 @@ story.append(Paragraph("Reference: <font face='Courier'>https://developers.faceb
 story.append(PageBreak())
 
 # ---------- 6. TEMPLATE MANAGEMENT ----------
-story.append(Paragraph("6. Template Management Endpoints", h1))
+story.append(Paragraph("7. Template Management Endpoints", h1))
 story.append(Paragraph(
     "These endpoints cover the rest of the template lifecycle: listing, fetching, editing, "
     "and deleting templates.",
     body,
 ))
 
-story.append(Paragraph("6.1 Get All Templates", h2))
+story.append(Paragraph("7.1 Get All Templates", h2))
 story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/{{wabaId}}/message_templates' \\
 --header 'Authorization: Bearer {{User-Access-Token}}'"""))
 story.append(Paragraph("Response (excerpt)", h3))
@@ -771,12 +1319,12 @@ story.append(code_block("""{
 }"""))
 story.append(PageBreak())
 
-story.append(Paragraph("6.2 Get Template by ID", h2))
+story.append(Paragraph("7.2 Get Template by ID", h2))
 story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/<TEMPLATE_ID>' \\
 --header 'Authorization: Bearer {{User-Access-Token}}'"""))
 story.append(Spacer(1, 0.15 * inch))
 
-story.append(Paragraph("6.3 Edit Template", h2))
+story.append(Paragraph("7.3 Edit Template", h2))
 story.append(Paragraph(
     "Editing reuses the template ID as the path parameter. Send only the components you want "
     "to update; the category cannot be changed once approved unless "
@@ -805,7 +1353,7 @@ story.append(callout(
 ))
 story.append(PageBreak())
 
-story.append(Paragraph("6.4 Delete Template", h2))
+story.append(Paragraph("7.4 Delete Template", h2))
 story.append(Paragraph(
     "Delete by name (removes all language variants) or by ID (removes a single language). "
     "Pass the template name or <font face='Courier'>hsm_id</font> as a query parameter.",
@@ -822,8 +1370,8 @@ story.append(code_block("""curl --location --globoff --request DELETE \\
 story.append(PageBreak())
 
 # ---------- 7. CHANNEL MGMT ----------
-story.append(Paragraph("7. Channel Management", h1))
-story.append(Paragraph("7.1 Get Channels", h2))
+story.append(Paragraph("8. Channel Management", h1))
+story.append(Paragraph("8.1 Get Channels", h2))
 story.append(code_block("""curl --location --globoff 'https://{{Your domain name}}/v23.0/channels' \\
 --header 'Authorization: Bearer {{User-Access-Token}}'"""))
 story.append(Paragraph("Response", h3))
@@ -840,9 +1388,9 @@ story.append(code_block("""{
 story.append(PageBreak())
 
 # ---------- 8. ADDITIONAL APIs ----------
-story.append(Paragraph("8. Additional APIs", h1))
+story.append(Paragraph("9. Additional APIs", h1))
 
-story.append(Paragraph("8.1 Get Wallet Balance", h2))
+story.append(Paragraph("9.1 Get Wallet Balance", h2))
 story.append(code_block("""curl --location --globoff --request GET 'https://{{Your domain name}}/api/v1/user/balance' \\
 --header 'Authorization: Bearer {{User-Access-Token}}'"""))
 story.append(Paragraph("Response &mdash; HTTP 200", h3))
@@ -851,7 +1399,7 @@ story.append(code_block("""{
 }"""))
 story.append(Spacer(1, 0.1 * inch))
 
-story.append(Paragraph("8.2 Upload WhatsApp Media", h2))
+story.append(Paragraph("9.2 Upload WhatsApp Media", h2))
 story.append(Paragraph(
     "Upload media before referencing it in template headers or send-message payloads. The "
     "returned <font face='Courier'>id</font> is what you pass in subsequent calls.",
