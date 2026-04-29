@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
-  KeyboardAvoidingView, Platform, Alert, ScrollView, Animated,
+  KeyboardAvoidingView, Platform, ScrollView, Animated, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,7 +51,64 @@ const FloatingIcon = ({ name, size, top, left, right, bottom, rotate, opacity = 
   );
 };
 
-export default function LoginScreen() {
+const ErrorModal = ({ visible, title, message, onClose, dark }) => {
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Animated.View 
+          className="w-full max-w-[340px] rounded-[40px] overflow-hidden"
+          style={{ 
+            backgroundColor: dark ? '#17171b' : '#ffffff',
+            borderWidth: 1,
+            borderColor: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+          }}
+        >
+          <LinearGradient
+            colors={dark ? ['#1f1f24', '#17171b'] : ['#ffffff', '#f8fafb']}
+            style={{ padding: 32, alignItems: 'center' }}
+          >
+            <View 
+              className="w-20 h-20 rounded-full items-center justify-center mb-6"
+              style={{ backgroundColor: 'rgba(32, 148, 171, 0.1)' }}
+            >
+              <Ionicons name="alert-circle" size={48} color="#2094ab" />
+            </View>
+
+            <Text className="text-[24px] font-bold mb-3 text-center" style={{ color: dark ? '#ffffff' : '#1a1a1a' }}>
+              {title}
+            </Text>
+            
+            <Text className="text-[16px] text-center mb-8 leading-6" style={{ color: dark ? '#a0a0a0' : '#666666' }}>
+              {message}
+            </Text>
+
+            <TouchableOpacity 
+              onPress={onClose}
+              activeOpacity={0.8}
+              className="w-full"
+            >
+              <LinearGradient
+                colors={['#2094ab', '#175a6e']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ borderRadius: 20, paddingVertical: 16, alignItems: 'center', shadowColor: '#2094ab', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
+              >
+                <Text className="text-white font-bold text-[17px]">Got it</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </LinearGradient>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+};
+
+export default function LoginScreen({ navigation }) {
   const c = useBrand();
   const dark = c.scheme === 'dark';
   const dispatch = useDispatch();
@@ -59,16 +116,26 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('omniuser');
   const [password, setPassword] = useState('Omni@1234');
   const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalContent, setModalContent] = useState({ title: '', message: '' });
+  const [showPassword, setShowPassword] = useState(false);
+
+  const showError = (title, message) => {
+    setModalContent({ title, message });
+    setModalVisible(true);
+  };
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('Required', 'Enter username and password.');
+      showError("Details Required", "Please enter your username and password to continue.");
       return;
     }
     setLoading(true);
     const result = await dispatch(loginThunk({ username: username.trim(), password }));
     setLoading(false);
-    if (!result.ok) Alert.alert('Sign-in refused', result.error);
+    if (!result.ok) {
+      showError("Sign-in Failed", result.error);
+    }
   };
 
   return (
@@ -182,7 +249,7 @@ export default function LoginScreen() {
                     onChangeText={setPassword}
                     placeholder="••••••••••••"
                     placeholderTextColor={c.textDim}
-                    secureTextEntry
+                    secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     className="flex-1 text-[16px]"
                     style={[
@@ -190,6 +257,17 @@ export default function LoginScreen() {
                       Platform.select({ web: { outlineStyle: 'none' } }),
                     ]}
                   />
+                  <TouchableOpacity 
+                    onPress={() => setShowPassword(!showPassword)}
+                    activeOpacity={0.6}
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons 
+                      name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                      size={20} 
+                      color={c.textMuted} 
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -224,7 +302,10 @@ export default function LoginScreen() {
           </View>
 
           <View className="mt-8 items-center">
-            <TouchableOpacity className="mb-6">
+            <TouchableOpacity 
+              className="mb-6"
+              onPress={() => navigation?.navigate('ForgotPassword')}
+            >
               <Text style={{ color: '#2094ab', fontWeight: '600' }}>Forgot password?</Text>
             </TouchableOpacity>
             
@@ -246,6 +327,13 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </LinearGradient>
+      <ErrorModal
+        visible={modalVisible}
+        title={modalContent.title}
+        message={modalContent.message}
+        onClose={() => setModalVisible(false)}
+        dark={dark}
+      />
     </KeyboardAvoidingView>
   );
 }
