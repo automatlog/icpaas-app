@@ -1,4 +1,4 @@
-// src/screens/shared/LoadingScreen.js — Brand splash (matches Loading.png / Loading white.png)
+// src/screens/auth/LoadingScreen.js — Brand splash (matches Loading.png / Loading white.png)
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Animated, Easing, Image, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';

@@ -1,4 +1,4 @@
-// src/screens/shared/ForgotPasswordScreen.js — Password recovery flow
+// src/screens/auth/ForgotPasswordScreen.js — Password recovery flow
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,

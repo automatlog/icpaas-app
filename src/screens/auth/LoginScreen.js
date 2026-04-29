@@ -1,4 +1,4 @@
-// src/screens/shared/LoginScreen.js — Brand sign-in (matches Sign In.png / Sign In white.png)
+// src/screens/auth/LoginScreen.js — Brand sign-in (matches Sign In.png / Sign In white.png)
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image,
