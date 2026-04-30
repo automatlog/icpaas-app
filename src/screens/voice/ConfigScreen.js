@@ -40,7 +40,7 @@ export default function ConfigScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 130, paddingHorizontal: 18 }}
+        contentContainerStyle={{ paddingTop: Math.max(insets.top, 28) + 8, paddingBottom: 130, paddingHorizontal: 18 }}
         showsVerticalScrollIndicator={false}
       >
         <View className="flex-row items-center mb-4" style={{ gap: 10 }}>

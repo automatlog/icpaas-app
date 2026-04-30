@@ -100,7 +100,7 @@ export default function ReportScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(c), [c]);
   const scrollPad = useMemo(
-    () => ({ ...styles.scroll, paddingTop: insets.top + 12 }),
+    () => ({ ...styles.scroll, paddingTop: Math.max(insets.top, 28) + 8 }),
     [styles.scroll, insets.top],
   );
 

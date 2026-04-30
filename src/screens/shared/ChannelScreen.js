@@ -144,7 +144,7 @@ export default function ChannelScreen({ navigation, route }) {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: Math.max(insets.top, 28) + 8, paddingBottom: 130 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetch(); }} tintColor={c.primary} />}
         showsVerticalScrollIndicator={false}
       >

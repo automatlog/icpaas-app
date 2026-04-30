@@ -9,10 +9,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../theme';
 
+// Icons mirror the Channels grid on the Dashboard so users see the same
+// visual identity for each channel across the app.
 const CHANNELS = [
   { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp',     route: 'WhatsAppCampaignStep1', tint: '#10B981' },
-  { id: 'rcs',      label: 'RCS',      icon: 'card',              route: 'RcsCampaign',           tint: '#8B5CF6' },
-  { id: 'sms',      label: 'SMS',      icon: 'chatbubble',        route: 'SmsCampaign',           tint: '#0B8A6F' },
+  { id: 'rcs',      label: 'RCS',      icon: 'card-outline',      route: 'RcsCampaign',           tint: '#8B5CF6' },
+  { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline', route: 'SmsCampaign',          tint: '#0B8A6F' },
   { id: 'voice',    label: 'Voice',    icon: 'call',              route: 'VoiceCampaign',         tint: '#F59E0B' },
 ];
 
@@ -52,7 +54,7 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
 
         <View
           style={{
-            backgroundColor: c.bg,
+            backgroundColor: c.primarySoft, // light-green dock matching the brand
             borderTopLeftRadius: 24,
             borderTopRightRadius: 24,
             paddingTop: 8,
@@ -62,12 +64,14 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
         >
           {/* Drag handle */}
           <View style={{ alignItems: 'center', paddingBottom: 6 }}>
-            <View style={{ width: 38, height: 4, borderRadius: 4, backgroundColor: c.border }} />
+            <View style={{ width: 38, height: 4, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.14)' }} />
           </View>
 
           <View style={{ alignItems: 'center', marginTop: 6, marginBottom: 18 }}>
-            <Text style={{ color: c.text, fontSize: 17, fontWeight: '800' }}>New Campaign</Text>
-            <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 4 }}>Pick a channel to start with.</Text>
+            <Text style={{ color: c.primaryDeep, fontSize: 17, fontWeight: '800' }}>New Campaign</Text>
+            <Text style={{ color: c.primaryDeep, fontSize: 12, marginTop: 4, opacity: 0.75 }}>
+              Pick a channel to start with.
+            </Text>
           </View>
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 }}>
@@ -97,7 +101,7 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
                 >
                   <Ionicons name={ch.icon} size={26} color="#FFFFFF" />
                 </TouchableOpacity>
-                <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', marginTop: 8 }}>{ch.label}</Text>
+                <Text style={{ color: c.primaryDeep, fontSize: 12, fontWeight: '700', marginTop: 8 }}>{ch.label}</Text>
               </Animated.View>
             ))}
           </View>

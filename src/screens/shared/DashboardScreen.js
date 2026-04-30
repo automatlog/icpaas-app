@@ -140,7 +140,7 @@ export default function DashboardScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 18, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: Math.max(insets.top, 28) + 8, paddingHorizontal: 18, paddingBottom: 130 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -333,28 +333,26 @@ const ChannelTile = ({ c, icon, label, count, onPress }) => (
   </TouchableOpacity>
 );
 
-// Bottom tab bar — always-dark "black strip" that hugs the bottom edge.
-// Sits above the OS gesture bar via safe-area inset; the dark strip extends
-// all the way down so the system nav buttons read as part of the strip.
-// Screen ScrollViews should use `paddingBottom: 130` (or the BAR_HEIGHT
-// constant exported below) so content clears the bar.
-export const BAR_BG = '#0F0F12';
-export const BAR_HEIGHT = 130; // approximate, including safe-area on most devices
+// Bottom tab bar — white icon strip with a primary-green band that fills the
+// bottom safe-area inset (covers the OS gesture bar / nav button area).
+// Screens pad their ScrollView with `paddingBottom: 130` to clear the bar.
+export const BAR_HEIGHT = 130;
 const ICON_INACTIVE = '#9CA3AF';
-const ICON_ACTIVE = '#FFFFFF';
 
 export function BottomTabBar({ c, navigation, active = 'home', onCampaignPress }) {
   const insets = useSafeAreaInsets();
-  const bottomPad = Math.max(insets.bottom, Platform.OS === 'ios' ? 18 : 14);
+  // The white icon strip uses c.bgCard so it stays clean in both themes.
+  const stripBg = c.bgCard;
+  const iconActive = c.text;
 
   const tab = (key, icon, label, onPress) => {
     const isActive = active === key;
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.7} className="items-center justify-center" style={{ flex: 1 }}>
-        <Ionicons name={icon} size={26} color={isActive ? ICON_ACTIVE : ICON_INACTIVE} />
+        <Ionicons name={icon} size={26} color={isActive ? iconActive : ICON_INACTIVE} />
         <Text
           style={{
-            color: isActive ? ICON_ACTIVE : ICON_INACTIVE,
+            color: isActive ? iconActive : ICON_INACTIVE,
             fontSize: 11,
             fontWeight: '700',
             marginTop: 4,
@@ -382,59 +380,73 @@ export function BottomTabBar({ c, navigation, active = 'home', onCampaignPress }
       style={{
         position: 'absolute',
         left: 0, right: 0, bottom: 0,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingTop: 16,
-        paddingBottom: bottomPad,
-        backgroundColor: BAR_BG,
-        borderTopLeftRadius: 22,
-        borderTopRightRadius: 22,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -6 },
-        shadowOpacity: 0.18,
+        shadowOpacity: 0.12,
         shadowRadius: 14,
         elevation: 18,
       }}
     >
-      {tab('home', 'home', 'Home', () => navigation.navigate('Dashboard'))}
-      {tab('chats', 'chatbubbles-outline', 'Chats', () => navigation.navigate('Inbox'))}
+      {/* White icon strip */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 12,
+          paddingTop: 16,
+          paddingBottom: 14,
+          backgroundColor: stripBg,
+          borderTopLeftRadius: 22,
+          borderTopRightRadius: 22,
+          borderTopWidth: 1,
+          borderTopColor: c.border,
+        }}
+      >
+        {tab('home', 'home', 'Home', () => navigation.navigate('Dashboard'))}
+        {tab('chats', 'chatbubbles-outline', 'Chats', () => navigation.navigate('Inbox'))}
 
-      {/* Centered raised Campaign FAB */}
-      <View className="items-center justify-center" style={{ flex: 1 }}>
-        <TouchableOpacity
-          onPress={onCampaignPress || (() => navigation.navigate('CampaignsList'))}
-          activeOpacity={0.88}
-          style={{
-            width: 60, height: 60, borderRadius: 30,
-            alignItems: 'center', justifyContent: 'center',
-            backgroundColor: c.primary,
-            marginTop: -32,
-            shadowColor: c.primary,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.5,
-            shadowRadius: 14,
-            elevation: 10,
-            borderWidth: 4,
-            borderColor: BAR_BG,
-          }}
-        >
-          <Ionicons name="megaphone" size={26} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text
-          style={{
-            color: active === 'campaign' ? ICON_ACTIVE : ICON_INACTIVE,
-            fontSize: 11,
-            fontWeight: '700',
-            marginTop: 4,
-          }}
-        >
-          Campaign
-        </Text>
+        {/* Centered raised Campaign FAB */}
+        <View className="items-center justify-center" style={{ flex: 1 }}>
+          <TouchableOpacity
+            onPress={onCampaignPress || (() => navigation.navigate('CampaignsList'))}
+            activeOpacity={0.88}
+            style={{
+              width: 60, height: 60, borderRadius: 30,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: c.primary,
+              marginTop: -32,
+              shadowColor: c.primary,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.5,
+              shadowRadius: 14,
+              elevation: 10,
+              borderWidth: 4,
+              borderColor: stripBg,
+            }}
+          >
+            <Ionicons name="megaphone" size={26} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text
+            style={{
+              color: active === 'campaign' ? iconActive : ICON_INACTIVE,
+              fontSize: 11,
+              fontWeight: '700',
+              marginTop: 4,
+            }}
+          >
+            Campaign
+          </Text>
+        </View>
+
+        {tab('reports', 'bar-chart-outline', 'Reports', () => navigation.navigate('Report'))}
+        {tab('you', 'person-outline', 'Profile', () => navigation.navigate('Profile'))}
       </View>
 
-      {tab('reports', 'bar-chart-outline', 'Reports', () => navigation.navigate('Report'))}
-      {tab('you', 'person-outline', 'Profile', () => navigation.navigate('Profile'))}
+      {/* Green band: fills the safe-area inset region below the icons.
+          On gesture-bar phones this becomes the gesture pill background;
+          on 3-button-nav devices it sits between the white strip and the
+          OS nav buttons. */}
+      <View style={{ height: Math.max(insets.bottom, 14), backgroundColor: c.primary }} />
     </View>
   );
 }

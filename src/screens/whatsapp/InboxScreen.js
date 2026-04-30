@@ -116,7 +116,7 @@ export default function InboxScreen({ navigation, route }) {
 
   return (
     <View className={`flex-1 ${rootBg}`}>
-      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 22 }}>
+      <View style={{ paddingTop: Math.max(insets.top, 28) + 8, paddingHorizontal: 22 }}>
         {/* Header */}
         <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
           <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
