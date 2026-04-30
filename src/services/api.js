@@ -48,7 +48,7 @@ const STORAGE_KEYS = {
 
 // Demo bearer shared across gsauth.com + icpaas.in. Seeded on login so every
 // screen can call APIs without the user having to visit Config first.
-export const DEFAULT_API_TOKEN = 'b6f3b11e-64a5-49c7-9a90-54dd5a4cd482';
+export const DEFAULT_API_TOKEN = 'cabb46ed-d032-4940-9e97-d20e6073b120';
 
 const api = axios.create({
   baseURL: API_DOMAIN,
