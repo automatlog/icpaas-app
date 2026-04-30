@@ -3,6 +3,26 @@ node_modules/
 .pnp/
 .pnp.js
 
+# Playwright
+.playwright-mcp/
+click-to-call-bulk.png
+click-to-call.png
+icpaas-live-agent-chat.png
+icpaas-live-agent-inbox.png
+icpaas-live-agent.png
+icpaas-menu.png
+icpaas-products-home.png
+icpaas-signin.png
+rcs-campaign.png
+rcs-config.png
+sms-campaign.png
+sms-config.png
+voice-campaign.png
+voice-config.png
+whatsapp-config.png
+whatsapp-config2.png
+whatsapp-home.png
+
 # Expo
 .expo/
 .expo-shared/

@@ -49,6 +49,7 @@ import SmsSenderIdScreen from '../screens/sms/SenderIdScreen';
 import SmsTemplatesScreen from '../screens/sms/TemplatesScreen';
 import SmsCreateTemplateScreen from '../screens/sms/CreateTemplateScreen';
 import SmsCampaignScreen from '../screens/sms/CampaignScreen';
+import SmsConfigScreen from '../screens/sms/ConfigScreen';
 import SmsCampaignsList from '../screens/sms/campaigns/CampaignsListScreen';
 import SmsCampaignDetail from '../screens/sms/campaigns/CampaignDetailScreen';
 import SmsCampaignStep1 from '../screens/sms/campaigns/CampaignStep1Screen';
@@ -59,6 +60,7 @@ import SmsCampaignStep3 from '../screens/sms/campaigns/CampaignStep3Screen';
 import VoiceCallerIdScreen from '../screens/voice/CallerIdScreen';
 import VoiceConfigScreen from '../screens/voice/ConfigScreen';
 import VoiceCampaignScreen from '../screens/voice/CampaignScreen';
+import ClickToCallScreen from '../screens/voice/ClickToCallScreen';
 import VoiceCampaignsList from '../screens/voice/campaigns/CampaignsListScreen';
 import VoiceCampaignDetail from '../screens/voice/campaigns/CampaignDetailScreen';
 import VoiceCampaignStep1 from '../screens/voice/campaigns/CampaignStep1Screen';
@@ -145,6 +147,7 @@ export default function AppNavigator() {
         <Stack.Screen name="SmsTemplates" component={SmsTemplatesScreen} />
         <Stack.Screen name="SmsCreateTemplate" component={SmsCreateTemplateScreen} />
         <Stack.Screen name="SmsCampaign" component={SmsCampaignScreen} />
+        <Stack.Screen name="SmsConfig" component={SmsConfigScreen} />
         <Stack.Screen name="SmsCampaignsList" component={SmsCampaignsList} />
         <Stack.Screen name="SmsCampaignDetail" component={SmsCampaignDetail} />
         <Stack.Screen name="SmsCampaignStep1" component={SmsCampaignStep1} />
@@ -155,6 +158,7 @@ export default function AppNavigator() {
         <Stack.Screen name="VoiceCallerIds" component={VoiceCallerIdScreen} />
         <Stack.Screen name="VoiceConfig" component={VoiceConfigScreen} />
         <Stack.Screen name="VoiceCampaign" component={VoiceCampaignScreen} />
+        <Stack.Screen name="ClickToCall" component={ClickToCallScreen} />
         <Stack.Screen name="VoiceCampaignsList" component={VoiceCampaignsList} />
         <Stack.Screen name="VoiceCampaignDetail" component={VoiceCampaignDetail} />
         <Stack.Screen name="VoiceCampaignStep1" component={VoiceCampaignStep1} />
