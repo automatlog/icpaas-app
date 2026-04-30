@@ -6,10 +6,10 @@ import {
   ActivityIndicator, Platform, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../../theme';
 import { BalanceAPI, VoiceAPI, IVRAPI, TemplatesAPI } from '../../services/api';
 import { BottomTabBar } from './DashboardScreen';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const PROFILES = {
   whatsapp: {
@@ -115,7 +115,6 @@ const TOOLS = (id, navigation) => {
 
 export default function ChannelScreen({ navigation, route }) {
   const c = useBrand();
-  const insets = useSafeAreaInsets();
   const channelId = route?.params?.channel || 'whatsapp';
   const profile = PROFILES[channelId] || PROFILES.whatsapp;
 
@@ -143,36 +142,32 @@ export default function ChannelScreen({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon={profile.icon}
+        title={profile.label}
+        badge={profile.tag}
+        subtitle={{ text: profile.subtitle, dotColor: c.success }}
+        right={
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate(ROUTES[channelId]?.configScreen || 'Config')}
+            style={{
+              width: 36, height: 36, borderRadius: 18,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: c.bgInput,
+            }}
+          >
+            <Ionicons name="settings-outline" size={16} color={c.text} />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Math.max(insets.top, 28) + 8, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 130 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetch(); }} tintColor={c.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top bar */}
-        <View className="flex-row items-center px-4 mb-3" style={{ gap: 12 }}>
-          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
-            <Ionicons name="arrow-back" size={22} color={c.text} />
-          </TouchableOpacity>
-          <View className="w-10 h-10 rounded-full items-center justify-center" style={{ backgroundColor: c.primarySoft }}>
-            <Ionicons name={profile.icon} size={20} color={c.primary} />
-          </View>
-          <View className="flex-1">
-            <View className="flex-row items-center" style={{ gap: 8 }}>
-              <Text className="text-[18px] font-extrabold" style={{ color: c.text }}>{profile.label}</Text>
-              <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.primarySoft }}>
-                <Text className="text-[10px] font-bold" style={{ color: c.primaryDeep }}>{profile.tag}</Text>
-              </View>
-            </View>
-            <View className="flex-row items-center mt-0.5" style={{ gap: 4 }}>
-              <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.success }} />
-              <Text className="text-[11px] font-semibold" style={{ color: c.success }}>{profile.subtitle}</Text>
-            </View>
-          </View>
-          <TouchableOpacity className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: c.bgInput }}>
-            <Ionicons name="settings-outline" size={16} color={c.text} />
-          </TouchableOpacity>
-        </View>
-
         <Text className="text-[12px] px-4 mb-3" style={{ color: c.textMuted }}>{profile.blurb}</Text>
 
         {/* Search */}

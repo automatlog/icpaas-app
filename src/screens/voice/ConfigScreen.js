@@ -7,9 +7,9 @@ import {
   View, Text, ScrollView, TouchableOpacity, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../../theme';
 import SectionHeader from '../../components/SectionHeader';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const SYSTEM_CONFIG = [
   { id: 'voiceFiles',   label: 'Voice Files',     desc: 'Add Description Here.', icon: 'musical-notes',          tint: '#FED7AA', fg: '#C2410C' },
@@ -26,7 +26,6 @@ const CONTACT_MANAGER = [
 
 export default function ConfigScreen({ navigation }) {
   const c = useBrand();
-  const insets = useSafeAreaInsets();
 
   const goTo = (id) => {
     if (id === 'voiceFiles') return navigation.navigate('MediaLibrary');
@@ -39,20 +38,16 @@ export default function ConfigScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="settings-outline"
+        title="Voice Config"
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Math.max(insets.top, 28) + 8, paddingBottom: 130, paddingHorizontal: 18 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 130, paddingHorizontal: 18 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
-          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
-            <Ionicons name="arrow-back" size={22} color={c.text} />
-          </TouchableOpacity>
-          <Text className="flex-1 text-[18px] font-extrabold text-center" style={{ color: c.text }}>
-            Voice Config
-          </Text>
-          <View style={{ width: 36 }} />
-        </View>
-
         <SectionHeader c={c} icon="megaphone-outline" title="System Configuration" />
         <View style={{ gap: 10, marginBottom: 24 }}>
           {SYSTEM_CONFIG.map((item) => (

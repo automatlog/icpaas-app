@@ -7,7 +7,6 @@ import {
   Platform, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import { useBrand } from '../../theme';
 import { SMSAPI, TemplatesAPI } from '../../services/api';
@@ -21,6 +20,7 @@ import Dropdown from '../../components/Dropdown';
 import ToggleRow from '../../components/ToggleRow';
 import Pill from '../../components/Pill';
 import ScheduleModal from '../shared/ScheduleModal';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const ROUTES = [
   { id: 'master',        label: 'Master' },
@@ -49,7 +49,6 @@ const stamp = () => {
 
 export default function CampaignScreen({ navigation }) {
   const c = useBrand();
-  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
 
   const [name, setName] = useState(stamp());
@@ -224,21 +223,18 @@ export default function CampaignScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="chatbubble-outline"
+        title="SMS Campaign"
+        badge="SMS"
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Math.max(insets.top, 28) + 8, paddingBottom: 140, paddingHorizontal: 18 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 140, paddingHorizontal: 18 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
-          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
-            <Ionicons name="arrow-back" size={22} color={c.text} />
-          </TouchableOpacity>
-          <Text className="flex-1 text-[18px] font-extrabold text-center" style={{ color: c.text }}>
-            SMS Campaign
-          </Text>
-          <View style={{ width: 36 }} />
-        </View>
-
         <FormField
           c={c}
           label="Campaign Name *"

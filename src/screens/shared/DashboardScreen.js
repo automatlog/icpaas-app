@@ -139,8 +139,10 @@ export default function DashboardScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      {/* Green status-bar inset (matches the bottom green band) */}
+      <View style={{ height: insets.top, backgroundColor: c.primary }} />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Math.max(insets.top, 28) + 8, paddingHorizontal: 18, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 18, paddingBottom: 130 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

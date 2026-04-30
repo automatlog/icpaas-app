@@ -5,9 +5,9 @@ import {
   ActivityIndicator, Platform, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFeed, Fonts } from '../../theme';
 import { VoiceAPI, IVRAPI } from '../../services/api';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const ymd = (d) => {
   const y = d.getFullYear();
@@ -97,11 +97,10 @@ const makeStyles = (c) => StyleSheet.create({
 
 export default function ReportScreen({ navigation }) {
   const c = useFeed();
-  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(c), [c]);
   const scrollPad = useMemo(
-    () => ({ ...styles.scroll, paddingTop: Math.max(insets.top, 28) + 8 }),
-    [styles.scroll, insets.top],
+    () => ({ ...styles.scroll, paddingTop: 16 }),
+    [styles.scroll],
   );
 
   const [tab, setTab] = useState('obd');
@@ -148,21 +147,30 @@ export default function ReportScreen({ navigation }) {
 
   return (
     <View style={styles.root}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="bar-chart-outline"
+        title="Reports"
+        right={
+          <TouchableOpacity
+            onPress={fetchRows}
+            activeOpacity={0.7}
+            style={{
+              width: 36, height: 36, borderRadius: 18,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: c.bgInput,
+            }}
+          >
+            <Ionicons name="refresh" size={16} color={c.text} />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView
         contentContainerStyle={scrollPad}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRows(); }} tintColor={c.accentPink} />}
       >
-        <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Reports</Text>
-          <TouchableOpacity style={styles.backBtn} onPress={fetchRows} activeOpacity={0.7}>
-            <Ionicons name="refresh" size={18} color={c.text} />
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.tabs}>
           {TABS.map((t) => (
             <TouchableOpacity key={t.id} onPress={() => setTab(t.id)} style={[styles.tab, tab === t.id && styles.tabActive]} activeOpacity={0.8}>

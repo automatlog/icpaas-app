@@ -6,7 +6,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import { AuthAPI } from '../../services/api';
@@ -16,6 +15,7 @@ import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
 import dialog from '../../services/dialog';
 import FormField from '../../components/FormField';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const TABS = [
   { id: 'info',     label: 'Personal Info',     icon: 'person-circle-outline' },
@@ -24,7 +24,6 @@ const TABS = [
 
 export default function ProfileScreen({ navigation }) {
   const c = useBrand();
-  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const user = useSelector((s) => s.auth.user) || {};
   const themeMode = useSelector(selectThemeMode);
@@ -103,22 +102,29 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        title="Profile"
+        right={
+          <TouchableOpacity
+            onPress={save}
+            activeOpacity={0.85}
+            style={{
+              width: 36, height: 36, borderRadius: 18,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: c.primary,
+            }}
+          >
+            <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Math.max(insets.top, 28) + 8, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 130 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
-        <View className="flex-row items-center px-4 mb-3" style={{ gap: 10 }}>
-          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
-            <Ionicons name="arrow-back" size={22} color={c.text} />
-          </TouchableOpacity>
-          <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>Profile</Text>
-          <TouchableOpacity onPress={save} activeOpacity={0.85} className="w-9 h-9 items-center justify-center rounded-full" style={{ backgroundColor: c.primary }}>
-            <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
         {/* Avatar + name card */}
         <View
           className="items-center mx-4 rounded-[20px] py-5 px-4 mb-4"

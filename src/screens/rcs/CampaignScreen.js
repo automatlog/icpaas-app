@@ -8,7 +8,6 @@ import {
   Platform, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import { useBrand } from '../../theme';
 import { RCSAPI, TemplatesAPI } from '../../services/api';
@@ -21,6 +20,7 @@ import FormField, { inputStyle } from '../../components/FormField';
 import Dropdown from '../../components/Dropdown';
 import ToggleRow from '../../components/ToggleRow';
 import ScheduleModal from '../shared/ScheduleModal';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const TEMPLATE_TYPES = [
   { id: '3',        label: 'Text Message' },
@@ -42,7 +42,6 @@ const stamp = () => {
 
 export default function CampaignScreen({ navigation }) {
   const c = useBrand();
-  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
 
   const [name, setName] = useState(stamp());
@@ -186,21 +185,18 @@ export default function CampaignScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="card-outline"
+        title="RCS Message"
+        badge="RCS"
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Math.max(insets.top, 28) + 8, paddingBottom: 140, paddingHorizontal: 18 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 140, paddingHorizontal: 18 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header + breadcrumb */}
-        <View className="flex-row items-center mb-2" style={{ gap: 10 }}>
-          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
-            <Ionicons name="arrow-back" size={22} color={c.text} />
-          </TouchableOpacity>
-          <Text className="flex-1 text-[18px] font-extrabold text-center" style={{ color: c.text }}>
-            RCS Message
-          </Text>
-          <View style={{ width: 36 }} />
-        </View>
         <View className="flex-row items-center mb-4 px-1" style={{ gap: 6 }}>
           <Text className="text-[12px] font-semibold" style={{ color: c.textMuted }}>Home</Text>
           <Ionicons name="chevron-forward" size={11} color={c.textMuted} />
