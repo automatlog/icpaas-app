@@ -11,6 +11,7 @@ import { WhatsAppAPI } from '../../../services/api';
 import { selectGroups } from '../../../store/slices/groupsSlice';
 import AddRecipientsModal from '../../shared/AddRecipientsModal';
 import ScheduleModal from '../../shared/ScheduleModal';
+import Select from '../../../components/Select';
 
 const fmtNow = () => {
   const d = new Date();
@@ -90,42 +91,23 @@ export default function CampaignStep1Screen({ navigation, route }) {
           </Field>
 
           <Field c={c} label="WABA Channel" required>
-            <TouchableOpacity
-              onPress={() => setShowChannels((v) => !v)}
-              activeOpacity={0.85}
-              className="flex-row items-center rounded-[10px] px-3 py-3"
-              style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bg }}
-            >
-              <Ionicons name="logo-whatsapp" size={14} color={c.textMuted} />
-              <Text className="flex-1 text-[14px] ml-2" style={{ color: channelId ? c.text : c.textMuted }}>
-                {loadingCh ? 'Loading channels…' : channelLabel}
-              </Text>
-              <Ionicons name={showChannels ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
-            </TouchableOpacity>
-            {showChannels && channels.length > 0 ? (
-              <View className="rounded-[10px] mt-1.5 overflow-hidden" style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bgCard }}>
-                {channels.map((ch, i) => (
-                  <TouchableOpacity
-                    key={ch.phoneNumberId || i}
-                    onPress={() => { setChannelId(ch.phoneNumberId); setShowChannels(false); }}
-                    activeOpacity={0.8}
-                    className="px-3 py-3 flex-row items-center"
-                    style={{ gap: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.rule }}
-                  >
-                    <Ionicons name="logo-whatsapp" size={14} color={c.primary} />
-                    <View className="flex-1">
-                      <Text className="text-[13px] font-semibold" style={{ color: c.text }} numberOfLines={1}>
-                        {ch.label || ch.wabaNumber || ch.phoneNumberId}
-                      </Text>
-                      <Text className="text-[10px]" style={{ color: c.textMuted }} numberOfLines={1}>
-                        ID: {ch.phoneNumberId}
-                      </Text>
-                    </View>
-                    {channelId === ch.phoneNumberId ? <Ionicons name="checkmark" size={16} color={c.primary} /> : null}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : null}
+            <Select
+              c={c}
+              icon="logo-whatsapp"
+              placeholder={loadingCh ? 'Loading channels…' : 'Select Channel'}
+              value={channelLabel === 'Select Channel' ? '' : channelLabel}
+              open={showChannels}
+              onToggle={() => setShowChannels((v) => !v)}
+              options={channels.map((ch) => ({
+                id: ch.phoneNumberId,
+                label: ch.label || ch.wabaNumber || ch.phoneNumberId,
+                sub: `ID: ${ch.phoneNumberId}`,
+              }))}
+              selectedId={channelId}
+              onSelect={(o) => setChannelId(o.id)}
+              onClear={() => setChannelId(null)}
+              searchable
+            />
           </Field>
 
           <Field
@@ -298,7 +280,7 @@ export function SectionTitle({ c, icon, label }) {
   );
 }
 
-function Field({ c, label, required, right, children }) {
+export function Field({ c, label, required, right, children }) {
   return (
     <View className="mb-3.5">
       <View className="flex-row items-center justify-between mb-1.5">

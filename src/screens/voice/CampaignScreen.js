@@ -16,7 +16,7 @@ import toast from '../../services/toast';
 import dialog from '../../services/dialog';
 import GradientButton from '../../components/GradientButton';
 import FormField, { inputStyle } from '../../components/FormField';
-import Dropdown from '../../components/Dropdown';
+import Select from '../../components/Select';
 import ToggleRow from '../../components/ToggleRow';
 import SectionHeader from '../../components/SectionHeader';
 import Pill from '../../components/Pill';
@@ -166,7 +166,7 @@ export default function CampaignScreen({ navigation }) {
           label="Voice Plan *"
           hint="Voice plans operate on a 15-sec or 30-sec pulse."
         >
-          <Dropdown
+          <Select
             c={c}
             placeholder="Select Voice Plan"
             value={planLabel}
@@ -183,7 +183,7 @@ export default function CampaignScreen({ navigation }) {
           label="Caller ID *"
           hint="Caller ID assigned to the user."
         >
-          <Dropdown
+          <Select
             c={c}
             placeholder="Select CallerID"
             value={callerLabel}
@@ -211,7 +211,7 @@ export default function CampaignScreen({ navigation }) {
         />
 
         <FormField c={c} label="Sound File">
-          <Dropdown
+          <Select
             c={c}
             placeholder="Select Sound File"
             value={soundFile?.name || ''}
@@ -257,7 +257,7 @@ export default function CampaignScreen({ navigation }) {
           </View>
           <View style={{ flex: 1 }}>
             <FormField c={c} label="Group">
-              <Dropdown
+              <Select
                 c={c}
                 placeholder="Select Groups"
                 value={group?.name || ''}

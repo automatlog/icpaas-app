@@ -16,7 +16,7 @@ import toast from '../../services/toast';
 import dialog from '../../services/dialog';
 import GradientButton from '../../components/GradientButton';
 import FormField, { inputStyle } from '../../components/FormField';
-import Dropdown from '../../components/Dropdown';
+import Select from '../../components/Select';
 import ToggleRow from '../../components/ToggleRow';
 import Pill from '../../components/Pill';
 import ScheduleModal from '../shared/ScheduleModal';
@@ -252,7 +252,7 @@ export default function CampaignScreen({ navigation }) {
 
         <Row>
           <FormField c={c} label="Route *" hint="Select the route for delivering messages." flex>
-            <Dropdown
+            <Select
               c={c}
               placeholder="Pick route"
               value={routeLabel}
@@ -264,7 +264,7 @@ export default function CampaignScreen({ navigation }) {
             />
           </FormField>
           <FormField c={c} label="SenderId *" hint="Enter a valid 6-character SenderID from this list." flex>
-            <Dropdown
+            <Select
               c={c}
               placeholder={loadingSenders ? 'Loading…' : 'Pick sender'}
               value={sender?.senderId || ''}
@@ -279,7 +279,7 @@ export default function CampaignScreen({ navigation }) {
 
         <Row>
           <FormField c={c} label="Language" hint="Select preferred language." flex>
-            <Dropdown
+            <Select
               c={c}
               placeholder="Pick"
               value={langLabel}
@@ -427,7 +427,7 @@ export default function CampaignScreen({ navigation }) {
 
         <Row>
           <FormField c={c} label="Campaign Type *" flex>
-            <Dropdown
+            <Select
               c={c}
               placeholder="Pick"
               value={campaignLabel}
@@ -454,7 +454,7 @@ export default function CampaignScreen({ navigation }) {
 
         <Row>
           <FormField c={c} label="Group" hint="Select contact group for messaging." flex>
-            <Dropdown
+            <Select
               c={c}
               placeholder="Select Group"
               value={group?.name || ''}

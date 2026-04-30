@@ -17,7 +17,7 @@ import toast from '../../services/toast';
 import dialog from '../../services/dialog';
 import GradientButton from '../../components/GradientButton';
 import FormField, { inputStyle } from '../../components/FormField';
-import Dropdown from '../../components/Dropdown';
+import Select from '../../components/Select';
 import ToggleRow from '../../components/ToggleRow';
 import ScheduleModal from '../shared/ScheduleModal';
 import ScreenHeader from '../../components/ScreenHeader';
@@ -214,7 +214,7 @@ export default function CampaignScreen({ navigation }) {
         </FormField>
 
         <FormField c={c} label="Agent">
-          <Dropdown
+          <Select
             c={c}
             placeholder={loadingBots ? 'Loading agents…' : 'Select agent'}
             value={bot ? `${bot.agentName || ''} (${bot.botId}) - Transactional` : ''}
@@ -231,7 +231,7 @@ export default function CampaignScreen({ navigation }) {
         </FormField>
 
         <FormField c={c} label="Template Type">
-          <Dropdown
+          <Select
             c={c}
             placeholder="Select type"
             value={selectedTypeLabel}
@@ -244,7 +244,7 @@ export default function CampaignScreen({ navigation }) {
         </FormField>
 
         <FormField c={c} label="Select Template">
-          <Dropdown
+          <Select
             c={c}
             placeholder={loadingTemplates ? 'Loading templates…' : 'Select Template'}
             value={template?.name || ''}
@@ -257,7 +257,7 @@ export default function CampaignScreen({ navigation }) {
         </FormField>
 
         <FormField c={c} label="Campaign Type *">
-          <Dropdown
+          <Select
             c={c}
             placeholder="Pick"
             value={selectedCampaignLabel}

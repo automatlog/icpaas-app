@@ -7,9 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../../../theme';
 import { TemplatesAPI } from '../../../services/api';
 import { extractWhatsAppVariables } from '../../../services/whatsappHelpers';
-import {
-  Stepper, Card, SectionTitle, PrimaryButton, SecondaryButton,
-} from './CampaignStep1Screen';
+import toast from '../../../services/toast';
+import Select from '../../../components/Select';
+import { Stepper, Card, SectionTitle, PrimaryButton, SecondaryButton, Field } from './CampaignStep1Screen';
 
 // Flat variable spec for one WhatsApp template
 const waVarSpec = (extracted = {}) => {
@@ -90,13 +90,16 @@ export default function CampaignStep2Screen({ navigation, route }) {
   };
 
   const filteredTemplates = useMemo(
-    () => templates
-      .filter((t) => (category ? t.category === category : true))
-      .filter((t) => {
-        if (!type || type === 'All') return true;
-        const flow = isFlowsTemplate(t);
-        return type === 'Flows' ? flow : !flow;
-      }),
+    () => {
+      if (!category) return [];
+      return templates
+        .filter((t) => t.category === category)
+        .filter((t) => {
+          if (!type || type === 'All') return true;
+          const flow = isFlowsTemplate(t);
+          return type === 'Flows' ? flow : !flow;
+        });
+    },
     [templates, category, type],
   );
 
@@ -111,6 +114,18 @@ export default function CampaignStep2Screen({ navigation, route }) {
   }, [selectedTemplate]);
 
   const next = () => {
+    if (!templateName) {
+      toast.warning('Required', 'Please select a Meta template first.');
+      return;
+    }
+
+    // Validate that all variables in the spec have a value
+    const missing = varSpec.find((s) => !values[s.key]?.trim());
+    if (missing) {
+      toast.warning('Incomplete', `Please provide a value for ${missing.label}.`);
+      return;
+    }
+
     navigation.navigate('CampaignStep3', {
       draft: { ...draft, category, type, templateName, values, varSpec },
     });
@@ -149,54 +164,65 @@ export default function CampaignStep2Screen({ navigation, route }) {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header c={c} navigation={navigation} title="Campaign Launch" />
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Stepper c={c} step={2} />
 
         <Card c={c}>
           <SectionTitle c={c} icon="document-text" label="Template Information" />
 
-          <Dropdown
-            c={c}
-            icon="filter"
-            label="Template Category"
-            required
-            hint="Select your template category"
-            value={category}
-            placeholder="Select Category"
-            open={openDD === 'category'}
-            onToggle={() => setOpenDD(openDD === 'category' ? null : 'category')}
-            options={categories}
-            onPick={onPickCategory}
-          />
+          <Field c={c} label="Template Category" required hint="Select your template category">
+            <Select
+              c={c}
+              icon="filter"
+              value={category}
+              placeholder="Select Category"
+              open={openDD === 'category'}
+              onToggle={() => setOpenDD(openDD === 'category' ? null : 'category')}
+              options={categories}
+              selectedId={category}
+              onSelect={(o) => onPickCategory(o)}
+              onClear={() => onPickCategory(null)}
+            />
+          </Field>
 
-          <Dropdown
-            c={c}
-            icon="grid"
-            label="Template Type"
-            required
-            hint="Select your template type"
-            value={type}
-            placeholder="Select Type"
-            open={openDD === 'type'}
-            onToggle={() => setOpenDD(openDD === 'type' ? null : 'type')}
-            options={types}
-            onPick={onPickType}
-          />
+          <Field c={c} label="Template Type" required hint="Select your template type">
+            <Select
+              c={c}
+              icon="grid"
+              value={type}
+              placeholder="Select Type"
+              open={openDD === 'type'}
+              onToggle={() => {
+                if (!category) return;
+                setOpenDD(openDD === 'type' ? null : 'type');
+              }}
+              options={category ? types : []}
+              style={{ opacity: category ? 1 : 0.5 }}
+              selectedId={type}
+              onSelect={(o) => onPickType(o)}
+              onClear={() => onPickType(null)}
+            />
+          </Field>
 
-          <Dropdown
-            c={c}
-            icon="phone-portrait"
-            label="Meta Template"
-            required
-            hint="Your WhatsApp approved templates"
-            value={templateName}
-            placeholder="Select Template"
-            open={openDD === 'template'}
-            onToggle={() => setOpenDD(openDD === 'template' ? null : 'template')}
-            options={filteredTemplates.map((t) => t.name || t.id)}
-            onPick={onPickTemplate}
-            searchable
-          />
+          <Field c={c} label="Meta Template" required hint="Your WhatsApp approved templates">
+            <Select
+              c={c}
+              icon="phone-portrait"
+              value={templateName}
+              placeholder="Select Template"
+              open={openDD === 'template'}
+              onToggle={() => {
+                if (!category || !type) return;
+                setOpenDD(openDD === 'template' ? null : 'template');
+              }}
+              options={(category && type) ? filteredTemplates.map((t) => t.name || t.id) : []}
+              style={{ opacity: (category && type) ? 1 : 0.5 }}
+              selectedId={templateName}
+              onSelect={(o) => onPickTemplate(o)}
+              onClear={() => onPickTemplate(null)}
+              searchable
+            />
+          </Field>
 
           {/* Variable mapping */}
           {selectedTemplate && varSpec.length > 0 ? (
@@ -261,22 +287,24 @@ export default function CampaignStep2Screen({ navigation, route }) {
             </View>
           ) : null}
 
-          {/* Empty state */}
-          {!loading && filteredTemplates.length === 0 ? (
-            <View className="items-center py-8" style={{ gap: 8 }}>
+          {/* Empty state / Template selection placeholder */}
+          {!loading && !selectedTemplate ? (
+            <View className="items-center py-10" style={{ gap: 8 }}>
               <View
                 className="w-24 h-24 rounded-2xl items-center justify-center"
                 style={{ backgroundColor: c.bgInput }}
               >
-                <Ionicons name="document-outline" size={36} color={c.textDim} />
+                <Ionicons name="document-outline" size={40} color={c.textDim} />
               </View>
-              <Text className="text-[15px] font-bold" style={{ color: c.text }}>Empty Templates</Text>
-              <Text className="text-[12px]" style={{ color: c.textMuted }}>There are no template added yet</Text>
+              <Text className="text-[15px] font-bold" style={{ color: c.text }}>No Template Selected</Text>
+              <Text className="text-[12px] text-center px-6" style={{ color: c.textMuted }}>
+                Please select a category and type, then pick a Meta template to configure variables.
+              </Text>
             </View>
           ) : null}
 
           {loading ? (
-            <View className="py-6 items-center"><ActivityIndicator color={c.primary} /></View>
+            <View className="py-10 items-center"><ActivityIndicator color={c.primary} /></View>
           ) : null}
         </Card>
 
@@ -312,95 +340,3 @@ function Header({ c, navigation, title }) {
   );
 }
 
-function Dropdown({ c, icon, label, required, hint, value, placeholder, open, onToggle, options, onPick, searchable }) {
-  const [query, setQuery] = useState('');
-
-  // Reset query whenever the dropdown closes
-  useEffect(() => { if (!open) setQuery(''); }, [open]);
-
-  const filtered = useMemo(() => {
-    if (!searchable) return options;
-    const q = query.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter((o) => String(o).toLowerCase().includes(q));
-  }, [options, query, searchable]);
-
-  return (
-    <View className="mb-3.5">
-      <View className="flex-row items-center mb-1" style={{ gap: 6 }}>
-        <Ionicons name={icon} size={13} color={c.textMuted} />
-        <Text className="text-[13px] font-bold" style={{ color: c.text }}>
-          {label}{required ? <Text style={{ color: c.danger }}>  *</Text> : null}
-        </Text>
-      </View>
-      <Text className="text-[11px] mb-1.5" style={{ color: c.textMuted }}>{hint}</Text>
-      <TouchableOpacity
-        onPress={onToggle}
-        activeOpacity={0.85}
-        className="flex-row items-center rounded-[10px] px-3 py-3"
-        style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bg }}
-      >
-        <Text className="flex-1 text-[14px]" style={{ color: value ? c.text : c.textMuted }}>
-          {value || placeholder}
-        </Text>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
-      </TouchableOpacity>
-
-      {open && searchable ? (
-        <View
-          className="flex-row items-center mt-1.5 rounded-[10px] px-3"
-          style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bgInput, gap: 8 }}
-        >
-          <Ionicons name="search-outline" size={14} color={c.textMuted} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={`Search ${label.toLowerCase()}…`}
-            placeholderTextColor={c.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            className="flex-1 text-[13px]"
-            style={[
-              { paddingVertical: Platform.OS === 'ios' ? 11 : 8, color: c.text },
-              Platform.select({ web: { outlineStyle: 'none' } }),
-            ]}
-          />
-          {query ? (
-            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={14} color={c.textMuted} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      ) : null}
-      {open ? (
-        <View
-          className="rounded-[10px] mt-1.5 overflow-hidden"
-          style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bgCard, maxHeight: 280 }}
-        >
-          {filtered.length === 0 ? (
-            <View className="px-3 py-4 items-center">
-              <Text className="text-[12px] italic" style={{ color: c.textDim }}>
-                {searchable && query ? `No match for "${query}"` : 'No options'}
-              </Text>
-            </View>
-          ) : (
-            <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-              {filtered.map((opt, i) => (
-                <TouchableOpacity
-                  key={String(opt) + i}
-                  activeOpacity={0.8}
-                  onPress={() => onPick(opt)}
-                  className="px-3 py-3 flex-row items-center"
-                  style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.rule }}
-                >
-                  <Text className="flex-1 text-[13px]" style={{ color: c.text }} numberOfLines={1}>{opt}</Text>
-                  {value === opt ? <Ionicons name="checkmark" size={14} color={c.primary} /> : null}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      ) : null}
-    </View>
-  );
-}
