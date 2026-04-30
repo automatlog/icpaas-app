@@ -6,7 +6,6 @@ import { useFeed } from '../theme';
 
 // Shared screens (channel-agnostic)
 import DashboardScreen from '../screens/shared/DashboardScreen';
-import ProductIconsScreen from '../screens/shared/ProductIconsScreen';
 import ReportScreen from '../screens/shared/ReportScreen';
 import AgentScreen from '../screens/shared/AgentScreen';
 import ConfigScreen from '../screens/shared/ConfigScreen';
@@ -102,7 +101,6 @@ export default function AppNavigator() {
       <Stack.Navigator initialRouteName="Dashboard" screenOptions={screenOptions}>
         {/* Shared */}
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        <Stack.Screen name="ProductIcons" component={ProductIconsScreen} />
         <Stack.Screen name="Report" component={ReportScreen} />
         <Stack.Screen name="Agent" component={AgentScreen} />
         <Stack.Screen name="Config" component={ConfigScreen} />

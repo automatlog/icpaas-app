@@ -1,8 +1,9 @@
 // src/screens/DashboardScreen.js — Brand Home (matches Home black/white.png)
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, Platform, RefreshControl,
+  Animated, Pressable,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -49,6 +50,55 @@ const STATUS_TINT = (c, s) => {
   if (s === 'New')       return { bg: '#DBEAFE',     fg: '#2563EB' };
   if (s === 'Added')     return { bg: '#FEF3C7',     fg: '#B45309' };
   return { bg: c.bgInput, fg: c.textMuted };
+};
+
+const WalletCard = ({ c, balance, balanceError, loading, navigation }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const hIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start();
+  const hOut = () => Animated.spring(scale, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }).start();
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPressIn={hIn}
+        onPressOut={hOut}
+        onPress={() => navigation.navigate('Config')}
+        className="flex-row items-center rounded-[16px] p-3.5 mt-2"
+        style={{ backgroundColor: c.primarySoft, gap: 12 }}
+      >
+        <View className="w-10 h-10 rounded-full items-center justify-center" style={{ backgroundColor: c.primary }}>
+          <Ionicons name="wallet" size={18} color="#FFFFFF" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: c.primaryDeep, opacity: 0.75 }}>
+            Wallet Balance
+          </Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={c.primaryDeep} style={{ alignSelf: 'flex-start', marginTop: 2 }} />
+          ) : balance != null ? (
+            <Text className="text-[20px] font-extrabold mt-0.5" style={{ color: c.primaryDeep }}>
+              ₹{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+          ) : (
+            <>
+              <Text className="text-[16px] font-bold mt-0.5" style={{ color: c.danger }}>Unavailable</Text>
+              <Text className="text-[10px] mt-0.5" style={{ color: c.primaryDeep, opacity: 0.7 }} numberOfLines={2}>
+                {balanceError || 'Pull to refresh'}
+              </Text>
+            </>
+          )}
+        </View>
+        <View
+          className="rounded-[10px] flex-row items-center px-3 py-2"
+          style={{ backgroundColor: c.primary, gap: 4 }}
+        >
+          <Ionicons name="add" size={12} color="#FFFFFF" />
+          <Text className="text-[11px] font-bold text-white">Top up</Text>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
 };
 
 export default function DashboardScreen({ navigation }) {
@@ -193,54 +243,10 @@ export default function DashboardScreen({ navigation }) {
 
         {/* Wallet balance callout — live from BalanceAPI.getBalance().
             Card itself is non-interactive; only the Top up button navigates. */}
-        <View
-          className="flex-row items-center rounded-[16px] p-3.5 mt-2"
-          style={{ backgroundColor: c.primarySoft, gap: 12 }}
-        >
-          <View
-            className="w-10 h-10 rounded-full items-center justify-center"
-            style={{ backgroundColor: c.primary }}
-          >
-            <Ionicons name="wallet" size={18} color="#FFFFFF" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: c.primaryDeep, opacity: 0.75 }}>
-              Wallet Balance
-            </Text>
-            {loading ? (
-              <ActivityIndicator size="small" color={c.primaryDeep} style={{ alignSelf: 'flex-start', marginTop: 2 }} />
-            ) : balance != null ? (
-              <Text className="text-[20px] font-extrabold mt-0.5" style={{ color: c.primaryDeep }}>
-                ₹{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </Text>
-            ) : (
-              <>
-                <Text className="text-[16px] font-bold mt-0.5" style={{ color: c.danger }}>
-                  Unavailable
-                </Text>
-                <Text className="text-[10px] mt-0.5" style={{ color: c.primaryDeep, opacity: 0.7 }} numberOfLines={2}>
-                  {balanceError || 'Pull to refresh'}
-                </Text>
-              </>
-            )}
-          </View>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Config')}
-            activeOpacity={0.85}
-            className="rounded-[10px] flex-row items-center px-3 py-2"
-            style={{ backgroundColor: c.primary, gap: 4 }}
-          >
-            <Ionicons name="add" size={12} color="#FFFFFF" />
-            <Text className="text-[11px] font-bold text-white">Top up</Text>
-          </TouchableOpacity>
-        </View>
+        <WalletCard c={c} balance={balance} balanceError={balanceError} loading={loading} navigation={navigation} />
 
-        {/* Channels */}
         <View className="flex-row items-center justify-between mt-6 mb-3">
           <Text className="text-[16px] font-bold" style={{ color: c.text }}>Channels</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('ProductIcons')}>
-            <Text className="text-[12px] font-bold" style={{ color: c.primary }}>View All</Text>
-          </TouchableOpacity>
         </View>
 
         <View className="flex-row flex-wrap" style={{ gap: 10 }}>
@@ -256,18 +262,18 @@ export default function DashboardScreen({ navigation }) {
           ))}
         </View>
 
-        {/* Recent Activity */}
         <View className="flex-row items-center justify-between mt-6 mb-3">
           <Text className="text-[16px] font-bold" style={{ color: c.text }}>Recent Activity</Text>
-          <TouchableOpacity><Text className="text-[12px] font-bold" style={{ color: c.primary }}>View All</Text></TouchableOpacity>
         </View>
 
         <View className="rounded-[16px] overflow-hidden" style={{ backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border }}>
           {ACTIVITY.map((a, i) => {
             const tint = STATUS_TINT(c, a.status);
             return (
-              <View
+              <TouchableOpacity
                 key={a.id}
+                activeOpacity={0.7}
+                onPress={() => toast.info('Activity Detail', `Viewing ${a.title}`)}
                 className="flex-row items-center px-3.5 py-3"
                 style={{
                   gap: 12,
@@ -288,7 +294,7 @@ export default function DashboardScreen({ navigation }) {
                     <Text className="text-[10px] font-bold" style={{ color: tint.fg }}>{a.status}</Text>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -310,30 +316,41 @@ export default function DashboardScreen({ navigation }) {
   );
 }
 
-const ChannelTile = ({ c, icon, label, count, onPress }) => (
-  <TouchableOpacity
-    onPress={onPress}
-    activeOpacity={0.85}
-    className="rounded-[16px] p-3"
-    style={{ width: '48%', backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border }}
-  >
-    <View className="flex-row items-center justify-between mb-2">
-      <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: c.primarySoft }}>
-        <Ionicons name={icon} size={20} color={c.primary} />
-      </View>
-      <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.primarySoft }}>
-        <Text className="text-[10px] font-bold" style={{ color: c.primaryDeep }}>{count}</Text>
-      </View>
-    </View>
-    <Text className="text-[14px] font-bold" style={{ color: c.text }}>{label}</Text>
-    <View className="flex-row items-center mt-1" style={{ gap: 5 }}>
-      <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.success }} />
-      <Text className="text-[11px] font-semibold" style={{ color: c.success }}>Active</Text>
-      <View className="flex-1" />
-      <Ionicons name="arrow-forward" size={12} color={c.textMuted} />
-    </View>
-  </TouchableOpacity>
-);
+const ChannelTile = ({ c, icon, label, count, onPress }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const hIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true }).start();
+  const hOut = () => Animated.spring(scale, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }).start();
+
+  return (
+    <Animated.View style={{ width: '48%', transform: [{ scale }] }}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={hIn}
+        onPressOut={hOut}
+        activeOpacity={0.9}
+        className="rounded-[16px] p-3"
+        style={{ backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border, width: '100%' }}
+      >
+        <View className="flex-row items-center justify-between mb-2">
+          <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: c.primarySoft }}>
+            <Ionicons name={icon} size={20} color={c.primary} />
+          </View>
+          <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.primarySoft }}>
+            <Text className="text-[10px] font-bold" style={{ color: c.primaryDeep }}>{count}</Text>
+          </View>
+        </View>
+        <Text className="text-[14px] font-bold" style={{ color: c.text }}>{label}</Text>
+        <View className="flex-row items-center mt-1" style={{ gap: 5 }}>
+          <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.success }} />
+          <Text className="text-[11px] font-semibold" style={{ color: c.success }}>Active</Text>
+          <View className="flex-1" />
+          <Ionicons name="arrow-forward" size={12} color={c.textMuted} />
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 // Bottom tab bar — white icon strip with a primary-green band that fills the
 // bottom safe-area inset (covers the OS gesture bar / nav button area).
