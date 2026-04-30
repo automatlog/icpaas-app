@@ -79,3 +79,10 @@ Thumbs.db
 # Claude / tooling
 .sixth/
 .claude/
+
+# UI image
+UI image\Omni App.pdf
+UI image\RCS Campaign Screen.png
+UI image\SMS Campaign Screen.png
+UI image\Voice Campaign Screen.png
+UI imaage\Voice Config Screen.png

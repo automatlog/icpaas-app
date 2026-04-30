@@ -17,6 +17,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import LoadingScreen from './src/screens/auth/LoadingScreen';
 import AlertDialogHost from './src/components/AlertDialog';
+import RealtimeProvider from './src/components/RealtimeProvider';
 import { store, persistor } from './src/store';
 import { setHydrated } from './src/store/slices/hydratedSlice';
 import { useFeed } from './src/theme';
@@ -71,7 +72,9 @@ function AppInner() {
     <View style={outerStyle}>
       <StatusBar barStyle={barStyle} backgroundColor={statusBarBg} />
       <View style={innerStyle}>
-        {isLoggedIn && isHydrated ? <AppNavigator /> : <AuthNavigator />}
+        <RealtimeProvider>
+          {isLoggedIn && isHydrated ? <AppNavigator /> : <AuthNavigator />}
+        </RealtimeProvider>
       </View>
       <FlashMessage position="top" />
       <AlertDialogHost />

@@ -16,6 +16,8 @@ import toast from '../../services/toast';
 import dialog from '../../services/dialog';
 import FormField from '../../components/FormField';
 import ScreenHeader from '../../components/ScreenHeader';
+import Select from '../../components/Select';
+import { COUNTRIES, getStates, getCities } from '../../constants/locations';
 
 const TABS = [
   { id: 'info',     label: 'Personal Info',     icon: 'person-circle-outline' },
@@ -34,9 +36,13 @@ export default function ProfileScreen({ navigation }) {
   const [mobile, setMobile]       = useState(user.mobile || '');
   const [email, setEmail]         = useState(user.email || '');
   const [address, setAddress]     = useState(user.address || '');
-  const [city, setCity]           = useState(user.city || '');
-  const [state, setState]         = useState(user.state || '');
+  const [country, setCountry]     = useState(user.country || 'IN');
+  const [state, setState]         = useState(user.state || ''); // state id
+  const [city, setCity]           = useState(user.city || '');  // city id
   const [pin, setPin]             = useState(user.pin || '');
+  const [showCountry, setShowCountry] = useState(false);
+  const [showState, setShowState]     = useState(false);
+  const [showCity, setShowCity]       = useState(false);
   const [apiKey, setApiKey]           = useState('');
   const [apiKeyDirty, setApiKeyDirty] = useState(false);
   const [testingKey, setTestingKey]   = useState(false);
@@ -222,17 +228,61 @@ export default function ProfileScreen({ navigation }) {
                 />
               </FormField>
 
+              {/* Country → State → City: each dropdown filters the next */}
+              <FormField caps c={c} label="Country">
+                <Select
+                  c={c}
+                  placeholder="Select country"
+                  value={COUNTRIES.find((co) => co.id === country)?.label || ''}
+                  open={showCountry}
+                  onToggle={() => setShowCountry((v) => !v)}
+                  options={COUNTRIES}
+                  selectedId={country}
+                  onSelect={(opt) => {
+                    setCountry(opt.id);
+                    // Country changed → state + city no longer valid
+                    setState('');
+                    setCity('');
+                    setShowCountry(false);
+                  }}
+                />
+              </FormField>
+
               <View className="flex-row" style={{ gap: 8 }}>
-                <FormField caps c={c} label="City" flex>
-                  <TextInput value={city} onChangeText={setCity} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="—" />
-                </FormField>
                 <FormField caps c={c} label="State" flex>
-                  <TextInput value={state} onChangeText={setState} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="—" />
+                  <Select
+                    c={c}
+                    placeholder={getStates(country).length ? 'Select state' : 'Pick a country first'}
+                    value={getStates(country).find((s) => s.id === state)?.label || ''}
+                    open={showState}
+                    onToggle={() => getStates(country).length && setShowState((v) => !v)}
+                    options={getStates(country)}
+                    selectedId={state}
+                    onSelect={(opt) => {
+                      setState(opt.id);
+                      // State changed → city no longer valid
+                      setCity('');
+                      setShowState(false);
+                    }}
+                  />
                 </FormField>
-                <FormField caps c={c} label="Pin Code" flex>
-                  <TextInput value={pin} onChangeText={setPin} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="—" keyboardType="number-pad" />
+                <FormField caps c={c} label="City" flex>
+                  <Select
+                    c={c}
+                    placeholder={state ? 'Select city' : 'Pick a state first'}
+                    value={getCities(state).find((ci) => ci.id === city)?.label || ''}
+                    open={showCity}
+                    onToggle={() => state && setShowCity((v) => !v)}
+                    options={getCities(state)}
+                    selectedId={city}
+                    onSelect={(opt) => { setCity(opt.id); setShowCity(false); }}
+                  />
                 </FormField>
               </View>
+
+              <FormField caps c={c} label="Pin Code">
+                <TextInput value={pin} onChangeText={setPin} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="—" keyboardType="number-pad" />
+              </FormField>
 
               <FormField caps c={c} label="Public API Key" hint="Used for gsauth.com (WhatsApp / SMS / RCS) + icpaas.in (Voice / wallet).">
                 <View className="flex-row items-center" style={{ gap: 8 }}>

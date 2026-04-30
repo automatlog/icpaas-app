@@ -13,6 +13,7 @@
     "test": "jest --passWithNoTests --runInBand"
   },
   "dependencies": {
+    "@microsoft/signalr": "^10.0.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/cli": "^20.1.3",
     "@react-native-community/datetimepicker": "^8.4.4",

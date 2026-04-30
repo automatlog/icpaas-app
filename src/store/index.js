@@ -23,6 +23,7 @@ import mediaReducer from './slices/mediaSlice';
 import notificationsReducer from './slices/notificationsSlice';
 import groupsReducer from './slices/groupsSlice';
 import themeReducer from './slices/themeSlice';
+import liveChatReducer from './slices/liveChatSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -36,14 +37,17 @@ const rootReducer = combineReducers({
   notifications: notificationsReducer,
   groups: groupsReducer,
   theme: themeReducer,
+  liveChat: liveChatReducer,
 });
 
 const persistConfig = {
   key: 'icpaas-app-state',
   version: 1,
   storage: AsyncStorage,
-  // Don't persist the hydrated flag — it's runtime-only
-  blacklist: ['hydrated'],
+  // hydrated  → runtime-only flag.
+  // liveChat  → server is source of truth; persisting would show stale chats
+  //             and stale connection status on relaunch.
+  blacklist: ['hydrated', 'liveChat'],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

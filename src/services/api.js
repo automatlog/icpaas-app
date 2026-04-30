@@ -36,6 +36,7 @@ import {
   getSmsTemplateText,
   replaceSmsVariables,
 } from './smsHelpers';
+import { OMNI_HOST, LIVE_CHAT_PAGE_SIZE, LIVE_CHAT_MESSAGE_PAGE_SIZE } from '../config';
 
 const API_DOMAIN = 'https://gsauth.com';
 const ICPAAS_DOMAIN = 'https://icpaas.in';
@@ -67,11 +68,22 @@ const icpaasApi = axios.create({
   },
 });
 
-// Hard-coded bearer for both gsauth.com and icpaas.in. AsyncStorage is still
-// updated by the login / Profile flows for display, but every outgoing
-// request uses DEFAULT_API_TOKEN regardless.
+// OmniApp host (REST: /WAMessage/UserLiveChat/* etc.; SignalR: /whatsAppProgressHub).
+// Used by LiveChatAPI for the agent inbox/chat surface.
+const omniApi = axios.create({
+  baseURL: OMNI_HOST,
+  timeout: 20000,
+  headers: {
+    Accept: 'application/json',
+  },
+});
+
+// Reads the bearer from AsyncStorage on every request. Falls back to
+// DEFAULT_API_TOKEN so existing demo flows keep working until the real
+// login replaces the seeded token.
 const attachAuth = async (config) => {
-  config.headers.Authorization = `Bearer ${DEFAULT_API_TOKEN}`;
+  const stored = await AsyncStorage.getItem(STORAGE_KEYS.token);
+  config.headers.Authorization = `Bearer ${stored || DEFAULT_API_TOKEN}`;
   return config;
 };
 
@@ -96,6 +108,9 @@ api.interceptors.response.use((response) => response.data, handleResponseError);
 
 icpaasApi.interceptors.request.use(attachAuth, (error) => Promise.reject(error));
 icpaasApi.interceptors.response.use((response) => response.data, handleResponseError);
+
+omniApi.interceptors.request.use(attachAuth, (error) => Promise.reject(error));
+omniApi.interceptors.response.use((response) => response.data, handleResponseError);
 
 const asArray = (value) => {
   if (Array.isArray(value)) return value;
@@ -1145,5 +1160,94 @@ export const isSuccess = (response) => {
 
 export const getJobId = (response) => response?.jobId || response?.callback_data || null;
 export const getStatusMessage = (response) => response?.statusMessage || response?.message || '';
+
+// ---------------------------------------------------------------------------
+// LiveChatAPI — agent-facing WhatsApp Live Chat surface served by OmniApp.
+// See docs/live-agent-reference.md for endpoint semantics and docs/connection.md
+// for how this slots into the wider port.
+// ---------------------------------------------------------------------------
+export const LiveChatAPI = {
+  // GET /WAMessage/UserLiveChat/GetChannels
+  // → list of WABAChannels the logged-in user is authorised on.
+  getChannels: () => omniApi.get('/WAMessage/UserLiveChat/GetChannels'),
+
+  // POST /WAMessage/UserLiveChat/GetChatCount?channel=&chatType=
+  // → ChatCountRequestModel (badge counts for the filter chips).
+  getCounts: (channel = 'All', chatType = 'All') =>
+    omniApi.post('/WAMessage/UserLiveChat/GetChatCount', null, {
+      params: { channel, chatType },
+    }),
+
+  // POST /WAMessage/UserLiveChat/GetChatList?channel=&chatType=&pageIndex=&pageSize=
+  // Body: { Search?: string }
+  // → { isOnline, allChats: WebChatsModel[], currentPage, totalPages, totalCount }
+  getChatList: ({
+    channel = 'All',
+    chatType = 'All',
+    search,
+    pageIndex = 1,
+    pageSize = LIVE_CHAT_PAGE_SIZE,
+  } = {}) =>
+    omniApi.post(
+      '/WAMessage/UserLiveChat/GetChatList',
+      { Search: search || '' },
+      { params: { channel, chatType, pageIndex, pageSize } },
+    ),
+
+  // GET /WAMessage/UserLiveChat/GetUserChatMessages
+  // Cursor-based: pass beforeId (oldest WAInboxId already loaded) to scroll up.
+  // → { chatList: ChatModel[], hasMore, pageSize, canSendTemplate }
+  getMessages: ({
+    senderNumber,
+    channelNumber,
+    chatType = 'active',
+    beforeId,
+    pageSize = LIVE_CHAT_MESSAGE_PAGE_SIZE,
+  }) =>
+    omniApi.get('/WAMessage/UserLiveChat/GetUserChatMessages', {
+      params: { senderNumber, channelNumber, chatType, beforeId, pageSize },
+    }),
+
+  // POST /WAMessage/UserLiveChat/SendChatMessage (multipart/form-data)
+  // Caller builds the FormData; helper below covers the common path.
+  sendMessage: (formData) =>
+    omniApi.post('/WAMessage/UserLiveChat/SendChatMessage', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
+  // GET /WAMessage/UserLiveChat/getAllStatus?messageId=...
+  // → per-message delivery status timeline.
+  getAllStatus: (messageId) =>
+    omniApi.get('/WAMessage/UserLiveChat/getAllStatus', { params: { messageId } }),
+
+  // POST /WAMessage/UserLiveChat/AssignAgent
+  // force=false returns { confirmNeeded, existingAgentId } when the chat is
+  // already owned by another agent; force=true reassigns unconditionally.
+  assignAgent: ({ agentId, waNumber, channel, force = false }) =>
+    omniApi.post('/WAMessage/UserLiveChat/AssignAgent', null, {
+      params: { agentId, waNumber, channel, force },
+    }),
+};
+
+// Convenience builder for the common text-only send path. Returns a FormData
+// instance ready to hand to LiveChatAPI.sendMessage(). Media/location flows
+// build their own FormData (v2).
+export const buildLiveChatTextForm = ({
+  number,
+  channel,
+  message,
+  waInboxId = 0,
+  chatType = 'active',
+  replyToMessageId,
+}) => {
+  const fd = new FormData();
+  fd.append('Number', number);
+  fd.append('Channel', channel);
+  fd.append('Message', message);
+  fd.append('WaInboxId', String(waInboxId));
+  fd.append('ChatType', chatType);
+  if (replyToMessageId) fd.append('ReplyToMessageId', replyToMessageId);
+  return fd;
+};
 
 export default api;
