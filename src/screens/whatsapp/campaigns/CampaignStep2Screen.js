@@ -52,6 +52,8 @@ export default function CampaignStep2Screen({ navigation, route }) {
   const [templateName, setTemplateName] = useState(draft.templateName || '');
   const [openDD, setOpenDD] = useState(null); // 'category' | 'type' | 'template'
   const [values, setValues] = useState(draft.values || {});
+  const [focusedField, setFocusedField] = useState(null);
+  const [showErrors, setShowErrors] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,11 +122,13 @@ export default function CampaignStep2Screen({ navigation, route }) {
     }
 
     // Validate that all variables in the spec have a value
-    const missing = varSpec.find((s) => !values[s.key]?.trim());
-    if (missing) {
-      toast.warning('Incomplete', `Please provide a value for ${missing.label}.`);
+    const missing = varSpec.filter((s) => !values[s.key]?.trim());
+    if (missing.length > 0) {
+      setShowErrors(true);
+      toast.warning('Incomplete', `Please fill all variables: ${missing.map((m) => m.label).join(', ')}`);
       return;
     }
+    setShowErrors(false);
 
     navigation.navigate('CampaignStep3', {
       draft: { ...draft, category, type, templateName, values, varSpec },
@@ -244,11 +248,20 @@ export default function CampaignStep2Screen({ navigation, route }) {
                   </Text>
                   <View
                     className="rounded-[10px] px-3"
-                    style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bg }}
+                    style={{ 
+                      borderWidth: 1.5, 
+                      borderColor: focusedField === s.key ? c.primary : (showErrors && !values[s.key] ? c.danger : c.border), 
+                      backgroundColor: focusedField === s.key ? c.primary + '05' : (showErrors && !values[s.key] ? c.danger + '05' : c.bg) 
+                    }}
                   >
                     <TextInput
                       value={values[s.key] || ''}
-                      onChangeText={(v) => setValues((prev) => ({ ...prev, [s.key]: v }))}
+                      onChangeText={(v) => {
+                        setValues((prev) => ({ ...prev, [s.key]: v }));
+                        if (showErrors) setShowErrors(false);
+                      }}
+                      onFocus={() => setFocusedField(s.key)}
+                      onBlur={() => setFocusedField(null)}
                       placeholder={`Value for ${s.label}`}
                       placeholderTextColor={c.textMuted}
                       className="text-[13px]"
