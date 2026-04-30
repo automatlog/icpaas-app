@@ -11,6 +11,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import { BalanceAPI, VoiceAPI, IVRAPI } from '../../services/api';
 import { selectUnreadCount, pushNotification } from '../../store/slices/notificationsSlice';
+import { selectConnection, selectUnreadBadgeTotal } from '../../store/slices/liveChatSlice';
 import Banner from '../../components/Banner';
 import CampaignPicker from '../../components/CampaignPicker';
 import toast from '../../services/toast';
@@ -99,6 +100,8 @@ export default function DashboardScreen({ navigation }) {
   const dark = c.scheme === 'dark';
   const user = useSelector((s) => s.auth.user);
   const unread = useSelector(selectUnreadCount);
+  const liveConnection = useSelector(selectConnection);
+  const liveUnread = useSelector(selectUnreadBadgeTotal);
   const dispatch = useDispatch();
 
   const [balance, setBalance] = useState(null);
@@ -252,6 +255,46 @@ export default function DashboardScreen({ navigation }) {
           ))}
         </View>
 
+        {/* WhatsApp Live Agent — server-driven, real-time inbox.
+            Connection status pill mirrors the SignalR socket health. */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => navigation.navigate('LiveAgentInbox')}
+          className="flex-row items-center rounded-[16px] p-3.5 mt-6"
+          style={{ backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border, gap: 12 }}
+        >
+          <View
+            className="w-12 h-12 rounded-full items-center justify-center"
+            style={{ backgroundColor: c.primarySoft }}
+          >
+            <Ionicons name="chatbubbles" size={20} color={c.primary} />
+          </View>
+          <View className="flex-1">
+            <View className="flex-row items-center" style={{ gap: 6 }}>
+              <Text className="text-[14px] font-bold" style={{ color: c.text }}>WhatsApp Live Agent</Text>
+              <LiveStatusDot status={liveConnection.status} c={c} />
+            </View>
+            <Text className="text-[11px] mt-0.5" style={{ color: c.textMuted }} numberOfLines={1}>
+              {liveConnection.status === 'connected'
+                ? 'Real-time customer conversations'
+                : liveConnection.status === 'reconnecting'
+                  ? 'Reconnecting to live channel…'
+                  : liveConnection.status === 'disconnected'
+                    ? 'Offline — tap to retry'
+                    : 'Tap to open live inbox'}
+            </Text>
+          </View>
+          {liveUnread > 0 && (
+            <View
+              className="rounded-full px-2 py-0.5 mr-1"
+              style={{ backgroundColor: c.primary }}
+            >
+              <Text className="text-[11px] font-bold text-white">{liveUnread > 99 ? '99+' : liveUnread}</Text>
+            </View>
+          )}
+          <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+        </TouchableOpacity>
+
         <View className="flex-row items-center justify-between mt-6 mb-3">
           <Text className="text-[16px] font-bold" style={{ color: c.text }}>Recent Activity</Text>
         </View>
@@ -305,6 +348,31 @@ export default function DashboardScreen({ navigation }) {
     </View>
   );
 }
+
+// Tiny dot + label that mirrors the SignalR connection status from
+// liveChatSlice. Used on the dashboard's Live Agent entry point so users
+// see realtime health at a glance.
+const LiveStatusDot = ({ status, c }) => {
+  const palette = {
+    connected:    { bg: c.success || '#22C55E', label: 'live' },
+    connecting:   { bg: '#F0B95C',              label: 'connecting' },
+    reconnecting: { bg: '#F0B95C',              label: 'reconnecting' },
+    disconnected: { bg: c.danger || '#E54B4B', label: 'offline' },
+    idle:         { bg: c.textMuted,            label: 'idle' },
+  }[status] || { bg: c.textMuted, label: status || 'idle' };
+
+  return (
+    <View
+      className="flex-row items-center px-1.5 py-0.5 rounded-full"
+      style={{ backgroundColor: palette.bg + '22', gap: 4 }}
+    >
+      <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: palette.bg }} />
+      <Text className="text-[9px] font-bold" style={{ color: palette.bg, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+        {palette.label}
+      </Text>
+    </View>
+  );
+};
 
 const ChannelTile = ({ c, icon, label, count, onPress }) => {
   const scale = useRef(new Animated.Value(1)).current;

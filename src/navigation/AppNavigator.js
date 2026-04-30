@@ -20,6 +20,8 @@ import ContactsScreen from '../screens/shared/ContactsScreen';
 // WhatsApp screens
 import WhatsAppInboxScreen from '../screens/whatsapp/InboxScreen';
 import WhatsAppChatScreen from '../screens/whatsapp/ChatScreen';
+import LiveAgentInbox from '../screens/whatsapp/LiveAgentInbox';
+import LiveAgentChat from '../screens/whatsapp/LiveAgentChat';
 import WhatsAppTemplatesScreen from '../screens/whatsapp/TemplatesScreen';
 import WhatsAppCreateTemplateScreen from '../screens/whatsapp/CreateTemplateScreen';
 import WabaChannelScreen from '../screens/whatsapp/WabaChannelScreen';
@@ -126,6 +128,10 @@ export default function AppNavigator() {
         <Stack.Screen name="WhatsAppCampaignStep1" component={WhatsAppCampaignStep1} />
         <Stack.Screen name="WhatsAppCampaignStep2" component={WhatsAppCampaignStep2} />
         <Stack.Screen name="WhatsAppCampaignStep3" component={WhatsAppCampaignStep3} />
+
+        {/* WhatsApp Live Agent (server-driven, real-time) */}
+        <Stack.Screen name="LiveAgentInbox" component={LiveAgentInbox} />
+        <Stack.Screen name="LiveAgentChat" component={LiveAgentChat} />
 
         {/* RCS */}
         <Stack.Screen name="RcsInbox" component={RcsInboxScreen} />

@@ -24,6 +24,7 @@ import notificationsReducer from './slices/notificationsSlice';
 import groupsReducer from './slices/groupsSlice';
 import themeReducer from './slices/themeSlice';
 import liveChatReducer from './slices/liveChatSlice';
+import liveChatNotifier from './middleware/liveChatNotifier';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -59,7 +60,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }),
+    }).concat(liveChatNotifier),
 });
 
 export const persistor = persistStore(store);

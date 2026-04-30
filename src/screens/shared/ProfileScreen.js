@@ -9,7 +9,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import { AuthAPI } from '../../services/api';
-import { logout as logoutAction } from '../../store/slices/authSlice';
+import { logoutAndCleanup } from '../../store/slices/authSlice';
 import { selectThemeMode, setThemeMode } from '../../store/slices/themeSlice';
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
@@ -101,7 +101,7 @@ export default function ProfileScreen({ navigation }) {
       danger: true,
     });
     if (ok) {
-      dispatch(logoutAction());
+      await dispatch(logoutAndCleanup());
       toast.success('Signed out', 'See you again soon.');
     }
   };
