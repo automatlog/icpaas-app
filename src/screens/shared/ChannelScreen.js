@@ -74,6 +74,7 @@ const ROUTES = {
     identityLabel: 'Sender IDs',
     identityDesc: 'DLT-registered SMS senders',
     identityIcon: 'chatbubble',
+    configScreen: 'SmsConfig',
   },
   voice: {
     inbox: null,
@@ -84,6 +85,7 @@ const ROUTES = {
     identityDesc: 'Outbound caller numbers',
     identityIcon: 'call',
     configScreen: 'VoiceConfig',
+    clickToCall: 'ClickToCall',
   },
 };
 
@@ -104,6 +106,9 @@ const TOOLS = (id, navigation) => {
   }
   if (r.identityScreen) {
     items.push({ icon: r.identityIcon, tint: '#0B8A6F', tintBg: '#D1FAE5', label: r.identityLabel, desc: r.identityDesc, onPress: () => navigation.navigate(r.identityScreen) });
+  }
+  if (r.clickToCall) {
+    items.push({ icon: 'call-outline', tint: '#F59E0B', tintBg: '#FEF3C7', label: 'Click to Call', desc: 'Originate single or bulk calls', onPress: () => navigation.navigate(r.clickToCall) });
   }
   items.push({ icon: 'people', tint: '#8B5CF6', tintBg: '#EDE9FE', label: 'Contacts', desc: 'Manage & segment contacts', onPress: () => navigation.navigate('Contacts') });
   items.push({ icon: 'bar-chart', tint: '#EC4899', tintBg: '#FCE7F3', label: 'Reports', desc: 'View analytics & performance', onPress: () => navigation.navigate('Report') });

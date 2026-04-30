@@ -1,87 +1,84 @@
-// src/screens/whatsapp/InboxScreen.js — WhatsApp/omni inbox (NativeWind)
-// Accepts optional route.params.channel to lock the inbox to a single product
-// (e.g. 'rcs', 'sms', 'voice'). Defaults to a multi-channel view.
-import React, { useState, useEffect, useCallback } from 'react';
+// src/screens/whatsapp/InboxScreen.js — Live Agent Inbox.
+// Mirrors the icpaas.in WAMessage/UserLiveChat/Index layout:
+//   - Top header (channel avatar + name + active filter chip + kebab)
+//   - Filter row: "All (N)" dropdown + search input
+//   - Conversation list: tinted-bg circular avatar + name + last message,
+//     time top-right, red unread badge bottom-right
+//   - Active row gets a green left-edge accent
+//   - Pagination footer "1 - N of M"
+//
+// Accepts optional `route.params.channel` ('whatsapp' | 'rcs' | 'sms' |
+// 'voice') to lock the inbox to a single product. Defaults to omni view.
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  RefreshControl, ActivityIndicator, Platform, useColorScheme,
+  RefreshControl, ActivityIndicator, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
+import { useBrand } from '../../theme';
 import { WhatsAppAPI } from '../../services/api';
 import { setConversations as setConversationsAction } from '../../store/slices/conversationsSlice';
+import ScreenHeader from '../../components/ScreenHeader';
 
-const FILTERS_OMNI = [
-  { id: 'All', icon: 'apps-outline' },
-  { id: 'WhatsApp', icon: 'logo-whatsapp' },
-  { id: 'SMS', icon: 'chatbubble-outline' },
-  { id: 'RCS', icon: 'card-outline' },
-  { id: 'Unread', icon: 'mail-unread-outline' },
+const PRODUCT = {
+  whatsapp: { label: 'WhatsApp', icon: 'logo-whatsapp', tint: '#10B981' },
+  rcs:      { label: 'RCS',      icon: 'logo-google',   tint: '#8B5CF6' },
+  sms:      { label: 'SMS',      icon: 'chatbubble-outline', tint: '#0B8A6F' },
+  voice:    { label: 'Voice',    icon: 'mic-outline',   tint: '#F59E0B' },
+};
+
+const FILTER_OPTIONS = [
+  { id: 'All',      label: 'All' },
+  { id: 'WhatsApp', label: 'WhatsApp' },
+  { id: 'SMS',      label: 'SMS' },
+  { id: 'RCS',      label: 'RCS' },
+  { id: 'Unread',   label: 'Unread' },
 ];
 
-const PRODUCT_LABEL = {
-  whatsapp: 'WhatsApp',
-  rcs: 'RCS',
-  sms: 'SMS',
-  voice: 'Voice',
-};
-
-const CHANNEL_TINT = {
-  whatsapp: '#8FCFBD',
-  sms: '#F2A8B3',
-  rcs: '#D4B3E8',
-  ivr: '#E8D080',
-};
-
-const CHANNEL_ICON = {
-  whatsapp: 'logo-whatsapp',
-  sms: 'chatbubble-outline',
-  rcs: 'card-outline',
-  ivr: 'call-outline',
-};
+// Avatar tints used by the icpaas.in conversation list. Stable per
+// initials so the same contact reads the same colour across loads.
+const AVATAR_TINTS = ['#0BB783', '#D4B500', '#5BA0E5', '#EF4444', '#10B981', '#A855F7', '#F59E0B'];
 
 const MOCK_CONVERSATIONS = [
-  { id: '1', name: 'Acme Corp',             channel: 'whatsapp', lastMsg: 'Hi, we need to renew our WhatsApp API plan…', time: 'Just now', unread: 3, online: true },
-  { id: '2', name: 'Riya Sharma',           channel: 'sms',      lastMsg: 'Your OTP is 847261. Do not share.',           time: '2m',       unread: 0, online: false },
-  { id: '3', name: 'Priya — ExtraEdge',     channel: 'whatsapp', lastMsg: 'Is the IVR flow active for Maharashtra?',     time: '14m',      unread: 1, online: true },
-  { id: '4', name: 'HDFC Integration',      channel: 'rcs',      lastMsg: 'Webhook delivery logs for March batch ✓',     time: '1h',       unread: 0, online: false },
-  { id: '5', name: 'Flipkart Campaign',     channel: 'whatsapp', lastMsg: 'Campaign delivered to 45,200 users — 94%',    time: '3h',       unread: 0, online: false },
-  { id: '6', name: 'Apollo Hospital',       channel: 'sms',      lastMsg: 'Appointment reminders sent for tomorrow',     time: '5h',       unread: 0, online: false },
-  { id: '7', name: 'LeadSquared Bot',       channel: 'whatsapp', lastMsg: 'New lead: +91 8765432109 from Gujarat',       time: 'Yesterday', unread: 0, online: false },
-  { id: '8', name: 'Jio OTP Gateway',       channel: 'sms',      lastMsg: 'OTP delivered: 2,147 messages · 99.1%',       time: 'Yesterday', unread: 0, online: false },
+  { id: '1', name: 'Yogeshwar R Sharma',     channel: 'whatsapp', lastMsg: 'Welcome to the RDS Group Of...',  time: '46 min ago', unread: 2, online: true  },
+  { id: '2', name: 'talent',                 channel: 'whatsapp', lastMsg: 'Hello',                            time: '12:43 PM',   unread: 0, online: false },
+  { id: '3', name: 'CSC Computer Education', channel: 'whatsapp', lastMsg: 'Thank you for contacting...',     time: '08:49 AM',   unread: 1, online: false },
+  { id: '4', name: 'Supportybs',             channel: 'whatsapp', lastMsg: 'Hi',                               time: 'Yesterday',  unread: 1, online: false },
+  { id: '5', name: 'Amit',                   channel: 'whatsapp', lastMsg: 'https://icpaas.in',                time: 'Yesterday',  unread: 2, online: false },
 ];
-
-const C = {
-  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', green: '#4BD08D', gradA: '#FF4D7E', gradB: '#FF8A3D', gradC: '#B765E8' },
-  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', pink: '#E6428A', green: '#22C55E', gradA: '#E6428A', gradB: '#FF7A22', gradC: '#9A47D4' },
-};
 
 const initialsOf = (name = '') =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
 
-export default function InboxScreen({ navigation, route }) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
+const tintFor = (name) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_TINTS[hash % AVATAR_TINTS.length];
+};
 
-  const lockedChannel = route?.params?.channel; // 'rcs' | 'sms' | 'voice' | 'whatsapp'
-  const productLabel = lockedChannel ? (PRODUCT_LABEL[lockedChannel] || lockedChannel) : null;
-  const FILTERS = lockedChannel
-    ? [{ id: 'Unread', icon: 'mail-unread-outline' }]
-    : FILTERS_OMNI;
+export default function InboxScreen({ navigation, route }) {
+  const c = useBrand();
+
+  const lockedChannel = route?.params?.channel; // 'whatsapp' | 'rcs' | 'sms' | 'voice'
+  const product = lockedChannel ? PRODUCT[lockedChannel] : null;
 
   const dispatch = useDispatch();
   const conversations = useSelector((s) => s.conversations.list);
   const setConversations = (list) => dispatch(setConversationsAction(list));
 
-  const [filter, setFilter] = useState(lockedChannel ? 'All' : 'All');
+  const [filter, setFilter] = useState('All');
+  const [showFilter, setShowFilter] = useState(false);
   const [search, setSearch] = useState('');
+  const [activeId, setActiveId] = useState(null);
   const [loading, setLoading] = useState(conversations.length === 0);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchConversations = useCallback(async () => {
     try {
-      const res = await WhatsAppAPI.getConversations({ channel: filter === 'All' ? undefined : filter.toLowerCase() });
+      const res = await WhatsAppAPI.getConversations({
+        channel: filter === 'All' ? undefined : filter.toLowerCase(),
+      });
       setConversations(res?.data || MOCK_CONVERSATIONS);
     } catch {
       setConversations(MOCK_CONVERSATIONS);
@@ -93,156 +90,271 @@ export default function InboxScreen({ navigation, route }) {
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
-  const filtered = conversations.filter((cv) => {
+  const filtered = useMemo(() => conversations.filter((cv) => {
     const matchSearch = !search || cv.name.toLowerCase().includes(search.toLowerCase());
-    const matchProduct =
-      !lockedChannel || cv.channel?.toLowerCase() === lockedChannel.toLowerCase();
+    const matchProduct = !lockedChannel || cv.channel?.toLowerCase() === lockedChannel.toLowerCase();
     const matchFilter =
       filter === 'All' ||
       (filter === 'Unread' && cv.unread > 0) ||
       cv.channel?.toLowerCase() === filter.toLowerCase();
     return matchSearch && matchProduct && matchFilter;
-  });
+  }), [conversations, search, filter, lockedChannel]);
 
-  const unreadCount = conversations.filter((cv) => cv.unread > 0).length;
-
-  const rootBg = dark ? 'bg-[#0A0A0D]' : 'bg-white';
-  const softBg = dark ? 'bg-[#141418]' : 'bg-[#F2F2F5]';
-  const textInk = dark ? 'text-white' : 'text-[#0A0A0D]';
-  const textMuted = dark ? 'text-[#9A9AA2]' : 'text-[#5C5C63]';
-  const textDim = dark ? 'text-[#5C5C63]' : 'text-[#9A9AA2]';
+  const filterCount = filtered.length;
 
   return (
-    <View className={`flex-1 ${rootBg}`}>
-      <View style={{ paddingTop: 16, paddingHorizontal: 22 }}>
-        {/* Header */}
-        <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon={product?.icon || 'chatbubbles-outline'}
+        iconBg={product ? `${product.tint}22` : c.primarySoft}
+        iconFg={product?.tint || c.primary}
+        title={product?.label || 'Live Agent'}
+        subtitle={{ text: 'All', dotColor: c.primary }}
+        right={
+          <TouchableOpacity
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="ellipsis-vertical" size={18} color={c.textMuted} />
           </TouchableOpacity>
-          <View className="flex-1">
-            <Text className={`text-[28px] font-bold tracking-tight ${textInk}`}>
-              {productLabel ? `${productLabel} Inbox` : 'Inbox'}
+        }
+      />
+
+      {/* Filter dropdown + search row (mirrors icpaas.in WALiveAgent header) */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, gap: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => setShowFilter((v) => !v)}
+            activeOpacity={0.85}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: c.border,
+              backgroundColor: c.bgCard,
+              gap: 6,
+              minWidth: 110,
+            }}
+          >
+            <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>
+              {filter} ({filterCount})
             </Text>
-            <Text className={`text-xs ${textMuted}`}>
-              {unreadCount} unread · {productLabel || 'All channels'}
-            </Text>
+            <Ionicons name={showFilter ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
+          </TouchableOpacity>
+
+          <View
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: c.border,
+              backgroundColor: c.bgCard,
+              paddingHorizontal: 12,
+              gap: 8,
+            }}
+          >
+            <Ionicons name="search-outline" size={15} color={c.textMuted} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search conversations..."
+              placeholderTextColor={c.textMuted}
+              style={[
+                { flex: 1, fontSize: 13, color: c.text, paddingVertical: 10 },
+                Platform.select({ web: { outlineStyle: 'none' } }),
+              ]}
+            />
           </View>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} activeOpacity={0.7} onPress={() => navigation.navigate('Send')}>
-            <Ionicons name="create-outline" size={18} color={c.ink} />
-          </TouchableOpacity>
         </View>
 
-        {/* Search */}
-        <View className={`flex-row items-center rounded-[20px] px-4 mb-3 ${softBg}`} style={{ gap: 10 }}>
-          <Ionicons name="search-outline" size={16} color={c.muted} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search contacts or messages"
-            placeholderTextColor={c.muted}
-            className={`flex-1 py-3 text-sm ${textInk}`}
-            style={Platform.select({ web: { outlineStyle: 'none' } })}
-          />
-        </View>
-
-        {/* Filter chips */}
-        <FlatList
-          data={FILTERS}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(f) => f.id}
-          contentContainerStyle={{ gap: 6, paddingBottom: 10 }}
-          renderItem={({ item }) => {
-            const active = filter === item.id;
-            return (
-              <TouchableOpacity
-                onPress={() => setFilter(item.id)}
-                activeOpacity={0.8}
-                className="flex-row items-center py-2 px-3.5 rounded-[16px]"
-                style={{ backgroundColor: active ? c.ink : (dark ? '#141418' : '#F2F2F5'), gap: 6 }}
-              >
-                <Ionicons name={item.icon} size={12} color={active ? c.bg : c.muted} />
-                <Text className="text-xs" style={{ color: active ? c.bg : c.muted, fontWeight: active ? '700' : '500' }}>
-                  {item.id}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
+        {showFilter ? (
+          <View
+            style={{
+              backgroundColor: c.bgCard,
+              borderWidth: 1,
+              borderColor: c.border,
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
+            {FILTER_OPTIONS.map((opt, i) => {
+              const active = filter === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  onPress={() => { setFilter(opt.id); setShowFilter(false); }}
+                  activeOpacity={0.85}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: active ? c.primarySoft : 'transparent',
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: c.rule,
+                    gap: 8,
+                  }}
+                >
+                  <Ionicons
+                    name={active ? 'radio-button-on' : 'radio-button-off'}
+                    size={14}
+                    color={active ? c.primary : c.textMuted}
+                  />
+                  <Text style={{ color: c.text, fontSize: 13, fontWeight: active ? '700' : '500' }}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
 
-      {/* List */}
+      {/* Conversation list */}
       {loading ? (
-        <View className="flex-1 items-center justify-center" style={{ gap: 10 }}>
-          <ActivityIndicator color={c.pink} />
-          <Text className={`text-xs tracking-widest uppercase ${textMuted}`}>loading inbox</Text>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          <ActivityIndicator color={c.primary} />
+          <Text style={{ color: c.textMuted, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' }}>
+            loading inbox
+          </Text>
         </View>
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={(i) => i.id}
-          contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 120, paddingTop: 4 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchConversations(); }} tintColor={c.pink} />}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: 130 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => { setRefreshing(true); fetchConversations(); }}
+              tintColor={c.primary}
+            />
+          }
+          ItemSeparatorComponent={() => (
+            <View style={{ height: 1, backgroundColor: c.rule, marginLeft: 76 }} />
+          )}
           renderItem={({ item }) => {
-            const ch = String(item.channel || '').toLowerCase();
-            const tint = CHANNEL_TINT[ch] || '#E8B799';
-            const icon = CHANNEL_ICON[ch] || 'chatbubble-outline';
+            const isActive = activeId === item.id;
+            const tint = tintFor(item.name);
             return (
               <TouchableOpacity
-                onPress={() => navigation.navigate('Chat', { conversation: item })}
-                activeOpacity={0.8}
-                className={`flex-row items-center rounded-[20px] p-3 mb-2.5 ${softBg}`}
-                style={{ gap: 12, borderWidth: 1, borderColor: c.bgInput }}
+                onPress={() => {
+                  setActiveId(item.id);
+                  navigation.navigate('Chat', { conversation: item });
+                }}
+                activeOpacity={0.75}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  gap: 12,
+                  backgroundColor: isActive ? c.primarySoft : 'transparent',
+                  borderLeftWidth: isActive ? 3 : 0,
+                  borderLeftColor: c.primary,
+                }}
               >
-                <View className="relative">
-                  <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: tint }}>
-                    <Text className="text-sm font-bold" style={{ color: '#0A0A0D' }}>{initialsOf(item.name)}</Text>
+                <View style={{ position: 'relative' }}>
+                  <View
+                    style={{
+                      width: 44, height: 44, borderRadius: 22,
+                      alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: tint,
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                      {initialsOf(item.name)}
+                    </Text>
                   </View>
-                  {item.online && (
+                  {item.online ? (
                     <View
-                      className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full"
-                      style={{ backgroundColor: c.green, borderWidth: 2, borderColor: c.bgSoft }}
+                      style={{
+                        position: 'absolute',
+                        bottom: -1, right: -1,
+                        width: 11, height: 11, borderRadius: 6,
+                        backgroundColor: c.success,
+                        borderWidth: 2,
+                        borderColor: c.bg,
+                      }}
                     />
-                  )}
+                  ) : null}
                 </View>
-                <View className="flex-1">
-                  <View className="flex-row items-center">
-                    <Text className={`text-[15px] font-semibold flex-1 ${textInk}`} numberOfLines={1}>{item.name}</Text>
-                    <Text className={`text-[11px] ${textMuted}`}>{item.time}</Text>
+
+                <View style={{ flex: 1, justifyContent: 'center', gap: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        flex: 1,
+                        color: c.text,
+                        fontSize: 14,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text style={{ color: c.textMuted, fontSize: 11 }}>{item.time}</Text>
                   </View>
-                  <View className="flex-row items-center mt-0.5" style={{ gap: 6 }}>
-                    <Ionicons name={icon} size={11} color={c.muted} />
-                    <Text className={`flex-1 text-xs ${textMuted}`} numberOfLines={1}>{item.lastMsg}</Text>
-                    {item.unread > 0 && (
-                      <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.green }}>
-                        <Text className="text-[10px] font-bold" style={{ color: '#0A0A0D' }}>{item.unread}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{ flex: 1, color: c.textMuted, fontSize: 12 }}
+                    >
+                      {item.lastMsg}
+                    </Text>
+                    {item.unread > 0 ? (
+                      <View
+                        style={{
+                          minWidth: 20, height: 20, borderRadius: 10,
+                          paddingHorizontal: 6,
+                          backgroundColor: c.danger,
+                          alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>
+                          {item.unread > 99 ? '99+' : item.unread}
+                        </Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                 </View>
               </TouchableOpacity>
             );
           }}
           ListEmptyComponent={
-            <View className="items-center py-16" style={{ gap: 8 }}>
-              <Ionicons name="mail-outline" size={36} color={c.dim} />
-              <Text className={`text-[15px] font-semibold ${textInk}`}>No conversations</Text>
-              <Text className={`text-xs ${textDim}`}>Messages will appear here</Text>
+            <View style={{ alignItems: 'center', paddingVertical: 64, gap: 8 }}>
+              <Ionicons name="mail-outline" size={36} color={c.textDim} />
+              <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>No conversations</Text>
+              <Text style={{ color: c.textDim, fontSize: 12 }}>Messages will appear here</Text>
             </View>
+          }
+          ListFooterComponent={
+            filtered.length > 0 ? (
+              <View
+                style={{
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  backgroundColor: c.bgSoft,
+                  borderTopWidth: 1,
+                  borderTopColor: c.rule,
+                }}
+              >
+                <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '600' }}>
+                  1 - {filtered.length} of {conversations.length}
+                </Text>
+              </View>
+            ) : null
           }
         />
       )}
-
-      {/* FAB */}
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Send')}
-        activeOpacity={0.88}
-        className="absolute bottom-8 right-6 w-14 h-14 rounded-[18px] items-center justify-center"
-        style={{ backgroundColor: c.ink, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8 }}
-      >
-        <Ionicons name="create" size={22} color={c.bg} />
-      </TouchableOpacity>
     </View>
   );
 }
