@@ -71,10 +71,16 @@ export default function TemplatesScreen({ navigation, route }) {
     setErr(null);
     try {
       const res = await TemplatesAPI.getByChannel(channel);
-      setTemplates(Array.isArray(res?.data) ? res.data : []);
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setTemplates(list);
+      if (!list.length) {
+        toast.info('No templates', `${channel.toUpperCase()} returned an empty list.`);
+      }
     } catch (e) {
       setTemplates([]);
-      setErr(e?.message || 'Failed to fetch templates');
+      const message = e?.message || 'Failed to fetch templates';
+      setErr(message);
+      toast.error(`${channel.toUpperCase()} templates failed`, message);
     } finally {
       setLoading(false);
       setRefreshing(false);

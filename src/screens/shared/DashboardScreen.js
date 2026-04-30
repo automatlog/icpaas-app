@@ -12,6 +12,7 @@ import { useBrand } from '../../theme';
 import { BalanceAPI, VoiceAPI, IVRAPI } from '../../services/api';
 import { selectUnreadCount, pushNotification } from '../../store/slices/notificationsSlice';
 import Banner from '../../components/Banner';
+import toast from '../../services/toast';
 
 const greet = () => {
   const h = new Date().getHours();
@@ -57,11 +58,37 @@ export default function DashboardScreen({ navigation }) {
   const dispatch = useDispatch();
 
   const [balance, setBalance] = useState(null);
+  const [balanceError, setBalanceError] = useState(null);
   const [voiceRows, setVoiceRows] = useState(0);
   const [ivrRows, setIvrRows] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  // The icpaas.in /user/balance endpoint has surfaced the wallet under a few
+  // different keys over time (`walletBalance`, `balance`, sometimes nested
+  // under `data`). Try each in order so a server-side rename doesn't blank
+  // out the UI.
+  const extractBalance = (payload) => {
+    if (payload == null) return null;
+    if (typeof payload === 'number') return payload;
+    const candidates = [
+      payload.walletBalance,
+      payload.balance,
+      payload.amount,
+      payload.data?.walletBalance,
+      payload.data?.balance,
+      payload.data?.amount,
+      payload.result?.walletBalance,
+      payload.result?.balance,
+    ];
+    for (const v of candidates) {
+      if (v == null) continue;
+      const n = typeof v === 'string' ? Number(v) : v;
+      if (typeof n === 'number' && !Number.isNaN(n)) return n;
+    }
+    return null;
+  };
 
   const fetchFront = useCallback(async () => {
     const today = new Date();
@@ -75,16 +102,26 @@ export default function DashboardScreen({ navigation }) {
     ]);
 
     if (bal.status === 'fulfilled') {
-      const b = bal.value?.walletBalance ?? bal.value?.balance ?? null;
+      const b = extractBalance(bal.value);
       setBalance(b);
-      // Auto low-balance alert (threshold ₹1000) — once per refresh
-      if (typeof b === 'number' && b < 1000) {
-        dispatch(pushNotification({
-          kind: 'balance',
-          title: 'Low wallet balance',
-          body: `Wallet at ₹${Number(b).toLocaleString('en-IN', { maximumFractionDigits: 2 })}. Top up to keep campaigns running.`,
-        }));
+      if (b == null) {
+        setBalanceError('Balance field missing from API response.');
+      } else {
+        setBalanceError(null);
+        // Auto low-balance alert (threshold ₹1000) — once per refresh
+        if (b < 1000) {
+          dispatch(pushNotification({
+            kind: 'balance',
+            title: 'Low wallet balance',
+            body: `Wallet at ₹${Number(b).toLocaleString('en-IN', { maximumFractionDigits: 2 })}. Top up to keep campaigns running.`,
+          }));
+        }
       }
+    } else {
+      setBalance(null);
+      const message = bal.reason?.message || 'Balance request failed.';
+      setBalanceError(message);
+      toast.error('Wallet unavailable', message);
     }
     if (voice.status === 'fulfilled') setVoiceRows((voice.value?.data || []).length);
     if (ivr.status === 'fulfilled') setIvrRows((ivr.value?.data || []).length);
@@ -168,12 +205,19 @@ export default function DashboardScreen({ navigation }) {
             </Text>
             {loading ? (
               <ActivityIndicator size="small" color={c.primaryDeep} style={{ alignSelf: 'flex-start', marginTop: 2 }} />
-            ) : (
+            ) : balance != null ? (
               <Text className="text-[20px] font-extrabold mt-0.5" style={{ color: c.primaryDeep }}>
-                {balance == null
-                  ? '—'
-                  : `₹${Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                ₹{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Text>
+            ) : (
+              <>
+                <Text className="text-[16px] font-bold mt-0.5" style={{ color: c.danger }}>
+                  Unavailable
+                </Text>
+                <Text className="text-[10px] mt-0.5" style={{ color: c.primaryDeep, opacity: 0.7 }} numberOfLines={2}>
+                  {balanceError || 'Pull to refresh'}
+                </Text>
+              </>
             )}
           </View>
           <TouchableOpacity

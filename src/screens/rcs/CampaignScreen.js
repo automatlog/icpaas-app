@@ -18,6 +18,7 @@ import GradientButton from '../../components/GradientButton';
 import FormField, { inputStyle } from '../../components/FormField';
 import Dropdown from '../../components/Dropdown';
 import ToggleRow from '../../components/ToggleRow';
+import ScheduleModal from '../shared/ScheduleModal';
 
 const TEMPLATE_TYPES = [
   { id: '3',        label: 'Text Message' },
@@ -65,6 +66,9 @@ export default function CampaignScreen({ navigation }) {
   const [removeDup, setRemoveDup] = useState(true);
   const [removeBlack, setRemoveBlack] = useState(true);
   const [schedule, setSchedule] = useState(false);
+  const [schedTime, setSchedTime] = useState('');
+  const [schedAt, setSchedAt] = useState(null);
+  const [showSchedModal, setShowSchedModal] = useState(false);
 
   const [sending, setSending] = useState(false);
 
@@ -76,8 +80,12 @@ export default function CampaignScreen({ navigation }) {
         const list = res?.bots || res?.data?.bots || res?.data || [];
         setBots(Array.isArray(list) ? list : []);
         if (!bot && list[0]?.botId) setBot(list[0]);
+        if (!list.length) toast.warning('No bots', 'Your token returned zero RCS agents.');
       })
-      .catch(() => setBots([]))
+      .catch((e) => {
+        setBots([]);
+        toast.error('RCS bots failed', e?.message || 'Could not load bot IDs.');
+      })
       .finally(() => setLoadingBots(false));
   }, []);
 
@@ -90,8 +98,12 @@ export default function CampaignScreen({ navigation }) {
         const list = Array.isArray(res?.data) ? res.data : [];
         setTemplates(list);
         setTemplate(list[0] || null);
+        if (!list.length) toast.warning('No templates', `Bot ${bot.agentName || bot.botId} has none yet.`);
       })
-      .catch(() => setTemplates([]))
+      .catch((e) => {
+        setTemplates([]);
+        toast.error('Templates failed', e?.message || 'Could not load RCS templates.');
+      })
       .finally(() => setLoadingTemplates(false));
   }, [bot?.botId]);
 
@@ -300,7 +312,19 @@ export default function CampaignScreen({ navigation }) {
 
         <ToggleRow c={c} label="Remove Duplicate" value={removeDup} onChange={setRemoveDup} />
         <ToggleRow c={c} label="Remove BlackList" value={removeBlack} onChange={setRemoveBlack} />
-        <ToggleRow c={c} label="Schedule Now" value={schedule} onChange={setSchedule} />
+        <ToggleRow
+          c={c}
+          label="Schedule Now"
+          help={schedule && schedAt
+            ? `Will queue locally for ${schedAt.toLocaleString()} (RCS API has no native scheduling).`
+            : 'Pick a future date and time.'}
+          value={schedule}
+          onChange={(v) => {
+            setSchedule(v);
+            if (v) setShowSchedModal(true);
+            else { setSchedTime(''); setSchedAt(null); }
+          }}
+        />
 
         <View className="flex-row mt-5" style={{ gap: 10 }}>
           <View style={{ flex: 1 }}>
@@ -313,14 +337,29 @@ export default function CampaignScreen({ navigation }) {
           </View>
           <View style={{ flex: 1 }}>
             <GradientButton
-              title="Send Now"
-              icon="send"
+              title={schedule && schedTime ? 'Schedule Send' : 'Send Now'}
+              icon={schedule && schedTime ? 'calendar' : 'send'}
               loading={sending}
               onPress={send}
             />
           </View>
         </View>
       </ScrollView>
+
+      <ScheduleModal
+        visible={showSchedModal}
+        initialValue={schedAt}
+        onConfirm={(api, date) => {
+          setSchedTime(api);
+          setSchedAt(date);
+          setShowSchedModal(false);
+          setSchedule(true);
+        }}
+        onClose={() => {
+          setShowSchedModal(false);
+          if (!schedTime) setSchedule(false);
+        }}
+      />
     </View>
   );
 }

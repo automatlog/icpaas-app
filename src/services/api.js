@@ -67,11 +67,11 @@ const icpaasApi = axios.create({
   },
 });
 
+// Hard-coded bearer for both gsauth.com and icpaas.in. AsyncStorage is still
+// updated by the login / Profile flows for display, but every outgoing
+// request uses DEFAULT_API_TOKEN regardless.
 const attachAuth = async (config) => {
-  const token = await AsyncStorage.getItem(STORAGE_KEYS.token);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  config.headers.Authorization = `Bearer ${DEFAULT_API_TOKEN}`;
   return config;
 };
 

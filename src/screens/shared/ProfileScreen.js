@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Image,
-  Alert, Platform,
+  Alert, Platform, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -33,7 +33,10 @@ export default function ProfileScreen({ navigation }) {
   const [city, setCity]           = useState(user.city || '');
   const [state, setState]         = useState(user.state || '');
   const [pin, setPin]             = useState(user.pin || '');
-  const [apiKey, setApiKey]       = useState('');
+  const [apiKey, setApiKey]           = useState('');
+  const [apiKeyDirty, setApiKeyDirty] = useState(false);
+  const [testingKey, setTestingKey]   = useState(false);
+  const [keyScopes, setKeyScopes]     = useState(null); // { whatsapp, sms, rcs }
 
   useEffect(() => {
     AuthAPI.getToken().then((t) => setApiKey(t || ''));
@@ -43,6 +46,35 @@ export default function ProfileScreen({ navigation }) {
     if (!apiKey) { toast.warning('No API key', 'Save one in Config first.'); return; }
     await Clipboard.setStringAsync(apiKey);
     toast.success('Copied', 'Public API key copied to clipboard.');
+  };
+
+  const saveAndTestKey = async () => {
+    const token = apiKey.trim();
+    if (!token) { toast.warning('Required', 'Paste an API key first.'); return; }
+    setTestingKey(true);
+    try {
+      const result = await AuthAPI.saveAndVerifyCredentials(token);
+      const scopes = {
+        whatsapp: result?.whatsapp?.ok || false,
+        sms:      result?.sms?.ok      || false,
+        rcs:      result?.rcs?.ok      || false,
+      };
+      setKeyScopes(scopes);
+      setApiKeyDirty(false);
+      const ok = Object.values(scopes).filter(Boolean).length;
+      if (ok === 0) {
+        toast.error('Token saved · 0 scopes', 'No channels accept this token.');
+      } else {
+        toast.success(
+          `Token saved · ${ok}/3 scopes`,
+          `Active: ${Object.entries(scopes).filter(([, v]) => v).map(([k]) => k.toUpperCase()).join(', ')}`,
+        );
+      }
+    } catch (e) {
+      toast.error('Save failed', e?.message || 'Could not verify token.');
+    } finally {
+      setTestingKey(false);
+    }
   };
 
   const save = () => {
@@ -191,25 +223,86 @@ export default function ProfileScreen({ navigation }) {
                 </FormField>
               </View>
 
-              <FormField caps c={c} label="Public API Key">
+              <FormField caps c={c} label="Public API Key" hint="Used for gsauth.com (WhatsApp / SMS / RCS) + icpaas.in (Voice / wallet).">
                 <View className="flex-row items-center" style={{ gap: 8 }}>
-                  <View
-                    className="flex-1 rounded-[10px] px-3 py-3"
-                    style={{ borderWidth: 1, borderColor: c.border, backgroundColor: c.bgInput }}
-                  >
-                    <Text className="text-[12px] font-mono" style={{ color: c.text }} numberOfLines={1}>
-                      {apiKey || '—'}
-                    </Text>
-                  </View>
+                  <TextInput
+                    value={apiKey}
+                    onChangeText={(t) => { setApiKey(t); setApiKeyDirty(true); setKeyScopes(null); }}
+                    style={[inputStyle(c), { flex: 1, fontFamily: 'monospace', fontSize: 12 }]}
+                    placeholderTextColor={c.textMuted}
+                    placeholder="Paste your gsauth bearer here"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
                   <TouchableOpacity
                     onPress={copyKey}
                     activeOpacity={0.85}
                     className="w-11 h-11 rounded-[10px] items-center justify-center"
-                    style={{ backgroundColor: c.primary }}
+                    style={{ backgroundColor: c.bgInput }}
                   >
-                    <Ionicons name="copy" size={16} color="#FFFFFF" />
+                    <Ionicons name="copy" size={16} color={c.text} />
                   </TouchableOpacity>
                 </View>
+
+                {/* Scope chips after a successful test */}
+                {keyScopes ? (
+                  <View className="flex-row mt-2" style={{ gap: 6 }}>
+                    {['whatsapp', 'sms', 'rcs'].map((k) => {
+                      const ok = keyScopes[k];
+                      return (
+                        <View
+                          key={k}
+                          style={{
+                            paddingHorizontal: 8, paddingVertical: 4,
+                            borderRadius: 6,
+                            flexDirection: 'row', alignItems: 'center', gap: 4,
+                            backgroundColor: ok ? '#D1FAE5' : '#FEE2E2',
+                          }}
+                        >
+                          <Ionicons
+                            name={ok ? 'checkmark-circle' : 'close-circle'}
+                            size={11}
+                            color={ok ? '#047857' : '#B91C1C'}
+                          />
+                          <Text style={{ color: ok ? '#047857' : '#B91C1C', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>
+                            {k}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+
+                <TouchableOpacity
+                  onPress={saveAndTestKey}
+                  disabled={testingKey || !apiKeyDirty}
+                  activeOpacity={0.85}
+                  className="rounded-[10px] flex-row items-center justify-center mt-2 py-2.5"
+                  style={{
+                    backgroundColor: apiKeyDirty ? c.primary : c.bgInput,
+                    opacity: testingKey ? 0.6 : 1,
+                    gap: 6,
+                  }}
+                >
+                  {testingKey ? (
+                    <ActivityIndicator size="small" color={apiKeyDirty ? '#FFFFFF' : c.textMuted} />
+                  ) : (
+                    <Ionicons
+                      name={apiKeyDirty ? 'shield-checkmark' : 'checkmark-circle'}
+                      size={14}
+                      color={apiKeyDirty ? '#FFFFFF' : c.textMuted}
+                    />
+                  )}
+                  <Text
+                    style={{
+                      color: apiKeyDirty ? '#FFFFFF' : c.textMuted,
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {apiKeyDirty ? 'Save & Test Token' : 'Token saved'}
+                  </Text>
+                </TouchableOpacity>
               </FormField>
             </View>
 

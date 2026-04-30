@@ -18,6 +18,7 @@ import FormField, { inputStyle } from '../../components/FormField';
 import Dropdown from '../../components/Dropdown';
 import ToggleRow from '../../components/ToggleRow';
 import Pill from '../../components/Pill';
+import ScheduleModal from '../shared/ScheduleModal';
 
 const ROUTES = [
   { id: 'master',        label: 'Master' },
@@ -83,6 +84,9 @@ export default function CampaignScreen({ navigation }) {
   const [flashSms, setFlashSms] = useState(false);
   const [tinyCampaign, setTinyCampaign] = useState(false);
   const [schedule, setSchedule] = useState(false);
+  const [schedTime, setSchedTime] = useState('');     // API yyyy-MM-dd HH:mm:ss string
+  const [schedAt, setSchedAt] = useState(null);       // Date object for display
+  const [showSchedModal, setShowSchedModal] = useState(false);
 
   const [sending, setSending] = useState(false);
 
@@ -97,8 +101,12 @@ export default function CampaignScreen({ navigation }) {
           setSender(list[0]);
           if (list[0].entityId) setDltId('');
         }
+        if (!list.length) toast.warning('No senders', 'Your token returned zero sender IDs.');
       })
-      .catch(() => setSenders([]))
+      .catch((e) => {
+        setSenders([]);
+        toast.error('SMS senders failed', e?.message || 'Could not load sender IDs.');
+      })
       .finally(() => setLoadingSenders(false));
   }, []);
 
@@ -109,8 +117,12 @@ export default function CampaignScreen({ navigation }) {
       .then((res) => {
         const list = Array.isArray(res?.data) ? res.data : [];
         setTemplates(list);
+        if (!list.length) toast.warning('No templates', `Sender ${sender.senderId} has no approved templates yet.`);
       })
-      .catch(() => setTemplates([]));
+      .catch((e) => {
+        setTemplates([]);
+        toast.error('Templates failed', e?.message || 'Could not load SMS templates.');
+      });
   }, [sender?.senderId]);
 
   const numberCount = useMemo(() => {
@@ -154,7 +166,7 @@ export default function CampaignScreen({ navigation }) {
         dltTemplateId: dltId || (template?.dltTemplateId || ''),
         text: messageText.trim() || (template?.body || ''),
         flashSms: flashSms ? 1 : 0,
-        schedTime: schedule ? '' : '',
+        schedTime: schedule && schedTime ? schedTime : '',
         numbers: list,
         messageId: `cmp_${Date.now()}`,
       });
@@ -442,17 +454,44 @@ export default function CampaignScreen({ navigation }) {
         <ToggleRow c={c} label="Remove Duplicates" value={removeDup} onChange={setRemoveDup} />
         <ToggleRow c={c} label="Flash Sms"        value={flashSms}  onChange={setFlashSms} />
         <ToggleRow c={c} label="Tiny Campaign"    value={tinyCampaign} onChange={setTinyCampaign} />
-        <ToggleRow c={c} label="Schedule Now"     value={schedule}  onChange={setSchedule} />
+        <ToggleRow
+          c={c}
+          label="Schedule Now"
+          help={schedule && schedAt
+            ? `Scheduled for ${schedAt.toLocaleString()}`
+            : 'Pick a future date and time.'}
+          value={schedule}
+          onChange={(v) => {
+            setSchedule(v);
+            if (v) setShowSchedModal(true);
+            else { setSchedTime(''); setSchedAt(null); }
+          }}
+        />
 
         <View style={{ marginTop: 16 }}>
           <GradientButton
-            title="Send Now"
-            icon="send"
+            title={schedule && schedTime ? 'Schedule Send' : 'Send Now'}
+            icon={schedule && schedTime ? 'calendar' : 'send'}
             loading={sending}
             onPress={send}
           />
         </View>
       </ScrollView>
+
+      <ScheduleModal
+        visible={showSchedModal}
+        initialValue={schedAt}
+        onConfirm={(api, date) => {
+          setSchedTime(api);
+          setSchedAt(date);
+          setShowSchedModal(false);
+          setSchedule(true);
+        }}
+        onClose={() => {
+          setShowSchedModal(false);
+          if (!schedTime) setSchedule(false);
+        }}
+      />
     </View>
   );
 }

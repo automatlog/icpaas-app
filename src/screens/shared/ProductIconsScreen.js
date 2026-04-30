@@ -255,7 +255,7 @@ export default function ProductIconsScreen({ navigation }) {
       <View style={styles.dock}>
         <TouchableOpacity style={styles.dockPlus} activeOpacity={0.8} onPress={() => navigation.navigate('Send')}>
           <LinearGradient
-            colors={[c.gradA, c.gradB, c.gradC]}
+            colors={[c.gCtaA, c.gCtaB, c.gCtaC]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ flex: 1, borderRadius: 24 }}

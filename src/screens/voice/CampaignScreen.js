@@ -20,6 +20,7 @@ import Dropdown from '../../components/Dropdown';
 import ToggleRow from '../../components/ToggleRow';
 import SectionHeader from '../../components/SectionHeader';
 import Pill from '../../components/Pill';
+import ScheduleModal from '../shared/ScheduleModal';
 
 const VOICE_PLANS = [
   { id: '15s', label: '15-second pulse · ₹0.18/pulse' },
@@ -66,6 +67,9 @@ export default function CampaignScreen({ navigation }) {
 
   const [removeDup, setRemoveDup] = useState(true);
   const [schedule, setSchedule] = useState(false);
+  const [schedTime, setSchedTime] = useState('');
+  const [schedAt, setSchedAt] = useState(null);
+  const [showSchedModal, setShowSchedModal] = useState(false);
 
   const [calling, setCalling] = useState(false);
 
@@ -103,7 +107,7 @@ export default function CampaignScreen({ navigation }) {
         mediaFileId: useObdFlow ? null : soundFile?.id,
         botFlowId: useObdFlow ? soundFile?.id : null,
         isDtmfFile: isDtmfFile ? 1 : 0,
-        schedTime: schedule ? '' : '',
+        schedTime: !test && schedule && schedTime ? schedTime : '',
         removeDuplicate: removeDup ? 1 : 0,
       });
       dispatch(pushNotification({
@@ -296,13 +300,25 @@ export default function CampaignScreen({ navigation }) {
         </FormField>
 
         <ToggleRow c={c} label="Remove Duplicates" value={removeDup} onChange={setRemoveDup} />
-        <ToggleRow c={c} label="Schedule Now"     value={schedule}  onChange={setSchedule} />
+        <ToggleRow
+          c={c}
+          label="Schedule Now"
+          help={schedule && schedAt
+            ? `Scheduled for ${schedAt.toLocaleString()}`
+            : 'Pick a future date and time.'}
+          value={schedule}
+          onChange={(v) => {
+            setSchedule(v);
+            if (v) setShowSchedModal(true);
+            else { setSchedTime(''); setSchedAt(null); }
+          }}
+        />
 
         <View className="flex-row items-center mt-5" style={{ gap: 12 }}>
           <View style={{ flex: 1 }}>
             <GradientButton
-              title="Originate Call"
-              icon="call"
+              title={schedule && schedTime ? 'Schedule Call' : 'Originate Call'}
+              icon={schedule && schedTime ? 'calendar' : 'call'}
               loading={calling}
               onPress={() => submit()}
             />
@@ -319,6 +335,21 @@ export default function CampaignScreen({ navigation }) {
           </View>
         </View>
       </ScrollView>
+
+      <ScheduleModal
+        visible={showSchedModal}
+        initialValue={schedAt}
+        onConfirm={(api, date) => {
+          setSchedTime(api);
+          setSchedAt(date);
+          setShowSchedModal(false);
+          setSchedule(true);
+        }}
+        onClose={() => {
+          setShowSchedModal(false);
+          if (!schedTime) setSchedule(false);
+        }}
+      />
     </View>
   );
 }
