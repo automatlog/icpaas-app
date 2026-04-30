@@ -51,11 +51,15 @@ export default function Dropdown({
             {options.length === 0 ? (
               <Text style={{ color: c.textMuted, padding: 14, fontSize: 12 }}>No options.</Text>
             ) : (
-              options.map((o) => {
+              options.map((o, i) => {
                 const active = o.id === selectedId;
+                // Duplicate ids (e.g. SMS sender list returning "demo" twice
+                // for different entity IDs) would collide on React keys, so
+                // suffix with the index to keep keys unique without losing
+                // id-based selection matching.
                 return (
                   <TouchableOpacity
-                    key={o.id}
+                    key={`${o.id ?? 'opt'}_${i}`}
                     onPress={() => onSelect(o)}
                     style={{
                       flexDirection: 'row',

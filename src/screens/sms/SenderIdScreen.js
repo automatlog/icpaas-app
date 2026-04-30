@@ -106,7 +106,7 @@ export default function SenderIdScreen({ navigation }) {
           senders.map((s, i) => {
             const tint = TINTS[i % TINTS.length];
             return (
-              <View key={s.senderId || i} className={`rounded-[20px] p-4 mb-3 ${softBg}`} style={{ borderWidth: 1, borderColor: c.bgInput }}>
+              <View key={`${s.senderId || 'sender'}_${i}`} className={`rounded-[20px] p-4 mb-3 ${softBg}`} style={{ borderWidth: 1, borderColor: c.bgInput }}>
                 <View className="flex-row items-center mb-3" style={{ gap: 12 }}>
                   <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: tint }}>
                     <Ionicons name="chatbubble" size={22} color="#0A0A0D" />

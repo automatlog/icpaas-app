@@ -54,6 +54,7 @@ const STATUS_TINT = (c, s) => {
 export default function DashboardScreen({ navigation }) {
   const c = useBrand();
   const dark = c.scheme === 'dark';
+  const insets = useSafeAreaInsets();
   const user = useSelector((s) => s.auth.user);
   const unread = useSelector(selectUnreadCount);
   const dispatch = useDispatch();
@@ -139,7 +140,7 @@ export default function DashboardScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 18, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 18, paddingBottom: 130 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

@@ -7,6 +7,7 @@ import {
   RefreshControl, ActivityIndicator, Platform, useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { WhatsAppAPI } from '../../services/api';
 import { setConversations as setConversationsAction } from '../../store/slices/conversationsSlice';
@@ -63,6 +64,7 @@ export default function InboxScreen({ navigation, route }) {
   const scheme = useColorScheme();
   const dark = scheme === 'dark';
   const c = dark ? C.dark : C.light;
+  const insets = useSafeAreaInsets();
 
   const lockedChannel = route?.params?.channel; // 'rcs' | 'sms' | 'voice' | 'whatsapp'
   const productLabel = lockedChannel ? (PRODUCT_LABEL[lockedChannel] || lockedChannel) : null;
@@ -114,7 +116,7 @@ export default function InboxScreen({ navigation, route }) {
 
   return (
     <View className={`flex-1 ${rootBg}`}>
-      <View style={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22 }}>
+      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 22 }}>
         {/* Header */}
         <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
           <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>

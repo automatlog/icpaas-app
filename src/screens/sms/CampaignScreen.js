@@ -7,6 +7,7 @@ import {
   Platform, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import { useBrand } from '../../theme';
 import { SMSAPI, TemplatesAPI } from '../../services/api';
@@ -47,6 +48,7 @@ const stamp = () => {
 
 export default function CampaignScreen({ navigation }) {
   const c = useBrand();
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
 
   const [name, setName] = useState(stamp());
@@ -191,7 +193,7 @@ export default function CampaignScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 36, paddingBottom: 140, paddingHorizontal: 18 }}
+        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 140, paddingHorizontal: 18 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -311,9 +313,9 @@ export default function CampaignScreen({ navigation }) {
                   No templates for this sender.
                 </Text>
               ) : (
-                templates.map((t) => (
+                templates.map((t, i) => (
                   <TouchableOpacity
-                    key={t.id || t.name}
+                    key={`${t.id || t.name || 'tpl'}_${i}`}
                     onPress={() => {
                       setTemplate(t);
                       setMessageText(t.body || '');

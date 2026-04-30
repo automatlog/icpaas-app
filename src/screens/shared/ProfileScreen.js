@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import { AuthAPI } from '../../services/api';
@@ -23,6 +24,7 @@ const TABS = [
 
 export default function ProfileScreen({ navigation }) {
   const c = useBrand();
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const user = useSelector((s) => s.auth.user) || {};
   const themeMode = useSelector(selectThemeMode);
@@ -102,7 +104,7 @@ export default function ProfileScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 36, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 130 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >

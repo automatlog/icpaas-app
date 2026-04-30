@@ -6,6 +6,7 @@ import {
   ActivityIndicator, Platform, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../../theme';
 import { BalanceAPI, VoiceAPI, IVRAPI, TemplatesAPI } from '../../services/api';
 import { BottomTabBar } from './DashboardScreen';
@@ -114,6 +115,7 @@ const TOOLS = (id, navigation) => {
 
 export default function ChannelScreen({ navigation, route }) {
   const c = useBrand();
+  const insets = useSafeAreaInsets();
   const channelId = route?.params?.channel || 'whatsapp';
   const profile = PROFILES[channelId] || PROFILES.whatsapp;
 
@@ -142,7 +144,7 @@ export default function ChannelScreen({ navigation, route }) {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 36, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 130 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetch(); }} tintColor={c.primary} />}
         showsVerticalScrollIndicator={false}
       >

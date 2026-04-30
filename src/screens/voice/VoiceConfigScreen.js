@@ -7,6 +7,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../../theme';
 import SectionHeader from '../../components/SectionHeader';
 
@@ -25,6 +26,7 @@ const CONTACT_MANAGER = [
 
 export default function VoiceConfigScreen({ navigation }) {
   const c = useBrand();
+  const insets = useSafeAreaInsets();
 
   const goTo = (id) => {
     if (id === 'voiceFiles') return navigation.navigate('MediaLibrary');
@@ -38,7 +40,7 @@ export default function VoiceConfigScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 36, paddingBottom: 130, paddingHorizontal: 18 }}
+        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 130, paddingHorizontal: 18 }}
         showsVerticalScrollIndicator={false}
       >
         <View className="flex-row items-center mb-4" style={{ gap: 10 }}>

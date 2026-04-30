@@ -5,6 +5,7 @@ import {
   ActivityIndicator, Platform, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFeed, Fonts } from '../../theme';
 import { VoiceAPI, IVRAPI } from '../../services/api';
 
@@ -96,7 +97,12 @@ const makeStyles = (c) => StyleSheet.create({
 
 export default function ReportScreen({ navigation }) {
   const c = useFeed();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const scrollPad = useMemo(
+    () => ({ ...styles.scroll, paddingTop: insets.top + 12 }),
+    [styles.scroll, insets.top],
+  );
 
   const [tab, setTab] = useState('obd');
   const [fromDate, setFromDate] = useState(daysAgo(14));
@@ -143,7 +149,7 @@ export default function ReportScreen({ navigation }) {
   return (
     <View style={styles.root}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={scrollPad}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRows(); }} tintColor={c.accentPink} />}
       >
