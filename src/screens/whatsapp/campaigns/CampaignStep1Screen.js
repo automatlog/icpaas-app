@@ -313,7 +313,7 @@ function PickerBtn({ c, icon, label, onPress }) {
 
 function ToggleRow({ c, label, value, onValueChange }) {
   return (
-    <View className="flex-row items-center py-2" style={{ gap: 10 }}>
+    <View className="flex-row items-center py-1" style={{ gap: 10 }}>
       <Switch
         value={value}
         onValueChange={onValueChange}
@@ -341,7 +341,7 @@ function ScheduleRow({ c, value, schedTime, onValueChange, onEdit }) {
   })();
 
   return (
-    <View className="py-2" style={{ gap: 8 }}>
+    <View className="py-1" style={{ gap: 8 }}>
       <View className="flex-row items-center" style={{ gap: 10 }}>
         <Switch
           value={value}
