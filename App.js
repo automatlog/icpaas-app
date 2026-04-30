@@ -1,8 +1,14 @@
-// App.js — icpaas.ai root (Redux + NativeWind)
+// App.js — icpaas.ai root (Redux + NativeWind).
+// Layout: a green outer parent (`c.primary`) holds a white inner panel that
+// uses safe-area inset MARGINS, so every screen gets a green band above the
+// status bar and below the system nav automatically — no per-screen edits
+// needed. Screens render edge-to-edge inside the white panel; absolute
+// children (BottomTabBar, modals) sit at the inner panel's edges, with
+// the green margin showing beyond.
 import './global.css';
 import React, { useEffect, useMemo, useState } from 'react';
-import { StatusBar, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar, View, Platform } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import FlashMessage from 'react-native-flash-message';
 import { Provider, useSelector, useDispatch } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
@@ -17,6 +23,7 @@ import { useFeed } from './src/theme';
 
 function AppInner() {
   const c = useFeed(); // honours theme.mode override (default light)
+  const insets = useSafeAreaInsets();
 
   const isHydrated = useSelector((s) => s.hydrated);
   const isLoggedIn = useSelector((s) => s.auth.isAuthenticated);
@@ -31,29 +38,44 @@ function AppInner() {
     return () => clearTimeout(t);
   }, [dispatch]);
 
-  const rootStyle = useMemo(() => ({ flex: 1, backgroundColor: c.bg }), [c]);
-  const barStyle = c.scheme === 'dark' ? 'light-content' : 'dark-content';
+  // The OS status bar (Android) and the area behind it (iOS) match the
+  // inset bands so transitions are seamless.
+  const statusBarBg = c.primary;
+  const barStyle = 'light-content'; // green status bar reads with light text
+
+  // Inner panel uses margins so the parent green leaks through above the
+  // status bar inset and below the gesture / nav bar inset. We apply a
+  // floor of 24px on top so Android phones not in edge-to-edge mode (which
+  // report insets.top: 0) still get a visible green strip.
+  const innerStyle = useMemo(() => ({
+    flex: 1,
+    backgroundColor: c.bg,
+    marginTop: Math.max(insets.top, Platform.OS === 'android' ? 24 : 0),
+    marginBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 0 : 0),
+  }), [c.bg, insets.top, insets.bottom]);
+
+  const outerStyle = useMemo(() => ({ flex: 1, backgroundColor: c.primary }), [c.primary]);
 
   if (!bootDone) {
     return (
-      <SafeAreaProvider>
-        <StatusBar barStyle={barStyle} backgroundColor={c.bg} />
-        <View style={rootStyle}>
+      <View style={outerStyle}>
+        <StatusBar barStyle={barStyle} backgroundColor={statusBarBg} />
+        <View style={innerStyle}>
           <LoadingScreen onFinish={() => setBootDone(true)} />
         </View>
-      </SafeAreaProvider>
+      </View>
     );
   }
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={barStyle} backgroundColor={c.bg} />
-      <View style={rootStyle}>
+    <View style={outerStyle}>
+      <StatusBar barStyle={barStyle} backgroundColor={statusBarBg} />
+      <View style={innerStyle}>
         {isLoggedIn && isHydrated ? <AppNavigator /> : <AuthNavigator />}
       </View>
       <FlashMessage position="top" />
       <AlertDialogHost />
-    </SafeAreaProvider>
+    </View>
   );
 }
 
@@ -67,8 +89,10 @@ export default function App() {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <OnRehydrate />
-        <AppInner />
+        <SafeAreaProvider>
+          <OnRehydrate />
+          <AppInner />
+        </SafeAreaProvider>
       </PersistGate>
     </Provider>
   );

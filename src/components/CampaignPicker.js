@@ -8,15 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../theme';
-
-// Icons mirror the Channels grid on the Dashboard so users see the same
-// visual identity for each channel across the app.
-const CHANNELS = [
-  { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp',     route: 'WhatsAppCampaignStep1', tint: '#10B981' },
-  { id: 'rcs',      label: 'RCS',      icon: 'card-outline',      route: 'RcsCampaign',           tint: '#8B5CF6' },
-  { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline', route: 'SmsCampaign',          tint: '#0B8A6F' },
-  { id: 'voice',    label: 'Voice',    icon: 'call',              route: 'VoiceCampaign',         tint: '#F59E0B' },
-];
+import { CHANNELS } from '../constants/channels';
 
 export default function CampaignPicker({ visible, onClose, onPick }) {
   const c = useBrand();
@@ -111,4 +103,3 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
   );
 }
 
-export const CAMPAIGN_CHANNELS = CHANNELS;

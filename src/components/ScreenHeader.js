@@ -1,9 +1,11 @@
 // src/components/ScreenHeader.js — sticky page header.
-// Renders:
-//   1. A primary-green status-bar inset spacer (height = insets.top)
-//   2. A header bar with optional back arrow, optional tinted-circle icon,
-//      title + optional inline badge, optional subtitle (with status dot),
-//      and an optional right-aligned action.
+// Renders a header bar with optional back arrow, optional tinted-circle
+// icon, title + optional inline badge, optional subtitle (with status
+// dot), and an optional right-aligned action.
+//
+// The status-bar GREEN inset is handled at the App.js level — every
+// screen sits inside a green-bordered container, so the header just
+// renders the header bar itself.
 //
 // Mount ABOVE the screen's ScrollView. The ScrollView gets `flex: 1` and
 // scrolls underneath the header — the header itself stays put.
@@ -21,7 +23,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ScreenHeader({
   c,
@@ -34,18 +35,12 @@ export default function ScreenHeader({
   subtitle,  // string OR { text, dotColor }
   right,
   centerTitle = false,
-  insetColor, // color for the status-bar inset spacer; defaults to c.primary
 }) {
-  const insets = useSafeAreaInsets();
-
   const badgeObj = typeof badge === 'string' ? { text: badge } : badge;
   const subObj = typeof subtitle === 'string' ? { text: subtitle } : subtitle;
 
   return (
     <View>
-      {/* Status-bar inset, painted with the brand primary green */}
-      <View style={{ height: insets.top, backgroundColor: insetColor || c.primary }} />
-
       {/* Header bar */}
       <View
         style={{
@@ -65,6 +60,9 @@ export default function ScreenHeader({
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            accessibilityHint="Goes to previous screen"
           >
             <Ionicons name="arrow-back" size={22} color={c.text} />
           </TouchableOpacity>

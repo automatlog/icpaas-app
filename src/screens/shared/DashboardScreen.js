@@ -7,7 +7,6 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import { BalanceAPI, VoiceAPI, IVRAPI } from '../../services/api';
@@ -15,6 +14,7 @@ import { selectUnreadCount, pushNotification } from '../../store/slices/notifica
 import Banner from '../../components/Banner';
 import CampaignPicker from '../../components/CampaignPicker';
 import toast from '../../services/toast';
+import { CHANNELS } from '../../constants/channels';
 
 const greet = () => {
   const h = new Date().getHours();
@@ -30,13 +30,6 @@ const ymd = (d) => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
-
-const CHANNELS = [
-  { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp',      count: 32 },
-  { id: 'rcs',      label: 'RCS',      icon: 'logo-google',       count: 14 },
-  { id: 'voice',    label: 'Voice',    icon: 'mic-outline',               count: 8  },
-  { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline', count: 21 },
-];
 
 const ACTIVITY = [
   { id: '1', icon: 'send',          title: 'Campaign "New Offer" sent',         sub: '1,248 messages sent successfully',         time: '05:34 PM', status: 'Completed' },
@@ -104,7 +97,6 @@ const WalletCard = ({ c, balance, balanceError, loading, navigation }) => {
 export default function DashboardScreen({ navigation }) {
   const c = useBrand();
   const dark = c.scheme === 'dark';
-  const insets = useSafeAreaInsets();
   const user = useSelector((s) => s.auth.user);
   const unread = useSelector(selectUnreadCount);
   const dispatch = useDispatch();
@@ -189,10 +181,8 @@ export default function DashboardScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Green status-bar inset (matches the bottom green band) */}
-      <View style={{ height: insets.top, backgroundColor: c.primary }} />
       <ScrollView
-        contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 18, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 18, paddingBottom: 110 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -352,14 +342,14 @@ const ChannelTile = ({ c, icon, label, count, onPress }) => {
   );
 };
 
-// Bottom tab bar — white icon strip with a primary-green band that fills the
-// bottom safe-area inset (covers the OS gesture bar / nav button area).
-// Screens pad their ScrollView with `paddingBottom: 130` to clear the bar.
-export const BAR_HEIGHT = 130;
+// Bottom tab bar — white icon strip. The bottom safe-area green band is
+// painted by the App-level outer container (App.js), so this component
+// only needs to render the icons. Screens still pad their ScrollView with
+// `paddingBottom: 100` to clear the strip.
+export const BAR_HEIGHT = 100;
 const ICON_INACTIVE = '#9CA3AF';
 
 export function BottomTabBar({ c, navigation, active = 'home', onCampaignPress }) {
-  const insets = useSafeAreaInsets();
   // The white icon strip uses c.bgCard so it stays clean in both themes.
   const stripBg = c.bgCard;
   const iconActive = c.text;
@@ -460,12 +450,6 @@ export function BottomTabBar({ c, navigation, active = 'home', onCampaignPress }
         {tab('reports', 'bar-chart-outline', 'Reports', () => navigation.navigate('Report'))}
         {tab('you', 'person-outline', 'Profile', () => navigation.navigate('Profile'))}
       </View>
-
-      {/* Green band: fills the safe-area inset region below the icons.
-          On gesture-bar phones this becomes the gesture pill background;
-          on 3-button-nav devices it sits between the white strip and the
-          OS nav buttons. */}
-      <View style={{ height: Math.max(insets.bottom, 14), backgroundColor: c.primary }} />
     </View>
   );
 }
