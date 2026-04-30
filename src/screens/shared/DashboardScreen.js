@@ -32,8 +32,8 @@ const ymd = (d) => {
 
 const CHANNELS = [
   { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp',      count: 32 },
-  { id: 'rcs',      label: 'RCS',      icon: 'card-outline',       count: 14 },
-  { id: 'voice',    label: 'Voice',    icon: 'call',               count: 8  },
+  { id: 'rcs',      label: 'RCS',      icon: 'logo-google',       count: 14 },
+  { id: 'voice',    label: 'Voice',    icon: 'mic-outline',               count: 8  },
   { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline', count: 21 },
 ];
 
@@ -273,8 +273,8 @@ export default function DashboardScreen({ navigation }) {
                   borderBottomColor: c.rule,
                 }}
               >
-                <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: c.primarySoft }}>
-                  <Ionicons name={a.icon} size={16} color={c.primary} />
+                <View className="w-11 h-11 rounded-full items-center justify-center" style={{ backgroundColor: c.primarySoft }}>
+                  <Ionicons name={a.icon} size={18} color={c.primary} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-[13px] font-semibold" style={{ color: c.text }} numberOfLines={1}>{a.title}</Text>
@@ -316,8 +316,8 @@ const ChannelTile = ({ c, icon, label, count, onPress }) => (
     style={{ width: '48%', backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border }}
   >
     <View className="flex-row items-center justify-between mb-2">
-      <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: c.primarySoft }}>
-        <Ionicons name={icon} size={18} color={c.primary} />
+      <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: c.primarySoft }}>
+        <Ionicons name={icon} size={20} color={c.primary} />
       </View>
       <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.primarySoft }}>
         <Text className="text-[10px] font-bold" style={{ color: c.primaryDeep }}>{count}</Text>
