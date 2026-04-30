@@ -1,4 +1,4 @@
-// src/services/waMediaSpec.js — Meta WhatsApp Cloud API media constraints
+// src/services/whatsappMediaSpec.js — Meta WhatsApp Cloud API media constraints
 // Source: developers.facebook.com/docs/whatsapp/cloud-api/reference/media
 //
 // Type      Formats                              Max size

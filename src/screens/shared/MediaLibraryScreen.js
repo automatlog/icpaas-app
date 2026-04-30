@@ -16,7 +16,7 @@ import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
 import {
   validateForWhatsApp, MEDIA_KINDS, STICKER_ANIMATED_MAX, formatBytes, ALL_MIMES,
-} from '../../services/waMediaSpec';
+} from '../../services/whatsappMediaSpec';
 
 const RETENTION_DAYS = 30;
 

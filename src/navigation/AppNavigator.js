@@ -58,7 +58,7 @@ import SmsCampaignStep3 from '../screens/sms/campaigns/CampaignStep3Screen';
 
 // Voice screens
 import VoiceCallerIdScreen from '../screens/voice/CallerIdScreen';
-import VoiceConfigScreen from '../screens/voice/VoiceConfigScreen';
+import VoiceConfigScreen from '../screens/voice/ConfigScreen';
 import VoiceCampaignScreen from '../screens/voice/CampaignScreen';
 import VoiceCampaignsList from '../screens/voice/campaigns/CampaignsListScreen';
 import VoiceCampaignDetail from '../screens/voice/campaigns/CampaignDetailScreen';

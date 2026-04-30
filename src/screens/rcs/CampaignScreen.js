@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import { useBrand } from '../../theme';
 import { RCSAPI, TemplatesAPI } from '../../services/api';
+import { extractRcsVariables, getRcsComponent } from '../../services/rcsHelpers';
 import { pushNotification } from '../../store/slices/notificationsSlice';
 import toast from '../../services/toast';
 import dialog from '../../services/dialog';
@@ -64,6 +65,7 @@ export default function CampaignScreen({ navigation }) {
 
   const [tab, setTab] = useState('Body');
   const [numbers, setNumbers] = useState('');
+  const [varValues, setVarValues] = useState({}); // { varName: value }
 
   const [removeDup, setRemoveDup] = useState(true);
   const [removeBlack, setRemoveBlack] = useState(true);
@@ -117,6 +119,17 @@ export default function CampaignScreen({ navigation }) {
       .length;
   }, [numbers]);
 
+  // Pull declared variables from the selected template's component schema.
+  // Names come from TextMessageVarValue / TitleVariables / DescVariables /
+  // Suggestion UrlVariables. Empty array → no variable UI rendered.
+  const templateVars = useMemo(() => {
+    if (!template) return [];
+    return extractRcsVariables(getRcsComponent(template));
+  }, [template]);
+
+  // Reset variable values whenever the picked template changes.
+  useEffect(() => { setVarValues({}); }, [template?.name]);
+
   const send = async () => {
     if (!bot?.botId) { Alert.alert('Pick a bot', 'Select an RCS agent first.'); return; }
     if (!template?.name) { Alert.alert('Pick a template', 'Choose an RCS template first.'); return; }
@@ -131,12 +144,24 @@ export default function CampaignScreen({ navigation }) {
     });
     if (!ok) return;
 
+    // Validate every declared variable has a value.
+    const missingVar = templateVars.find((name) => !String(varValues[name] || '').trim());
+    if (missingVar) {
+      Alert.alert('Variable required', `Enter a value for "${missingVar}".`);
+      return;
+    }
+
     setSending(true);
     try {
+      // RCS /sendmessage expects `var: { name: value, ... }` keyed by the
+      // variable names declared on the template. Same values are applied to
+      // every recipient in this single call (gsauth limits to 5,000 numbers
+      // per request).
       const result = await RCSAPI.send({
         botId: bot.botId,
         templateName: template.name,
         destination: list,
+        ...(templateVars.length > 0 ? { var: varValues } : {}),
         callbackdata: `rcs_${Date.now()}`,
       });
       const successful = Array.isArray(result)
@@ -297,6 +322,45 @@ export default function CampaignScreen({ navigation }) {
             );
           })}
         </View>
+
+        {/* Template variables — declared on the selected RCS template */}
+        {templateVars.length > 0 ? (
+          <View
+            style={{
+              backgroundColor: c.bgCard,
+              borderWidth: 1,
+              borderColor: c.border,
+              borderRadius: 14,
+              padding: 12,
+              marginBottom: 14,
+              gap: 8,
+            }}
+          >
+            <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 4 }}>
+              Template Variables
+            </Text>
+            {templateVars.map((name) => (
+              <FormField
+                key={name}
+                caps
+                c={c}
+                label={name}
+                style={{ marginBottom: 0 }}
+              >
+                <TextInput
+                  value={varValues[name] || ''}
+                  onChangeText={(v) => setVarValues((prev) => ({ ...prev, [name]: v }))}
+                  placeholder={`Value for {${name}}`}
+                  placeholderTextColor={c.textMuted}
+                  style={inputStyle(c)}
+                />
+              </FormField>
+            ))}
+            <Text style={{ color: c.textMuted, fontSize: 10 }}>
+              Same value is sent to every recipient in this batch.
+            </Text>
+          </View>
+        ) : null}
 
         <FormField c={c} label={`Numbers (${numberCount})`} hint="Paste up to 5,000 numbers only.">
           <TextInput

@@ -1,4 +1,4 @@
-// src/screens/voice/VoiceConfigScreen.js — Voice channel config hub.
+// src/screens/voice/ConfigScreen.js — Voice channel config hub.
 // Mirrors UI image/Voice Config Screen.png. Two grouped sections of cards:
 // System Configuration and Contact Manager. Tapping a card routes to a
 // dedicated manager (placeholders for now — wire as endpoints come online).
@@ -24,7 +24,7 @@ const CONTACT_MANAGER = [
   { id: 'blacklist', label: 'Blacklist Numbers', desc: 'Manage your blacklist for better control.', icon: 'shield-checkmark', tint: '#FEE2E2', fg: '#B91C1C' },
 ];
 
-export default function VoiceConfigScreen({ navigation }) {
+export default function ConfigScreen({ navigation }) {
   const c = useBrand();
   const insets = useSafeAreaInsets();
 

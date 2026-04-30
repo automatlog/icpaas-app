@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import { useBrand } from '../../theme';
 import { SMSAPI, TemplatesAPI } from '../../services/api';
+import { countSmsVariables, replaceSmsVariables } from '../../services/smsHelpers';
 import { pushNotification } from '../../store/slices/notificationsSlice';
 import toast from '../../services/toast';
 import dialog from '../../services/dialog';
@@ -71,6 +72,7 @@ export default function CampaignScreen({ navigation }) {
   const [showTemplate, setShowTemplate] = useState(false);
 
   const [messageText, setMessageText] = useState('');
+  const [varValues, setVarValues] = useState([]); // ordered list, one per {#var#}
 
   const [campaignType, setCampaignType] = useState('one_many');
   const [showCampaignType, setShowCampaignType] = useState(false);
@@ -135,14 +137,34 @@ export default function CampaignScreen({ navigation }) {
       .length;
   }, [numbers]);
 
+  // Number of {#var#} placeholders in the current message body.
+  const varCount = useMemo(() => countSmsVariables(messageText), [messageText]);
+
+  // The text that will actually leave the device after substituting var
+  // values into {#var#} placeholders. Empty values render as empty strings.
+  const previewText = useMemo(
+    () => replaceSmsVariables(messageText, varValues),
+    [messageText, varValues],
+  );
+
+  // Resize var values array when count changes (template switch / typing).
+  useEffect(() => {
+    setVarValues((prev) => {
+      const next = prev.slice(0, varCount);
+      while (next.length < varCount) next.push('');
+      return next;
+    });
+  }, [varCount]);
+
   // SMS segment math: 160 chars for plain GSM, 153 per segment after first.
+  // Counted on the resolved text since DLT validates the final payload.
   const stats = useMemo(() => {
-    const len = messageText.length;
+    const len = previewText.length;
     const maxLen = 160;
     const segments = len === 0 ? 0 : (len <= 160 ? 1 : Math.ceil(len / 153));
     const charsLeft = segments === 0 ? 160 : (segments === 1 ? 160 - len : (153 * segments) - len);
     return { length: len, maxLength: maxLen, segments, charsLeft };
-  }, [messageText]);
+  }, [previewText]);
 
   const send = async () => {
     if (!sender?.senderId) { Alert.alert('Pick sender', 'Select a sender ID first.'); return; }
@@ -159,6 +181,16 @@ export default function CampaignScreen({ navigation }) {
     });
     if (!ok) return;
 
+    // Every {#var#} placeholder must have a non-empty value before send,
+    // otherwise the carrier will reject as a DLT mismatch.
+    if (varCount > 0) {
+      const emptyIdx = varValues.findIndex((v) => !String(v || '').trim());
+      if (emptyIdx !== -1) {
+        Alert.alert('Variable required', `Fill variable #${emptyIdx + 1} before sending.`);
+        return;
+      }
+    }
+
     setSending(true);
     try {
       const result = await SMSAPI.send({
@@ -166,7 +198,7 @@ export default function CampaignScreen({ navigation }) {
         peId: sender.entityId,
         chainValue: sender.hashChainId,
         dltTemplateId: dltId || (template?.dltTemplateId || ''),
-        text: messageText.trim() || (template?.body || ''),
+        text: (previewText || messageText || template?.body || '').trim(),
         flashSms: flashSms ? 1 : 0,
         schedTime: schedule && schedTime ? schedTime : '',
         numbers: list,
@@ -353,6 +385,49 @@ export default function CampaignScreen({ navigation }) {
             ]}
           />
         </FormField>
+
+        {/* Per-template variable inputs ({#var#} placeholders) */}
+        {varCount > 0 ? (
+          <View
+            style={{
+              backgroundColor: c.bgCard,
+              borderWidth: 1,
+              borderColor: c.border,
+              borderRadius: 14,
+              padding: 12,
+              marginBottom: 14,
+              gap: 8,
+            }}
+          >
+            <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 4 }}>
+              Variables ({varCount})
+            </Text>
+            {Array.from({ length: varCount }).map((_, i) => (
+              <FormField
+                key={`var_${i}`}
+                caps
+                c={c}
+                label={`Variable #${i + 1}`}
+                style={{ marginBottom: 0 }}
+              >
+                <TextInput
+                  value={varValues[i] || ''}
+                  onChangeText={(v) => setVarValues((prev) => {
+                    const next = prev.slice();
+                    next[i] = v;
+                    return next;
+                  })}
+                  placeholder={`Replaces the ${i === 0 ? '1st' : i === 1 ? '2nd' : i === 2 ? '3rd' : `${i + 1}th`} {#var#}`}
+                  placeholderTextColor={c.textMuted}
+                  style={inputStyle(c)}
+                />
+              </FormField>
+            ))}
+            <Text style={{ color: c.textMuted, fontSize: 10 }}>
+              Resolved preview: <Text style={{ color: c.text, fontWeight: '600' }}>{previewText || '—'}</Text>
+            </Text>
+          </View>
+        ) : null}
 
         <Row>
           <FormField c={c} label="Campaign Type *" flex>
