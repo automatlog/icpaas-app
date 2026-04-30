@@ -22,6 +22,7 @@ import templatesReducer from './slices/templatesSlice';
 import mediaReducer from './slices/mediaSlice';
 import notificationsReducer from './slices/notificationsSlice';
 import groupsReducer from './slices/groupsSlice';
+import themeReducer from './slices/themeSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -34,6 +35,7 @@ const rootReducer = combineReducers({
   media: mediaReducer,
   notifications: notificationsReducer,
   groups: groupsReducer,
+  theme: themeReducer,
 });
 
 const persistConfig = {

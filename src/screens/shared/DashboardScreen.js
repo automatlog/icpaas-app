@@ -12,6 +12,7 @@ import { useBrand } from '../../theme';
 import { BalanceAPI, VoiceAPI, IVRAPI } from '../../services/api';
 import { selectUnreadCount, pushNotification } from '../../store/slices/notificationsSlice';
 import Banner from '../../components/Banner';
+import CampaignPicker from '../../components/CampaignPicker';
 import toast from '../../services/toast';
 
 const greet = () => {
@@ -64,6 +65,7 @@ export default function DashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [showCampaignPicker, setShowCampaignPicker] = useState(false);
 
   // The icpaas.in /user/balance endpoint has surfaced the wallet under a few
   // different keys over time (`walletBalance`, `balance`, sometimes nested
@@ -186,10 +188,9 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Wallet balance callout — live from BalanceAPI.getBalance() */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => navigation.navigate('Config')}
+        {/* Wallet balance callout — live from BalanceAPI.getBalance().
+            Card itself is non-interactive; only the Top up button navigates. */}
+        <View
           className="flex-row items-center rounded-[16px] p-3.5 mt-2"
           style={{ backgroundColor: c.primarySoft, gap: 12 }}
         >
@@ -229,7 +230,7 @@ export default function DashboardScreen({ navigation }) {
             <Ionicons name="add" size={12} color="#FFFFFF" />
             <Text className="text-[11px] font-bold text-white">Top up</Text>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
 
         {/* Channels */}
         <View className="flex-row items-center justify-between mt-6 mb-3">
@@ -291,7 +292,17 @@ export default function DashboardScreen({ navigation }) {
 
       </ScrollView>
 
-      <BottomTabBar c={c} navigation={navigation} active="home" />
+      <BottomTabBar
+        c={c}
+        navigation={navigation}
+        active="home"
+        onCampaignPress={() => setShowCampaignPicker(true)}
+      />
+      <CampaignPicker
+        visible={showCampaignPicker}
+        onClose={() => setShowCampaignPicker(false)}
+        onPick={(ch) => navigation.navigate(ch.route)}
+      />
     </View>
   );
 }
@@ -321,20 +332,45 @@ const ChannelTile = ({ c, icon, label, count, onPress }) => (
   </TouchableOpacity>
 );
 
-// Bottom tab bar with raised center Campaign FAB.
-// Sits above the OS gesture bar via safe-area inset.
-export function BottomTabBar({ c, navigation, active = 'home' }) {
+// Bottom tab bar — always-dark "black strip" that hugs the bottom edge.
+// Sits above the OS gesture bar via safe-area inset; the dark strip extends
+// all the way down so the system nav buttons read as part of the strip.
+// Screen ScrollViews should use `paddingBottom: 130` (or the BAR_HEIGHT
+// constant exported below) so content clears the bar.
+export const BAR_BG = '#0F0F12';
+export const BAR_HEIGHT = 130; // approximate, including safe-area on most devices
+const ICON_INACTIVE = '#9CA3AF';
+const ICON_ACTIVE = '#FFFFFF';
+
+export function BottomTabBar({ c, navigation, active = 'home', onCampaignPress }) {
   const insets = useSafeAreaInsets();
-  const bottomPad = Math.max(insets.bottom, Platform.OS === 'ios' ? 18 : 12) + 6;
+  const bottomPad = Math.max(insets.bottom, Platform.OS === 'ios' ? 18 : 14);
 
   const tab = (key, icon, label, onPress) => {
     const isActive = active === key;
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.7} className="items-center justify-center" style={{ flex: 1 }}>
-        <Ionicons name={icon} size={20} color={isActive ? c.primary : c.textMuted} />
-        <Text className="text-[10px] mt-1 font-semibold" style={{ color: isActive ? c.primary : c.textMuted }}>{label}</Text>
+        <Ionicons name={icon} size={26} color={isActive ? ICON_ACTIVE : ICON_INACTIVE} />
+        <Text
+          style={{
+            color: isActive ? ICON_ACTIVE : ICON_INACTIVE,
+            fontSize: 11,
+            fontWeight: '700',
+            marginTop: 4,
+          }}
+        >
+          {label}
+        </Text>
         {isActive ? (
-          <View className="absolute -bottom-1.5 w-6 h-0.5 rounded-full" style={{ backgroundColor: c.primary }} />
+          <View
+            style={{
+              position: 'absolute',
+              bottom: -4,
+              width: 24, height: 2.5,
+              borderRadius: 2,
+              backgroundColor: c.primary,
+            }}
+          />
         ) : null}
       </TouchableOpacity>
     );
@@ -342,21 +378,22 @@ export function BottomTabBar({ c, navigation, active = 'home' }) {
 
   return (
     <View
-      className="absolute left-0 right-0 bottom-0 flex-row items-center"
       style={{
+        position: 'absolute',
+        left: 0, right: 0, bottom: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 12,
-        paddingTop: 14,
+        paddingTop: 16,
         paddingBottom: bottomPad,
-        backgroundColor: c.bgSoft,
+        backgroundColor: BAR_BG,
         borderTopLeftRadius: 22,
         borderTopRightRadius: 22,
-        borderTopWidth: 1,
-        borderTopColor: c.border,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -6 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        elevation: 16,
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+        elevation: 18,
       }}
     >
       {tab('home', 'home', 'Home', () => navigation.navigate('Dashboard'))}
@@ -365,24 +402,32 @@ export function BottomTabBar({ c, navigation, active = 'home' }) {
       {/* Centered raised Campaign FAB */}
       <View className="items-center justify-center" style={{ flex: 1 }}>
         <TouchableOpacity
-          onPress={() => navigation.navigate('CampaignsList')}
+          onPress={onCampaignPress || (() => navigation.navigate('CampaignsList'))}
           activeOpacity={0.88}
-          className="w-14 h-14 rounded-full items-center justify-center"
           style={{
+            width: 60, height: 60, borderRadius: 30,
+            alignItems: 'center', justifyContent: 'center',
             backgroundColor: c.primary,
-            marginTop: -28,
+            marginTop: -32,
             shadowColor: c.primary,
             shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.4,
+            shadowOpacity: 0.5,
             shadowRadius: 14,
-            elevation: 8,
+            elevation: 10,
             borderWidth: 4,
-            borderColor: c.bgSoft,
+            borderColor: BAR_BG,
           }}
         >
-          <Ionicons name="megaphone" size={22} color="#FFFFFF" />
+          <Ionicons name="megaphone" size={26} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text className="text-[10px] mt-1 font-semibold" style={{ color: active === 'campaign' ? c.primary : c.textMuted }}>
+        <Text
+          style={{
+            color: active === 'campaign' ? ICON_ACTIVE : ICON_INACTIVE,
+            fontSize: 11,
+            fontWeight: '700',
+            marginTop: 4,
+          }}
+        >
           Campaign
         </Text>
       </View>

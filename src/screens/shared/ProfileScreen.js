@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Image,
-  Alert, Platform, ActivityIndicator,
+  Alert, Platform, ActivityIndicator, Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -10,6 +10,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import { AuthAPI } from '../../services/api';
 import { logout as logoutAction } from '../../store/slices/authSlice';
+import { selectThemeMode, setThemeMode } from '../../store/slices/themeSlice';
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
 import dialog from '../../services/dialog';
@@ -24,6 +25,8 @@ export default function ProfileScreen({ navigation }) {
   const c = useBrand();
   const dispatch = useDispatch();
   const user = useSelector((s) => s.auth.user) || {};
+  const themeMode = useSelector(selectThemeMode);
+  const isDark = themeMode === 'dark';
 
   const [tab, setTab] = useState('info');
   const [username, setUsername]   = useState(user.username || 'omniuser');
@@ -334,6 +337,33 @@ export default function ProfileScreen({ navigation }) {
           </>
         ) : (
           <View className="mx-4">
+            {/* Appearance */}
+            <View
+              className="rounded-[20px] p-4 mb-4"
+              style={{ backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border }}
+            >
+              <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 4 }}>
+                Appearance
+              </Text>
+              <View className="flex-row items-center py-3" style={{ gap: 12 }}>
+                <View className="w-10 h-10 rounded-[10px] items-center justify-center" style={{ backgroundColor: c.primarySoft }}>
+                  <Ionicons name={isDark ? 'moon' : 'sunny'} size={16} color={c.primary} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[14px] font-bold" style={{ color: c.text }}>Dark Mode</Text>
+                  <Text className="text-[11px] mt-0.5" style={{ color: c.textMuted }}>
+                    {isDark ? 'Dark theme is active.' : 'Light theme is active (default).'}
+                  </Text>
+                </View>
+                <Switch
+                  value={isDark}
+                  onValueChange={(v) => dispatch(setThemeMode(v ? 'dark' : 'light'))}
+                  trackColor={{ false: c.bgInput, true: c.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </View>
+
             <View
               className="rounded-[20px] p-4 mb-4"
               style={{ backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border }}

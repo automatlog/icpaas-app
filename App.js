@@ -1,7 +1,7 @@
 // App.js — icpaas.ai root (Redux + NativeWind)
 import './global.css';
 import React, { useEffect, useMemo, useState } from 'react';
-import { StatusBar, View, useColorScheme } from 'react-native';
+import { StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import FlashMessage from 'react-native-flash-message';
 import { Provider, useSelector, useDispatch } from 'react-redux';
@@ -13,11 +13,10 @@ import LoadingScreen from './src/screens/auth/LoadingScreen';
 import AlertDialogHost from './src/components/AlertDialog';
 import { store, persistor } from './src/store';
 import { setHydrated } from './src/store/slices/hydratedSlice';
-import { Feed, LightFeed } from './src/theme';
+import { useFeed } from './src/theme';
 
 function AppInner() {
-  const scheme = useColorScheme();
-  const c = useMemo(() => (scheme === 'dark' ? Feed : LightFeed), [scheme]);
+  const c = useFeed(); // honours theme.mode override (default light)
 
   const isHydrated = useSelector((s) => s.hydrated);
   const isLoggedIn = useSelector((s) => s.auth.isAuthenticated);
@@ -33,7 +32,7 @@ function AppInner() {
   }, [dispatch]);
 
   const rootStyle = useMemo(() => ({ flex: 1, backgroundColor: c.bg }), [c]);
-  const barStyle = scheme === 'dark' ? 'light-content' : 'dark-content';
+  const barStyle = c.scheme === 'dark' ? 'light-content' : 'dark-content';
 
   if (!bootDone) {
     return (

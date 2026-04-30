@@ -2,6 +2,7 @@
 // NativeWind handles utilities; runtime imports Brand/LightBrand + useBrand.
 
 import { Platform, useColorScheme } from 'react-native';
+import { useSelector } from 'react-redux';
 
 // Dark (black) brand palette — channel screens + chat
 export const Brand = {
@@ -79,8 +80,16 @@ export const LightBrand = {
   gCtaC: '#A855F7',
 };
 
+// Theme resolution order:
+//   1. Redux `theme.mode` if 'light' or 'dark' (user-controlled override)
+//   2. OS preference via useColorScheme() if mode === 'system'
+//   3. Light as the final fallback (app default)
 export const useBrand = () => {
   const scheme = useColorScheme();
+  const mode = useSelector((s) => s.theme?.mode || 'light');
+  if (mode === 'dark') return Brand;
+  if (mode === 'light') return LightBrand;
+  // mode === 'system'
   return scheme === 'dark' ? Brand : LightBrand;
 };
 
