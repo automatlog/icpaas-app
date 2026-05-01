@@ -1,16 +1,26 @@
 // src/screens/whatsapp/LiveAgentInbox.js
 //
-// Real-data WhatsApp Live Agent inbox. Mirrors the visual language of the
-// existing mock InboxScreen but is fully driven by liveChatSlice + OmniApp's
-// REST + SignalR. Mock screen stays untouched until v1 ships.
+// Live Agent inbox — the canonical inbox for WhatsApp + RCS conversations.
+// Real-data, fully wired to liveChatSlice + OmniApp REST + SignalR.
+//
+// Visual language matches icpaas.in /WAMessage/UserLiveChat/Index:
+//   - ScreenHeader (channel-tinted icon + "Live Agent" title + connection
+//     pill in the right slot)
+//   - Channel chip row (per WABA channel)
+//   - Search with clear button
+//   - Filter chip row (All / Unread / Assigned / Unassigned / Replied / Archive)
+//   - List rows: tinted-bg circular avatar + name + last message + time
+//     top-right + red unread badge bottom-right
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  RefreshControl, ActivityIndicator, Platform, useColorScheme,
+  RefreshControl, ActivityIndicator, Platform,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
+import { useBrand } from '../../theme';
+import ScreenHeader from '../../components/ScreenHeader';
 import {
   selectChannels,
   selectSelectedChannel,
@@ -37,9 +47,13 @@ const FILTERS = [
   { id: 'archive',    label: 'Archive',    countKey: null },
 ];
 
-const C = {
-  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', green: '#4BD08D', amber: '#F0B95C', red: '#FF5A5F', teal: '#2094ab' },
-  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', pink: '#E6428A', green: '#22C55E', amber: '#D9942C', red: '#E54B4B', teal: '#175a6e' },
+// Avatar tints per the icpaas.in conversation list — deterministic per
+// contact name so the same person reads the same colour across reloads.
+const AVATAR_TINTS = ['#0BB783', '#D4B500', '#5BA0E5', '#EF4444', '#10B981', '#A855F7', '#F59E0B'];
+const tintFor = (name = '') => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_TINTS[hash % AVATAR_TINTS.length];
 };
 
 const initialsOf = (name = '') =>
@@ -62,30 +76,36 @@ const formatTime = (iso) => {
 
 const ConnectionPill = ({ status, c }) => {
   const palette = {
-    connected:    { bg: c.green, label: 'live' },
-    connecting:   { bg: c.amber, label: 'connecting' },
-    reconnecting: { bg: c.amber, label: 'reconnecting' },
-    disconnected: { bg: c.red,   label: 'offline' },
-    idle:         { bg: c.dim,   label: 'idle' },
-  }[status] || { bg: c.dim, label: status || 'idle' };
+    connected:    { bg: c.success || '#22C55E', label: 'live' },
+    connecting:   { bg: '#F0B95C',              label: 'connecting' },
+    reconnecting: { bg: '#F0B95C',              label: 'reconnecting' },
+    disconnected: { bg: c.danger  || '#E54B4B', label: 'offline' },
+    idle:         { bg: c.textMuted,            label: 'idle' },
+  }[status] || { bg: c.textMuted, label: status || 'idle' };
 
   return (
     <View
-      className="flex-row items-center px-2 py-0.5 rounded-full"
-      style={{ backgroundColor: palette.bg + '22', gap: 5 }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 999,
+        gap: 5,
+        backgroundColor: palette.bg + '22',
+      }}
     >
-      <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: palette.bg }} />
-      <Text className="text-[10px] font-bold" style={{ color: palette.bg, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: palette.bg }} />
+      <Text style={{ color: palette.bg, fontSize: 10, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>
         {palette.label}
       </Text>
     </View>
   );
 };
 
-export default function LiveAgentInbox({ navigation }) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
+export default function LiveAgentInbox({ navigation, route }) {
+  const c = useBrand();
+  const channelKey = route?.params?.channel || 'whatsapp';
 
   const dispatch = useDispatch();
   const channels = useSelector(selectChannels);
@@ -168,39 +188,24 @@ export default function LiveAgentInbox({ navigation }) {
     ];
   }, [channels]);
 
-  const rootBg = dark ? 'bg-[#0A0A0D]' : 'bg-white';
-  const softBg = dark ? 'bg-[#141418]' : 'bg-[#F2F2F5]';
-  const textInk = dark ? 'text-white' : 'text-[#0A0A0D]';
-  const textMuted = dark ? 'text-[#9A9AA2]' : 'text-[#5C5C63]';
-  const textDim = dark ? 'text-[#5C5C63]' : 'text-[#9A9AA2]';
-
   const totalUnread = counts.UnReadChatCount || 0;
+  const isWhatsApp = channelKey === 'whatsapp';
 
   return (
-    <View className={`flex-1 ${rootBg}`}>
-      <View style={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22 }}>
-        {/* Header */}
-        <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
-          <TouchableOpacity
-            className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <View className="flex-row items-center" style={{ gap: 8 }}>
-              <Text className={`text-[26px] font-bold tracking-tight ${textInk}`}>WhatsApp Live</Text>
-              <ConnectionPill status={connection.status} c={c} />
-            </View>
-            <Text className={`text-[11px] ${textMuted}`}>
-              {totalUnread} unread · {selectedChannel === 'All' ? 'all channels' : selectedChannel}
-            </Text>
-          </View>
-        </View>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon={isWhatsApp ? 'logo-whatsapp' : 'logo-google'}
+        title="Live Agent"
+        badge={isWhatsApp ? 'WhatsApp' : 'RCS'}
+        subtitle={`${totalUnread} unread · ${selectedChannel === 'All' ? 'all channels' : selectedChannel}`}
+        right={<ConnectionPill status={connection.status} c={c} />}
+      />
 
-        {/* Channel selector */}
-        {channelOptions.length > 1 && (
+      <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+        {/* Channel selector — visible only when more than one WABA is wired */}
+        {channelOptions.length > 1 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -213,45 +218,60 @@ export default function LiveAgentInbox({ navigation }) {
                   key={opt.id}
                   onPress={() => onChannelChange(opt.id)}
                   activeOpacity={0.85}
-                  className="flex-row items-center py-2 px-3 rounded-[14px]"
                   style={{
-                    backgroundColor: active ? c.teal + '22' : (dark ? '#141418' : '#F2F2F5'),
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 7,
+                    paddingHorizontal: 12,
+                    borderRadius: 14,
+                    backgroundColor: active ? c.primarySoft : c.bgInput,
                     borderWidth: 1,
-                    borderColor: active ? c.teal : 'transparent',
+                    borderColor: active ? c.primary : 'transparent',
                     gap: 6,
                   }}
                 >
-                  <Ionicons name="logo-whatsapp" size={11} color={active ? c.teal : c.muted} />
-                  <Text
-                    className="text-[11px]"
-                    style={{ color: active ? c.teal : c.muted, fontWeight: active ? '700' : '500' }}
-                  >
+                  <Ionicons name="logo-whatsapp" size={11} color={active ? c.primary : c.textMuted} />
+                  <Text style={{ color: active ? c.primary : c.textMuted, fontSize: 11, fontWeight: active ? '700' : '500' }}>
                     {opt.label}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
-        )}
+        ) : null}
 
         {/* Search */}
-        <View className={`flex-row items-center rounded-[20px] px-4 mb-3 ${softBg}`} style={{ gap: 10 }}>
-          <Ionicons name="search-outline" size={16} color={c.muted} />
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: c.border,
+            backgroundColor: c.bgCard,
+            paddingHorizontal: 12,
+            marginBottom: 8,
+            gap: 8,
+          }}
+        >
+          <Ionicons name="search-outline" size={15} color={c.textMuted} />
           <TextInput
             value={searchInput}
             onChangeText={onSearchChange}
             placeholder="Search by name or number"
-            placeholderTextColor={c.muted}
-            className={`flex-1 py-3 text-sm ${textInk}`}
-            style={Platform.select({ web: { outlineStyle: 'none' } })}
+            placeholderTextColor={c.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
+            style={[
+              { flex: 1, fontSize: 13, color: c.text, paddingVertical: 10 },
+              Platform.select({ web: { outlineStyle: 'none' } }),
+            ]}
           />
-          {searchInput.length > 0 && (
+          {searchInput.length > 0 ? (
             <TouchableOpacity onPress={() => onSearchChange('')} activeOpacity={0.6}>
-              <Ionicons name="close-circle" size={16} color={c.muted} />
+              <Ionicons name="close-circle" size={16} color={c.textMuted} />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
 
         {/* Filter chips */}
@@ -268,22 +288,32 @@ export default function LiveAgentInbox({ navigation }) {
               <TouchableOpacity
                 onPress={() => onFilterChange(item.id)}
                 activeOpacity={0.85}
-                className="flex-row items-center py-2 px-3.5 rounded-[16px]"
-                style={{ backgroundColor: active ? c.ink : (dark ? '#141418' : '#F2F2F5'), gap: 6 }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 7,
+                  paddingHorizontal: 12,
+                  borderRadius: 16,
+                  gap: 6,
+                  backgroundColor: active ? c.text : c.bgInput,
+                }}
               >
-                <Text className="text-xs" style={{ color: active ? c.bg : c.muted, fontWeight: active ? '700' : '500' }}>
+                <Text style={{ color: active ? c.bg : c.textMuted, fontSize: 12, fontWeight: active ? '700' : '500' }}>
                   {item.label}
                 </Text>
-                {count != null && count > 0 && (
+                {count != null && count > 0 ? (
                   <View
-                    className="rounded-full px-1.5"
-                    style={{ backgroundColor: active ? c.bg + '22' : c.muted + '22' }}
+                    style={{
+                      paddingHorizontal: 6,
+                      borderRadius: 999,
+                      backgroundColor: active ? c.bg + '33' : c.textMuted + '22',
+                    }}
                   >
-                    <Text className="text-[10px] font-bold" style={{ color: active ? c.bg : c.muted }}>
+                    <Text style={{ color: active ? c.bg : c.textMuted, fontSize: 10, fontWeight: '700' }}>
                       {count}
                     </Text>
                   </View>
-                )}
+                ) : null}
               </TouchableOpacity>
             );
           }}
@@ -292,24 +322,29 @@ export default function LiveAgentInbox({ navigation }) {
 
       {/* List */}
       {chatList.loading && chatList.items.length === 0 ? (
-        <View className="flex-1 items-center justify-center" style={{ gap: 10 }}>
-          <ActivityIndicator color={c.teal} />
-          <Text className={`text-xs tracking-widest uppercase ${textMuted}`}>loading inbox</Text>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          <ActivityIndicator color={c.primary} />
+          <Text style={{ color: c.textMuted, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' }}>
+            loading inbox
+          </Text>
         </View>
       ) : (
         <FlatList
           data={chatList.items}
           keyExtractor={(item, idx) => String(item.WANumber || item.wa_id || item.WAInboxId || idx)}
-          contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 120, paddingTop: 4 }}
+          contentContainerStyle={{ paddingBottom: 130 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.teal} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} />
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
+          ItemSeparatorComponent={() => (
+            <View style={{ height: 1, backgroundColor: c.rule, marginLeft: 76 }} />
+          )}
           ListFooterComponent={
             chatList.loading && chatList.items.length > 0 ? (
-              <View className="py-4 items-center">
-                <ActivityIndicator color={c.teal} />
+              <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                <ActivityIndicator color={c.primary} />
               </View>
             ) : null
           }
@@ -320,41 +355,67 @@ export default function LiveAgentInbox({ navigation }) {
             const time   = formatTime(item.LastMessageOn);
             const unread = item.UnReadCount || 0;
             const channel = item.WABANumber;
+            const tint = tintFor(name || '');
             return (
               <TouchableOpacity
                 onPress={() => navigation.navigate('LiveAgentChat', {
                   waId, channel, profileName: name,
                 })}
-                activeOpacity={0.85}
-                className={`flex-row items-center rounded-[20px] p-3 mb-2.5 ${softBg}`}
-                style={{ gap: 12, borderWidth: 1, borderColor: c.bgInput }}
+                activeOpacity={0.75}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  gap: 12,
+                }}
               >
-                <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: c.teal + '33' }}>
-                  <Text className="text-sm font-bold" style={{ color: c.teal }}>{initialsOf(name)}</Text>
+                <View
+                  style={{
+                    width: 44, height: 44, borderRadius: 22,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: tint,
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                    {initialsOf(name)}
+                  </Text>
                 </View>
-                <View className="flex-1">
-                  <View className="flex-row items-center">
-                    <Text className={`text-[15px] font-semibold flex-1 ${textInk}`} numberOfLines={1}>{name}</Text>
-                    <Text className={`text-[11px] ${textMuted}`}>{time}</Text>
+                <View style={{ flex: 1, justifyContent: 'center', gap: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '700' }}>
+                      {name}
+                    </Text>
+                    <Text style={{ color: c.textMuted, fontSize: 11 }}>{time}</Text>
                   </View>
-                  <View className="flex-row items-center mt-0.5" style={{ gap: 6 }}>
-                    <Ionicons name="logo-whatsapp" size={11} color={c.muted} />
-                    <Text className={`flex-1 text-xs ${textMuted}`} numberOfLines={1}>{last}</Text>
-                    {unread > 0 && (
-                      <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.teal }}>
-                        <Text className="text-[10px] font-bold" style={{ color: '#FFFFFF' }}>{unread}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text numberOfLines={1} style={{ flex: 1, color: c.textMuted, fontSize: 12 }}>
+                      {last}
+                    </Text>
+                    {unread > 0 ? (
+                      <View
+                        style={{
+                          minWidth: 20, height: 20, borderRadius: 10,
+                          paddingHorizontal: 6,
+                          backgroundColor: c.danger,
+                          alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>
+                          {unread > 99 ? '99+' : unread}
+                        </Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                 </View>
               </TouchableOpacity>
             );
           }}
           ListEmptyComponent={
-            <View className="items-center py-16" style={{ gap: 8 }}>
-              <Ionicons name="mail-outline" size={36} color={c.dim} />
-              <Text className={`text-[15px] font-semibold ${textInk}`}>No conversations</Text>
-              <Text className={`text-xs ${textDim}`}>
+            <View style={{ alignItems: 'center', paddingVertical: 64, gap: 8 }}>
+              <Ionicons name="mail-outline" size={36} color={c.textDim} />
+              <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>No conversations</Text>
+              <Text style={{ color: c.textDim, fontSize: 12 }}>
                 {connection.status === 'disconnected'
                   ? 'Offline — pull to retry when connection returns.'
                   : 'New chats appear here in real time.'}

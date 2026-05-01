@@ -172,7 +172,12 @@ export default function AppNavigator() {
         <Stack.Screen name="VoiceCampaignStep3" component={VoiceCampaignStep3} />
 
         {/* Aliases for legacy route names so existing navigate('Inbox' / 'Chat' / 'Templates' / 'CreateTemplate' / 'CampaignStep1' / etc) keep working. Default to WhatsApp where ambiguous. */}
-        <Stack.Screen name="Inbox" component={WhatsAppInboxScreen} />
+        {/* The bottom-tab Chats button + Channel landing "Live Agent" tile
+            both route through `Inbox`. The polished real-data screen lives
+            in LiveAgentInbox.js — point Inbox at it so we have one canonical
+            inbox screen across the app. WhatsAppInbox/RcsInbox/SmsInbox
+            still resolve to InboxScreen.js for the per-channel mock views. */}
+        <Stack.Screen name="Inbox" component={LiveAgentInbox} />
         <Stack.Screen name="Chat" component={WhatsAppChatScreen} />
         <Stack.Screen name="Templates" component={WhatsAppTemplatesScreen} />
         <Stack.Screen name="CreateTemplate" component={WhatsAppCreateTemplateScreen} />

@@ -14,6 +14,7 @@ import { selectUnreadCount, pushNotification } from '../../store/slices/notifica
 import { selectConnection, selectUnreadBadgeTotal } from '../../store/slices/liveChatSlice';
 import Banner from '../../components/Banner';
 import CampaignPicker from '../../components/CampaignPicker';
+import ChatsPicker from '../../components/ChatsPicker';
 import toast from '../../services/toast';
 import { CHANNELS } from '../../constants/channels';
 
@@ -111,7 +112,6 @@ export default function DashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
-  const [showCampaignPicker, setShowCampaignPicker] = useState(false);
 
   // The icpaas.in /user/balance endpoint has surfaced the wallet under a few
   // different keys over time (`walletBalance`, `balance`, sometimes nested
@@ -334,17 +334,7 @@ export default function DashboardScreen({ navigation }) {
 
       </ScrollView>
 
-      <BottomTabBar
-        c={c}
-        navigation={navigation}
-        active="home"
-        onCampaignPress={() => setShowCampaignPicker(true)}
-      />
-      <CampaignPicker
-        visible={showCampaignPicker}
-        onClose={() => setShowCampaignPicker(false)}
-        onPick={(ch) => navigation.navigate(ch.route)}
-      />
+      <BottomTabBar c={c} navigation={navigation} active="home" />
     </View>
   );
 }
@@ -410,14 +400,21 @@ const ChannelTile = ({ c, icon, label, count, onPress }) => {
   );
 };
 
-// Bottom tab bar — white icon strip. The bottom safe-area green band is
-// painted by the App-level outer container (App.js), so this component
-// only needs to render the icons. Screens still pad their ScrollView with
-// `paddingBottom: 100` to clear the strip.
+// Bottom tab bar — white icon strip with a centre Campaign FAB. Tapping
+// the FAB toggles a speed-dial arc (CampaignPicker) above the bar with one
+// circle per channel; tapping a channel routes to its campaign screen.
+//
+// The bottom safe-area green band is painted by the App-level outer
+// container (App.js), so this component only needs to render the icons +
+// arc. Screens still pad their ScrollView with `paddingBottom: 100` to
+// clear the strip.
 export const BAR_HEIGHT = 100;
 const ICON_INACTIVE = '#9CA3AF';
 
-export function BottomTabBar({ c, navigation, active = 'home', onCampaignPress }) {
+export function BottomTabBar({ c, navigation, active = 'home' }) {
+  const [pickerOpen, setPickerOpen] = useState(false);     // Campaign speed-dial
+  const [chatsPickerOpen, setChatsPickerOpen] = useState(false); // Chats speed-dial
+
   // The white icon strip uses c.bgCard so it stays clean in both themes.
   const stripBg = c.bgCard;
   const iconActive = c.text;
@@ -480,12 +477,12 @@ export function BottomTabBar({ c, navigation, active = 'home', onCampaignPress }
         }}
       >
         {tab('home', 'home', 'Home', () => navigation.navigate('Dashboard'))}
-        {tab('chats', 'chatbubbles-outline', 'Chats', () => navigation.navigate('Inbox'))}
+        {tab('chats', 'chatbubbles-outline', 'Chats', () => setChatsPickerOpen((v) => !v))}
 
-        {/* Centered raised Campaign FAB */}
+        {/* Centered raised Campaign FAB — toggles the speed-dial arc */}
         <View className="items-center justify-center" style={{ flex: 1 }}>
           <TouchableOpacity
-            onPress={onCampaignPress || (() => navigation.navigate('CampaignsList'))}
+            onPress={() => setPickerOpen((v) => !v)}
             activeOpacity={0.88}
             style={{
               width: 60, height: 60, borderRadius: 30,
@@ -499,13 +496,14 @@ export function BottomTabBar({ c, navigation, active = 'home', onCampaignPress }
               elevation: 10,
               borderWidth: 4,
               borderColor: stripBg,
+              transform: [{ rotate: pickerOpen ? '45deg' : '0deg' }],
             }}
           >
-            <Ionicons name="megaphone" size={26} color="#FFFFFF" />
+            <Ionicons name={pickerOpen ? 'close' : 'megaphone'} size={26} color="#FFFFFF" />
           </TouchableOpacity>
           <Text
             style={{
-              color: active === 'campaign' ? iconActive : ICON_INACTIVE,
+              color: (active === 'campaign' || pickerOpen) ? iconActive : ICON_INACTIVE,
               fontSize: 11,
               fontWeight: '700',
               marginTop: 4,
@@ -518,6 +516,27 @@ export function BottomTabBar({ c, navigation, active = 'home', onCampaignPress }
         {tab('reports', 'bar-chart-outline', 'Reports', () => navigation.navigate('Report'))}
         {tab('you', 'person-outline', 'Profile', () => navigation.navigate('Profile'))}
       </View>
+
+      {/* Campaign speed-dial — fans above the centre FAB */}
+      <CampaignPicker
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={(ch) => {
+          setPickerOpen(false);
+          navigation.navigate(ch.route);
+        }}
+      />
+
+      {/* Chats speed-dial — fans above the Chats tab (left of centre).
+          Only WhatsApp + RCS are shown; SMS / Voice don't have live chat. */}
+      <ChatsPicker
+        visible={chatsPickerOpen}
+        onClose={() => setChatsPickerOpen(false)}
+        onPick={(ch) => {
+          setChatsPickerOpen(false);
+          navigation.navigate(ch.route, ch.routeParams);
+        }}
+      />
     </View>
   );
 }

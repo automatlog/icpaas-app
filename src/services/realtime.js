@@ -36,11 +36,16 @@ const url = () => `${OMNI_HOST}${OMNI_REALTIME_PATH}`;
 const buildConnection = () =>
   new signalR.HubConnectionBuilder()
     .withUrl(url(), {
-      // Skip the negotiate POST that needs cookies — go straight to WS with
-      // the bearer in the query string. SignalR reads access_token from there.
-      transport: signalR.HttpTransportType.WebSockets,
-      skipNegotiation: true,
+      // Standard SignalR handshake: client → POST {hub}/negotiate → server
+      // returns a connection ID + supported transports → client opens the
+      // chosen transport. Skipping this is what produced the "connection ID
+      // not present on the server" error. The accessTokenFactory is invoked
+      // during negotiate AND for the upgraded transport, so the bearer flows
+      // through both legs.
       accessTokenFactory: async () => (await AsyncStorage.getItem(TOKEN_KEY)) || '',
+      // Default transport set is WebSockets → SSE → LongPolling. SignalR
+      // picks the first one the server agrees to — keeps things working
+      // even behind proxies that strip WebSockets.
     })
     .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
     .configureLogging(signalR.LogLevel.Warning)
@@ -81,6 +86,17 @@ export async function connect() {
     return connection;
   }
   if (starting) return starting;
+
+  // No bearer means the server's negotiate will reject with 401 anyway —
+  // skip the cycle so we don't churn reconnects on a fresh install.
+  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    store.dispatch(connectionStatusChanged({
+      status: 'disconnected',
+      error: 'No bearer token saved; sign in to enable Live Agent.',
+    }));
+    throw new Error('No bearer token saved');
+  }
 
   store.dispatch(connectionStatusChanged({ status: 'connecting' }));
 

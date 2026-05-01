@@ -1,33 +1,35 @@
-// src/components/CampaignPicker.js — speed-dial arc.
-// Toggled by the centre Campaign FAB in the BottomTabBar; renders 4
-// channel circles fanning across 120° in the upper semi-circle above
-// the FAB. Each circle is a light-green tinted bubble with the channel
-// icon (matches the Channels grid on the Dashboard).
+// src/components/ChatsPicker.js — Chats speed-dial.
+// Toggled by the "Chats" tab in the BottomTabBar; renders the same
+// arc/fan visual as CampaignPicker but with only WhatsApp + RCS — the
+// two channels that support 2-way live chat. SMS / Voice are excluded
+// because they don't surface in the Live Agent inbox.
 //
-// Layout:
-//   - Transparent Modal so the arc floats above the BottomTabBar
-//   - Tap-outside backdrop closes
-//   - Stagger spring animation in; quick fade out on close
-//
-// Caller provides `visible` / `onClose` / `onPick`. The arc is pinned a
-// fixed distance above the bottom of the screen so it lines up with the
-// FAB across devices.
+// Picking a channel routes to the live-agent Inbox (with a `channel`
+// route param so the screen can adapt header / data source).
 import React, { useEffect, useRef } from 'react';
 import {
-  Modal, View, TouchableOpacity, Animated, Easing, Pressable,
-  StyleSheet, Platform,
+  Modal, View, TouchableOpacity, Animated, Easing, Pressable, StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../theme';
-import { CHANNELS } from '../constants/channels';
+import { getChannel } from '../constants/channels';
 
-const RADIUS = 92;
-const ANGLES = [-150, -110, -70, -30]; // 4 channels across 120° upper arc
+// Pull WhatsApp + RCS from the canonical channel list so icons / labels
+// stay in sync with the Dashboard tiles + CampaignPicker. SMS / Voice
+// don't have live chat — omitted.
+const CHATS_CHANNELS = [
+  { ...getChannel('whatsapp'), route: 'Inbox',    routeParams: { channel: 'whatsapp' } },
+  { ...getChannel('rcs'),      route: 'RcsInbox', routeParams: { channel: 'rcs' } },
+];
+
+const RADIUS = 88;
+// Two icons, slightly tighter spread than the 4-channel campaign arc.
+const ANGLES = [-130, -50];
 const CIRCLE_SIZE = 52;
 const ICON_SIZE   = 24;
 
-export default function CampaignPicker({ visible, onClose, onPick }) {
+export default function ChatsPicker({ visible, onClose, onPick }) {
   const c = useBrand();
   const insets = useSafeAreaInsets();
   const anim = useRef(new Animated.Value(0)).current;
@@ -41,11 +43,11 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
     }).start();
   }, [visible]);
 
-  // FAB centre y from screen bottom. The bottom tab strip is ~100px tall
-  // (BAR_HEIGHT) including padding; the FAB is lifted 32px and has a 30px
-  // radius. We add insets.bottom for devices that surface a gesture pill
-  // and an extra 8px so circles sit cleanly above the FAB rim.
-  const fabAnchor = insets.bottom + 100 - 32 + 30 - 8;
+  // Anchor at the Chats tab — that's the second of five tabs, ~30% from
+  // left. The bottom y matches the campaign FAB centre so both arcs read
+  // as part of the same bar visually.
+  const anchorLeftPercent = '30%';
+  const anchorBottom = insets.bottom + 100 - 20; // tab icon middle ≈ 80px from screen bottom
 
   return (
     <Modal
@@ -56,17 +58,15 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
       statusBarTranslucent
     >
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
-        {/* Tap-outside backdrop — faint dim so the arc reads as elevated
-            without hiding the screen behind. */}
         <Pressable
           onPress={onClose}
           style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,23,42,0.18)' }]}
         />
 
-        {CHANNELS.map((ch, i) => {
+        {CHATS_CHANNELS.map((ch, i) => {
           const ang = (ANGLES[i] * Math.PI) / 180;
           const dx = RADIUS * Math.cos(ang);
-          const dy = RADIUS * Math.sin(ang); // upward (negative y)
+          const dy = RADIUS * Math.sin(ang);
 
           return (
             <Animated.View
@@ -74,8 +74,8 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
               pointerEvents="box-none"
               style={{
                 position: 'absolute',
-                bottom: fabAnchor - CIRCLE_SIZE / 2,
-                left: '50%',
+                bottom: anchorBottom - CIRCLE_SIZE / 2,
+                left: anchorLeftPercent,
                 marginLeft: -CIRCLE_SIZE / 2,
                 opacity: anim,
                 transform: [
