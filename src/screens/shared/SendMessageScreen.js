@@ -17,13 +17,17 @@ import {
 import {
   extractRcsVariables, getRcsComponent, buildRcsPayload,
 } from '../../services/rcsHelpers';
+import useFormDraft from '../../hooks/useFormDraft';
+import { useBrand } from '../../theme';
+import ScreenHeader from '../../components/ScreenHeader';
 
-const CHANNELS = [
-  { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp',      tint: '#8FCFBD' },
-  { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline', tint: '#F2A8B3' },
-  { id: 'rcs',      label: 'RCS',      icon: 'card-outline',       tint: '#D4B3E8' },
-  { id: 'voice',    label: 'Voice',    icon: 'call-outline',       tint: '#E8D080' },
-];
+// Channel chip rail consumes the canonical channel list (single source of
+// truth in src/constants/channels.js) and uses the soft tint for chip
+// backgrounds rather than the bold dashboard tint.
+import { CHANNELS as CANONICAL_CHANNELS } from '../../constants/channels';
+const CHANNELS = CANONICAL_CHANNELS.map((ch) => ({
+  id: ch.id, label: ch.label, icon: ch.icon, tint: ch.softTint,
+}));
 
 const C = {
   dark: { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0' },
@@ -60,18 +64,42 @@ export default function SendMessageScreen({ navigation, route }) {
   const scheme = useColorScheme();
   const dark = scheme === 'dark';
   const c = dark ? C.dark : C.light;
+  // Brand palette is used by the unified ScreenHeader. Local palette `c`
+  // continues to drive the rest of this composer until it gets a full
+  // useBrand migration in a future pass.
+  const brand = useBrand();
 
-  const [channel, setChannel] = useState(route?.params?.channel || 'whatsapp');
-  const [to, setTo] = useState('');
-  const [text, setText] = useState('');
-  const [templateName, setTemplateName] = useState(route?.params?.templateName || '');
+  // User-facing fields are mirrored to redux via useFormDraft so the composer
+  // survives navigation pops and app restarts. Server-fetched lists and
+  // ephemeral UI flags stay as plain useState.
+  const [draft, patchDraft, clearDraft] = useFormDraft('sendMessage', {
+    channel: route?.params?.channel || 'whatsapp',
+    to: '',
+    text: '',
+    templateName: route?.params?.templateName || '',
+    values: {},
+    rcsValues: {},
+    smsValues: [],
+  });
+  const channel = draft.channel;
+  const setChannel = (v) => patchDraft({ channel: typeof v === 'function' ? v(channel) : v });
+  const to = draft.to;
+  const setTo = (v) => patchDraft({ to: typeof v === 'function' ? v(to) : v });
+  const text = draft.text;
+  const setText = (v) => patchDraft({ text: typeof v === 'function' ? v(text) : v });
+  const templateName = draft.templateName;
+  const setTemplateName = (v) => patchDraft({ templateName: typeof v === 'function' ? v(templateName) : v });
+  const values = draft.values;
+  const setValues = (v) => patchDraft({ values: typeof v === 'function' ? v(values) : v });
+  const rcsValues = draft.rcsValues;
+  const setRcsValues = (v) => patchDraft({ rcsValues: typeof v === 'function' ? v(rcsValues) : v });
+  const smsValues = draft.smsValues;
+  const setSmsValues = (v) => patchDraft({ smsValues: typeof v === 'function' ? v(smsValues) : v });
+
   const [templates, setTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [templateErr, setTemplateErr] = useState(null);
   const [sending, setSending] = useState(false);
-  const [values, setValues] = useState({});
-  const [rcsValues, setRcsValues] = useState({});
-  const [smsValues, setSmsValues] = useState([]);
   const [showPayload, setShowPayload] = useState(true);
 
   useEffect(() => {
@@ -172,6 +200,8 @@ export default function SendMessageScreen({ navigation, route }) {
         await VoiceAPI.makeCall({ number: toNum, callerId: text.trim() || 'TEST', mediaFileId: 1 });
       }
       Alert.alert('Sent', `${channel.toUpperCase()} dispatched to ${toNum}`);
+      // Composer succeeded — wipe the draft so the next visit starts blank.
+      clearDraft();
     } catch (e) {
       Alert.alert('Send failed', e?.message || 'Unknown error');
     } finally {
@@ -189,18 +219,16 @@ export default function SendMessageScreen({ navigation, route }) {
 
   return (
     <View className={`flex-1 ${rootBg}`}>
+      <ScreenHeader
+        c={brand}
+        onBack={() => navigation.goBack()}
+        icon="paper-plane-outline"
+        title="Send"
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 140 }}
+        contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 22, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
-          </TouchableOpacity>
-          <Text className={`text-[28px] font-bold tracking-tight flex-1 ${textInk}`}>Send</Text>
-        </View>
-
         {/* Channel chips */}
         <Label cls={textMuted}>Channel</Label>
         <View className="flex-row flex-wrap mb-3.5" style={{ gap: 8 }}>

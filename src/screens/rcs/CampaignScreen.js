@@ -19,7 +19,6 @@ import GradientButton from '../../components/GradientButton';
 import FormField, { inputStyle } from '../../components/FormField';
 import Select from '../../components/Select';
 import ToggleRow from '../../components/ToggleRow';
-import ScheduleModal from '../shared/ScheduleModal';
 import ScreenHeader from '../../components/ScreenHeader';
 
 const TEMPLATE_TYPES = [
@@ -40,9 +39,11 @@ const stamp = () => {
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}, ${d.toLocaleTimeString()}`;
 };
 
-export default function CampaignScreen({ navigation }) {
+export default function CampaignScreen({ navigation, route }) {
   const c = useBrand();
   const dispatch = useDispatch();
+  // Pre-selected template name when arriving from Templates → "send" icon.
+  const incomingTemplateName = route?.params?.templateName || null;
 
   const [name, setName] = useState(stamp());
 
@@ -68,10 +69,6 @@ export default function CampaignScreen({ navigation }) {
 
   const [removeDup, setRemoveDup] = useState(true);
   const [removeBlack, setRemoveBlack] = useState(true);
-  const [schedule, setSchedule] = useState(false);
-  const [schedTime, setSchedTime] = useState('');
-  const [schedAt, setSchedAt] = useState(null);
-  const [showSchedModal, setShowSchedModal] = useState(false);
 
   const [sending, setSending] = useState(false);
 
@@ -100,7 +97,15 @@ export default function CampaignScreen({ navigation }) {
       .then((res) => {
         const list = Array.isArray(res?.data) ? res.data : [];
         setTemplates(list);
-        setTemplate(list[0] || null);
+        // If we arrived here via Templates → "Send", honour the requested
+        // templateName; otherwise pre-select the first one as before.
+        const incoming = incomingTemplateName
+          ? list.find((t) => (t?.name || t?.id) === incomingTemplateName)
+          : null;
+        setTemplate(incoming || list[0] || null);
+        if (incomingTemplateName && !incoming) {
+          toast.warning('Template not found', `"${incomingTemplateName}" isn't on bot ${bot.agentName || bot.botId}.`);
+        }
         if (!list.length) toast.warning('No templates', `Bot ${bot.agentName || bot.botId} has none yet.`);
       })
       .catch((e) => {
@@ -374,19 +379,10 @@ export default function CampaignScreen({ navigation }) {
 
         <ToggleRow c={c} label="Remove Duplicate" value={removeDup} onChange={setRemoveDup} />
         <ToggleRow c={c} label="Remove BlackList" value={removeBlack} onChange={setRemoveBlack} />
-        <ToggleRow
-          c={c}
-          label="Schedule Now"
-          help={schedule && schedAt
-            ? `Will queue locally for ${schedAt.toLocaleString()} (RCS API has no native scheduling).`
-            : 'Pick a future date and time.'}
-          value={schedule}
-          onChange={(v) => {
-            setSchedule(v);
-            if (v) setShowSchedModal(true);
-            else { setSchedTime(''); setSchedAt(null); }
-          }}
-        />
+        {/* RCS scheduling: gsauth.com /rcs/sendmessage has no schedTime
+            field, so we don't expose a Schedule Now toggle here. SMS and
+            Voice surfaces have one because their endpoints support it.
+            Drop this comment once the server adds RCS scheduling. */}
 
         <View className="flex-row mt-5" style={{ gap: 10 }}>
           <View style={{ flex: 1 }}>
@@ -399,29 +395,14 @@ export default function CampaignScreen({ navigation }) {
           </View>
           <View style={{ flex: 1 }}>
             <GradientButton
-              title={schedule && schedTime ? 'Schedule Send' : 'Send Now'}
-              icon={schedule && schedTime ? 'calendar' : 'send'}
+              title="Send Now"
+              icon="send"
               loading={sending}
               onPress={send}
             />
           </View>
         </View>
       </ScrollView>
-
-      <ScheduleModal
-        visible={showSchedModal}
-        initialValue={schedAt}
-        onConfirm={(api, date) => {
-          setSchedTime(api);
-          setSchedAt(date);
-          setShowSchedModal(false);
-          setSchedule(true);
-        }}
-        onClose={() => {
-          setShowSchedModal(false);
-          if (!schedTime) setSchedule(false);
-        }}
-      />
     </View>
   );
 }

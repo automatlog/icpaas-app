@@ -16,7 +16,7 @@
 // OnConnectedAsync — nothing for us to do client-side beyond authenticating.
 
 import * as signalR from '@microsoft/signalr';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as secureStorage from './secureStorage';
 import { OMNI_HOST, OMNI_REALTIME_PATH } from '../config';
 import { store } from '../store';
 import {
@@ -42,7 +42,7 @@ const buildConnection = () =>
       // not present on the server" error. The accessTokenFactory is invoked
       // during negotiate AND for the upgraded transport, so the bearer flows
       // through both legs.
-      accessTokenFactory: async () => (await AsyncStorage.getItem(TOKEN_KEY)) || '',
+      accessTokenFactory: async () => (await secureStorage.getItem(TOKEN_KEY)) || '',
       // Default transport set is WebSockets → SSE → LongPolling. SignalR
       // picks the first one the server agrees to — keeps things working
       // even behind proxies that strip WebSockets.
@@ -89,7 +89,7 @@ export async function connect() {
 
   // No bearer means the server's negotiate will reject with 401 anyway —
   // skip the cycle so we don't churn reconnects on a fresh install.
-  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  const token = await secureStorage.getItem(TOKEN_KEY);
   if (!token) {
     store.dispatch(connectionStatusChanged({
       status: 'disconnected',
@@ -142,3 +142,7 @@ export const isConnected = () =>
   connection?.state === signalR.HubConnectionState.Connected;
 
 export const getConnection = () => connection;
+
+// Aliases — RealtimeProvider imports the longer names.
+export const startRealtime = connect;
+export const stopRealtime = stop;

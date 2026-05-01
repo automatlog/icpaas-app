@@ -2,7 +2,7 @@
 // Each row has a × to delete. Driven by Redux notificationsSlice.
 import React, { useEffect, useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Platform,
+  View, Text, ScrollView, TouchableOpacity, Platform, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
@@ -13,6 +13,8 @@ import {
   markAllRead,
   clearNotifications,
 } from '../../store/slices/notificationsSlice';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const KIND_STYLES = (c) => ({
   'balance': {
@@ -58,6 +60,13 @@ export default function NotificationsScreen({ navigation }) {
   // Mark everything read when this screen mounts
   useEffect(() => { dispatch(markAllRead()); }, [dispatch]);
 
+  // Pull-to-refresh: re-mark-read in case background pushes have arrived.
+  // The notification list itself lives in Redux, which is always live —
+  // there's no remote fetch to trigger.
+  const { refreshing, onRefresh } = usePullToRefresh(async () => {
+    dispatch(markAllRead());
+  });
+
   const grouped = useMemo(() => {
     const today = [];
     const earlier = [];
@@ -68,32 +77,28 @@ export default function NotificationsScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? 56 : 36,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: c.rule,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>Notifications</Text>
-        {list.length > 0 ? (
-          <TouchableOpacity onPress={() => dispatch(clearNotifications())} activeOpacity={0.7}>
-            <Text className="text-[12px] font-bold" style={{ color: c.danger }}>Clear all</Text>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="notifications-outline"
+        title="Notifications"
+        right={list.length > 0 ? (
+          <TouchableOpacity
+            onPress={() => dispatch(clearNotifications())}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Clear all notifications"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={{ color: c.danger, fontSize: 12, fontWeight: '700' }}>Clear all</Text>
           </TouchableOpacity>
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
-      </View>
+        ) : null}
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
       >
         {list.length === 0 ? (
           <View className="items-center py-16" style={{ gap: 8 }}>

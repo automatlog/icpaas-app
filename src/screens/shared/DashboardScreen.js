@@ -13,10 +13,10 @@ import { BalanceAPI, VoiceAPI, IVRAPI } from '../../services/api';
 import { selectUnreadCount, pushNotification } from '../../store/slices/notificationsSlice';
 import { selectConnection, selectUnreadBadgeTotal } from '../../store/slices/liveChatSlice';
 import Banner from '../../components/Banner';
-import CampaignPicker from '../../components/CampaignPicker';
-import ChatsPicker from '../../components/ChatsPicker';
+import BottomTabBar from '../../components/BottomTabBar';
 import toast from '../../services/toast';
 import { CHANNELS } from '../../constants/channels';
+import { formatCurrency } from '../../services/format';
 
 const greet = () => {
   const h = new Date().getHours();
@@ -73,7 +73,7 @@ const WalletCard = ({ c, balance, balanceError, loading, navigation }) => {
             <ActivityIndicator size="small" color={c.primaryDeep} style={{ alignSelf: 'flex-start', marginTop: 2 }} />
           ) : balance != null ? (
             <Text className="text-[20px] font-extrabold mt-0.5" style={{ color: c.primaryDeep }}>
-              ₹{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrency(balance)}
             </Text>
           ) : (
             <>
@@ -161,7 +161,7 @@ export default function DashboardScreen({ navigation }) {
           dispatch(pushNotification({
             kind: 'balance',
             title: 'Low wallet balance',
-            body: `Wallet at ₹${Number(b).toLocaleString('en-IN', { maximumFractionDigits: 2 })}. Top up to keep campaigns running.`,
+            body: `Wallet at ${formatCurrency(b)}. Top up to keep campaigns running.`,
           }));
         }
       }
@@ -200,7 +200,7 @@ export default function DashboardScreen({ navigation }) {
           <Banner
             tone="warning"
             title="Low wallet balance"
-            message={`Wallet at ₹${Number(balance).toLocaleString('en-IN', { maximumFractionDigits: 2 })}. Top up to keep campaigns running.`}
+            message={`Wallet at ${formatCurrency(balance)}. Top up to keep campaigns running.`}
             actionText="Top up"
             onAction={() => navigation.navigate('Config')}
             onClose={() => setBannerDismissed(true)}
@@ -400,143 +400,8 @@ const ChannelTile = ({ c, icon, label, count, onPress }) => {
   );
 };
 
-// Bottom tab bar — white icon strip with a centre Campaign FAB. Tapping
-// the FAB toggles a speed-dial arc (CampaignPicker) above the bar with one
-// circle per channel; tapping a channel routes to its campaign screen.
-//
-// The bottom safe-area green band is painted by the App-level outer
-// container (App.js), so this component only needs to render the icons +
-// arc. Screens still pad their ScrollView with `paddingBottom: 100` to
-// clear the strip.
-export const BAR_HEIGHT = 100;
-const ICON_INACTIVE = '#9CA3AF';
-
-export function BottomTabBar({ c, navigation, active = 'home' }) {
-  const [pickerOpen, setPickerOpen] = useState(false);     // Campaign speed-dial
-  const [chatsPickerOpen, setChatsPickerOpen] = useState(false); // Chats speed-dial
-
-  // The white icon strip uses c.bgCard so it stays clean in both themes.
-  const stripBg = c.bgCard;
-  const iconActive = c.text;
-
-  const tab = (key, icon, label, onPress) => {
-    const isActive = active === key;
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7} className="items-center justify-center" style={{ flex: 1 }}>
-        <Ionicons name={icon} size={26} color={isActive ? iconActive : ICON_INACTIVE} />
-        <Text
-          style={{
-            color: isActive ? iconActive : ICON_INACTIVE,
-            fontSize: 11,
-            fontWeight: '700',
-            marginTop: 4,
-          }}
-        >
-          {label}
-        </Text>
-        {isActive ? (
-          <View
-            style={{
-              position: 'absolute',
-              bottom: -4,
-              width: 24, height: 2.5,
-              borderRadius: 2,
-              backgroundColor: c.primary,
-            }}
-          />
-        ) : null}
-      </TouchableOpacity>
-    );
-  };
-
-  return (
-    <View
-      style={{
-        position: 'absolute',
-        left: 0, right: 0, bottom: 0,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -6 },
-        shadowOpacity: 0.12,
-        shadowRadius: 14,
-        elevation: 18,
-      }}
-    >
-      {/* White icon strip */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 12,
-          paddingTop: 16,
-          paddingBottom: 14,
-          backgroundColor: stripBg,
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
-          borderTopWidth: 1,
-          borderTopColor: c.border,
-        }}
-      >
-        {tab('home', 'home', 'Home', () => navigation.navigate('Dashboard'))}
-        {tab('chats', 'chatbubbles-outline', 'Chats', () => setChatsPickerOpen((v) => !v))}
-
-        {/* Centered raised Campaign FAB — toggles the speed-dial arc */}
-        <View className="items-center justify-center" style={{ flex: 1 }}>
-          <TouchableOpacity
-            onPress={() => setPickerOpen((v) => !v)}
-            activeOpacity={0.88}
-            style={{
-              width: 60, height: 60, borderRadius: 30,
-              alignItems: 'center', justifyContent: 'center',
-              backgroundColor: c.primary,
-              marginTop: -32,
-              shadowColor: c.primary,
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.5,
-              shadowRadius: 14,
-              elevation: 10,
-              borderWidth: 4,
-              borderColor: stripBg,
-              transform: [{ rotate: pickerOpen ? '45deg' : '0deg' }],
-            }}
-          >
-            <Ionicons name={pickerOpen ? 'close' : 'megaphone'} size={26} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text
-            style={{
-              color: (active === 'campaign' || pickerOpen) ? iconActive : ICON_INACTIVE,
-              fontSize: 11,
-              fontWeight: '700',
-              marginTop: 4,
-            }}
-          >
-            Campaign
-          </Text>
-        </View>
-
-        {tab('reports', 'bar-chart-outline', 'Reports', () => navigation.navigate('Report'))}
-        {tab('you', 'person-outline', 'Profile', () => navigation.navigate('Profile'))}
-      </View>
-
-      {/* Campaign speed-dial — fans above the centre FAB */}
-      <CampaignPicker
-        visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onPick={(ch) => {
-          setPickerOpen(false);
-          navigation.navigate(ch.route);
-        }}
-      />
-
-      {/* Chats speed-dial — fans above the Chats tab (left of centre).
-          Only WhatsApp + RCS are shown; SMS / Voice don't have live chat. */}
-      <ChatsPicker
-        visible={chatsPickerOpen}
-        onClose={() => setChatsPickerOpen(false)}
-        onPick={(ch) => {
-          setChatsPickerOpen(false);
-          navigation.navigate(ch.route, ch.routeParams);
-        }}
-      />
-    </View>
-  );
-}
+// BottomTabBar lives in src/components/BottomTabBar.js now. Re-exported
+// here so existing `import { BottomTabBar } from './DashboardScreen'`
+// callers keep working until they migrate to the components path.
+// New code should import directly from '../../components/BottomTabBar'.
+export { default as BottomTabBar, BAR_HEIGHT } from '../../components/BottomTabBar';

@@ -60,6 +60,8 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
             without hiding the screen behind. */}
         <Pressable
           onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close campaign picker"
           style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,23,42,0.18)' }]}
         />
 
@@ -88,6 +90,8 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={() => onPick?.(ch)}
+                accessibilityRole="button"
+                accessibilityLabel={`New ${ch.label} campaign`}
                 style={{ alignItems: 'center' }}
               >
                 <View

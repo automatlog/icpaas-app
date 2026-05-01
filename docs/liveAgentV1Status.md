@@ -62,7 +62,7 @@ A WhatsApp Live Agent surface with full real-time plumbing, ready to flip on the
 - [src/navigation/AppNavigator.js](../src/navigation/AppNavigator.js) — registers `LiveAgentInbox` and `LiveAgentChat` routes
 - [.env](../.env) — purged the ClickHouse credentials that were exposed (would have been bundled into the APK)
 
-## How to flip on real auth (one change)
+## How to flip on real auth (one change — once backend is ready)
 
 Edit [src/config.js](../src/config.js):
 
@@ -75,3 +75,23 @@ export const OMNI_AUTH_LOGIN_PATH = '/api/auth/mobile-token';
 ```
 
 Expected response shape: `{ token: string, user: { username, name, role } }`. Adjust `tryRemoteLogin` in [authSlice.js](../src/store/slices/authSlice.js) if the backend uses different field names.
+
+## Live probe results (verified 2026-05-01)
+
+Tested against `https://icpaas.in` with the demo bearer `cabb46ed-…d20e6073b120` (UserId 102):
+
+| Probe | Result | Implication |
+|---|---|---|
+| `POST /api/auth/mobile-token` | **404** | Endpoint not deployed. Tried 6 path variations (`/api/v1/auth/...`, `/AuthService/MobileToken`, etc.) — all 404. Don't set `OMNI_AUTH_LOGIN_PATH`. |
+| `GET /api/v1/user/balance` with bearer | **200** | Bearer is valid for the existing icpaas.in REST API surface. |
+| `POST /whatsAppProgressHub/negotiate` with bearer | **200** | SignalR accepts the bearer at negotiate. **Available transports: SSE + LongPolling — no WebSockets.** Hard-coding `transport: HttpTransportType.WebSockets` would have failed; the singleton was already updated to let SignalR pick. |
+| `GET /WAMessage/UserLiveChat/GetChannels` with bearer | **302 → /AuthService/SignIn** | Live Chat MVC controllers don't honor bearer auth — they require an ASP.NET session cookie. Same will be true for every `UserLiveChat/*` endpoint we wired. |
+
+## Backend gaps that block v1 turn-on
+
+Even with the bearer in hand, two server-side changes are required:
+
+1. **Add bearer-auth scheme to `UserLiveChatController`** (and any sibling controllers we call). Currently `[Authorize]` resolves to cookie auth only → 302. The token validator must map `cabb46ed-…d20e6073b120` to UserId 102 / username `omniuser` (and similarly for other tokens / users).
+2. **Add the same bearer scheme to `WhatsAppProgressHub`** so `OnConnectedAsync` resolves `Context.User.Identity.Name` from the bearer. Without it the connection never joins `waba_OMNIUSER`, so broadcasts from `MessageHandlerService.HandleIncomingMessageAsync` won't reach this client.
+
+Once both land, `OMNI_AUTH_LOGIN_PATH` can stay `null` — the demo login already seeds the bearer that everything else uses. (A dedicated `/api/auth/mobile-token` endpoint is only needed if we want users to authenticate by username/password rather than pasting a long-lived bearer.)

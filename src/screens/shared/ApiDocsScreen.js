@@ -2,13 +2,15 @@
 // Sourced from "Omni App.pdf"
 import React, { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Platform,
+  View, Text, ScrollView, TouchableOpacity, Platform, RefreshControl,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../../theme';
-import { BottomTabBar } from './DashboardScreen';
+import BottomTabBar from '../../components/BottomTabBar';
+import ScreenHeader from '../../components/ScreenHeader';
 import toast from '../../services/toast';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 
 const PRODUCTS = [
   {
@@ -76,6 +78,9 @@ const METHOD_TINT = {
 export default function ApiDocsScreen({ navigation, route }) {
   const c = useBrand();
   const [active, setActive] = useState(route?.params?.product || 'voice');
+  // Endpoint list is bundled with the app — refresh just acknowledges the
+  // gesture so the affordance is consistent with data-backed screens.
+  const { refreshing, onRefresh } = usePullToRefresh();
 
   const product = useMemo(() => PRODUCTS.find((p) => p.id === active) || PRODUCTS[0], [active]);
 
@@ -86,22 +91,12 @@ export default function ApiDocsScreen({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? 56 : 36,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: c.rule,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>API Docs</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="code-slash-outline"
+        title="API Docs"
+      />
 
       {/* Product pills */}
       <ScrollView
@@ -129,7 +124,11 @@ export default function ApiDocsScreen({ navigation, route }) {
         })}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 130 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 130 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
+      >
         {/* Product header card */}
         <View
           className="rounded-[20px] p-4 mb-3 flex-row items-center"

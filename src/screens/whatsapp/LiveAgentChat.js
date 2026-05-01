@@ -7,26 +7,34 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  KeyboardAvoidingView, Platform, ActivityIndicator, useColorScheme,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useDispatch, useSelector } from 'react-redux';
 import moment from 'moment';
-import { LiveChatAPI, buildLiveChatTextForm } from '../../services/api';
+import { useBrand } from '../../theme';
 import {
   selectThread,
   selectConnection,
   setActive,
-  optimisticSend,
-  sendResolved,
-  sendFailed,
 } from '../../store/slices/liveChatSlice';
-import { loadMessages, loadOlderMessages } from '../../services/liveChatActions';
-
-const C = {
-  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', green: '#4BD08D', red: '#FF5A5F', cyan: '#5CD4E0', amber: '#F0B95C', teal: '#2094ab', bubbleMe: '#2094ab', bubbleMeText: '#FFFFFF' },
-  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', green: '#22C55E', red: '#E54B4B', cyan: '#2FB8C4', amber: '#D9942C', teal: '#175a6e', bubbleMe: '#175a6e', bubbleMeText: '#FFFFFF' },
-};
+import {
+  loadMessages,
+  loadOlderMessages,
+  sendText as sendTextAction,
+  sendImage as sendImageAction,
+  sendVideo as sendVideoAction,
+  sendDocument as sendDocumentAction,
+  sendLocation as sendLocationAction,
+  sendTemplate as sendTemplateAction,
+  uploadMedia,
+} from '../../services/liveChatActions';
+import LiveAgentAttachMenu from '../../components/LiveAgentAttachMenu';
+import LiveAgentLocationModal from '../../components/LiveAgentLocationModal';
+import LiveAgentTemplatePicker from '../../components/LiveAgentTemplatePicker';
+import toast from '../../services/toast';
 
 const initialsOf = (name = '') =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
@@ -35,17 +43,17 @@ const initialsOf = (name = '') =>
 const StatusIcon = ({ status, c }) => {
   switch (status) {
     case 'Sending':
-      return <ActivityIndicator size="small" color={c.muted} style={{ transform: [{ scale: 0.6 }] }} />;
+      return <ActivityIndicator size="small" color={c.textMuted} style={{ transform: [{ scale: 0.6 }] }} />;
     case 'Sent':
-      return <Ionicons name="checkmark" size={13} color={c.muted} />;
+      return <Ionicons name="checkmark" size={13} color={c.textMuted} />;
     case 'Delivered':
-      return <Ionicons name="checkmark-done" size={13} color={c.muted} />;
+      return <Ionicons name="checkmark-done" size={13} color={c.textMuted} />;
     case 'Read':
-      return <Ionicons name="checkmark-done" size={13} color={c.cyan} />;
+      return <Ionicons name="checkmark-done" size={13} color={c.info} />;
     case 'Failed':
-      return <Ionicons name="alert-circle" size={13} color={c.red} />;
+      return <Ionicons name="alert-circle" size={13} color={c.danger} />;
     default:
-      return <Ionicons name="time-outline" size={12} color={c.muted} />;
+      return <Ionicons name="time-outline" size={12} color={c.textMuted} />;
   }
 };
 
@@ -85,9 +93,8 @@ const formatRemaining = (ms) => {
 };
 
 export default function LiveAgentChat({ route, navigation }) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
+  const c = useBrand();
+  const dark = c.scheme === 'dark';
 
   const { waId, channel, profileName } = route?.params || {};
   const dispatch = useDispatch();
@@ -96,6 +103,10 @@ export default function LiveAgentChat({ route, navigation }) {
 
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [picking, setPicking] = useState(false); // image/video/doc upload spinner
   const flatRef = useRef(null);
 
   // Mark this conversation active so the slice suppresses unread bumps for
@@ -144,20 +155,6 @@ export default function LiveAgentChat({ route, navigation }) {
     if (!text || sending || !waId || !channel) return;
 
     setSending(true);
-    const tempId = `temp-${Date.now()}`;
-    const tempRow = {
-      WAInboxId: tempId,
-      MessageId: null,
-      wa_id: waId,
-      SenderNumber: waId,
-      MessageText: text,
-      MessageType: 'text',
-      ChatType: 'OUT',
-      DeliveryStatus: 'Sending',
-      ReceivedDate: new Date().toISOString(),
-      WABANumber: channel,
-    };
-    dispatch(optimisticSend({ waId, row: tempRow }));
     setInput('');
 
     // After dispatch, the new row is at the END of the messages array (oldest-
@@ -166,27 +163,153 @@ export default function LiveAgentChat({ route, navigation }) {
     // newest message.
     setTimeout(() => flatRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
 
+    // sendTextAction handles optimistic render + Meta Cloud API call (via
+    // the gsauth proxy) + wamid reconciliation + Sent/Failed dispatch.
+    await dispatch(sendTextAction({ waId, channel, message: text }));
+    setSending(false);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Attachment flows. Each one is: picker → uploadMedia (Meta /media) →
+  // dispatch send action with the returned media id. Failures surface as
+  // a toast — the menu has already closed by this point.
+  // ---------------------------------------------------------------------------
+  const ensureCanSend = () => {
+    if (!waId || !channel) {
+      toast.error('No conversation', 'Open a chat before attaching.');
+      return false;
+    }
+    return true;
+  };
+
+  // Builds the RN-flavoured FormData file shape from a picker asset.
+  const fileFromAsset = (asset, fallbackMime, fallbackName) => ({
+    uri: asset.uri,
+    name: asset.fileName || asset.name || fallbackName,
+    type: asset.mimeType || asset.type || fallbackMime,
+  });
+
+  const uploadAndSend = async ({ kind, file, mimeType, sendAction, sendArgs }) => {
+    setPicking(true);
     try {
-      const fd = buildLiveChatTextForm({ number: waId, channel, message: text });
-      const res = await LiveChatAPI.sendMessage(fd);
-      const ok = res?.Success ?? res?.success ?? false;
-      if (ok) {
-        dispatch(sendResolved({ tempId, waId, patch: { DeliveryStatus: 'Sent' } }));
-      } else {
-        dispatch(sendFailed({
-          tempId,
-          waId,
-          error: res?.Message || res?.message || 'Send failed',
-        }));
+      const upload = await uploadMedia({ channel, file, mimeType });
+      const id = upload?.id || upload?.media?.[0]?.id;
+      if (!id) {
+        toast.error('Upload failed', 'Meta did not return a media id.');
+        return;
       }
+      setTimeout(() => flatRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
+      await dispatch(sendAction({ waId, channel, id, ...sendArgs }));
     } catch (e) {
-      dispatch(sendFailed({
-        tempId,
-        waId,
-        error: e?.message || 'Send failed',
-      }));
+      toast.error(`${kind} send failed`, e?.message || 'Try again.');
     } finally {
-      setSending(false);
+      setPicking(false);
+    }
+  };
+
+  const pickAndSendImage = async () => {
+    setAttachOpen(false);
+    if (!ensureCanSend()) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      toast.warning('Permission needed', 'Allow photo access to send images.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions?.Images || 'images',
+      quality: 0.8,
+      allowsEditing: false,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType || 'image/jpeg';
+    await uploadAndSend({
+      kind: 'Image',
+      file: fileFromAsset(asset, mimeType, `image-${Date.now()}.jpg`),
+      mimeType,
+      sendAction: sendImageAction,
+      sendArgs: {},
+    });
+  };
+
+  const pickAndSendVideo = async () => {
+    setAttachOpen(false);
+    if (!ensureCanSend()) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      toast.warning('Permission needed', 'Allow photo access to send videos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions?.Videos || 'videos',
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType || 'video/mp4';
+    await uploadAndSend({
+      kind: 'Video',
+      file: fileFromAsset(asset, mimeType, `video-${Date.now()}.mp4`),
+      mimeType,
+      sendAction: sendVideoAction,
+      sendArgs: {},
+    });
+  };
+
+  const pickAndSendDocument = async () => {
+    setAttachOpen(false);
+    if (!ensureCanSend()) return;
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      multiple: false,
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType || 'application/octet-stream';
+    await uploadAndSend({
+      kind: 'Document',
+      file: fileFromAsset(asset, mimeType, asset.name || `file-${Date.now()}`),
+      mimeType,
+      sendAction: sendDocumentAction,
+      sendArgs: { filename: asset.name },
+    });
+  };
+
+  const openLocation = () => {
+    setAttachOpen(false);
+    if (!ensureCanSend()) return;
+    setLocationOpen(true);
+  };
+
+  const handleSendLocation = async ({ latitude, longitude, name, address }) => {
+    setLocationOpen(false);
+    setPicking(true);
+    try {
+      setTimeout(() => flatRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
+      await dispatch(sendLocationAction({ waId, channel, latitude, longitude, name, address }));
+    } catch (e) {
+      toast.error('Location send failed', e?.message || 'Try again.');
+    } finally {
+      setPicking(false);
+    }
+  };
+
+  const openTemplate = () => {
+    setAttachOpen(false);
+    if (!ensureCanSend()) return;
+    setTemplateOpen(true);
+  };
+
+  const handleSendTemplate = async ({ name, language, components }) => {
+    setPicking(true);
+    try {
+      setTimeout(() => flatRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
+      await dispatch(sendTemplateAction({ waId, channel, name, language, components }));
+    } catch (e) {
+      toast.error('Template send failed', e?.message || 'Try again.');
+    } finally {
+      setPicking(false);
     }
   };
 
@@ -205,14 +328,14 @@ export default function LiveAgentChat({ route, navigation }) {
         <View
           className="rounded-[18px] px-3.5 py-2.5 max-w-[82%]"
           style={{
-            backgroundColor: me ? c.bubbleMe : (dark ? '#141418' : '#F2F2F5'),
+            backgroundColor: me ? c.primary : (dark ? '#141418' : '#F2F2F5'),
             borderWidth: item.DeliveryStatus === 'Failed' ? 1 : 0,
-            borderColor: item.DeliveryStatus === 'Failed' ? c.red : 'transparent',
+            borderColor: item.DeliveryStatus === 'Failed' ? c.danger : 'transparent',
           }}
         >
           <Text
             className="text-[14px] leading-5"
-            style={{ color: me ? c.bubbleMeText : c.ink }}
+            style={{ color: me ? '#FFFFFF' : c.text }}
           >
             {text}
           </Text>
@@ -224,7 +347,7 @@ export default function LiveAgentChat({ route, navigation }) {
           <Text className={`text-[10px] ${textMuted}`}>{time}</Text>
           {me && <StatusIcon status={item.DeliveryStatus} c={c} />}
           {item.DeliveryStatus === 'Failed' && item.ErrorMessage && (
-            <Text className="text-[10px] ml-1" style={{ color: c.red }} numberOfLines={1}>
+            <Text className="text-[10px] ml-1" style={{ color: c.danger }} numberOfLines={1}>
               {item.ErrorMessage}
             </Text>
           )}
@@ -254,14 +377,16 @@ export default function LiveAgentChat({ route, navigation }) {
             className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`}
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Back to inbox"
           >
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
+            <Ionicons name="chevron-back" size={20} color={c.text} />
           </TouchableOpacity>
           <View
             className="w-11 h-11 rounded-full items-center justify-center"
-            style={{ backgroundColor: c.teal + '33' }}
+            style={{ backgroundColor: c.primary + '33' }}
           >
-            <Text className="text-sm font-bold" style={{ color: c.teal }}>
+            <Text className="text-sm font-bold" style={{ color: c.primary }}>
               {initialsOf(profileName || waId)}
             </Text>
           </View>
@@ -270,15 +395,17 @@ export default function LiveAgentChat({ route, navigation }) {
               {profileName || waId || 'Conversation'}
             </Text>
             <View className="flex-row items-center mt-0.5" style={{ gap: 6 }}>
-              <Ionicons name="logo-whatsapp" size={11} color={c.muted} />
+              <Ionicons name="logo-whatsapp" size={11} color={c.textMuted} />
               <Text className={`text-[11px] ${textMuted}`}>{headerSubtitle}</Text>
             </View>
           </View>
           <TouchableOpacity
             className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Conversation options"
           >
-            <Ionicons name="ellipsis-horizontal" size={18} color={c.ink} />
+            <Ionicons name="ellipsis-horizontal" size={18} color={c.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -286,7 +413,7 @@ export default function LiveAgentChat({ route, navigation }) {
       {/* Messages */}
       {thread.loading && reversed.length === 0 ? (
         <View className="flex-1 items-center justify-center" style={{ gap: 10 }}>
-          <ActivityIndicator color={c.teal} />
+          <ActivityIndicator color={c.primary} />
           <Text className={`text-xs tracking-widest uppercase ${textMuted}`}>loading thread</Text>
         </View>
       ) : (
@@ -304,13 +431,13 @@ export default function LiveAgentChat({ route, navigation }) {
             // (oldest end). Show the older-loading spinner here.
             thread.loading && reversed.length > 0 ? (
               <View className="py-3 items-center">
-                <ActivityIndicator color={c.teal} />
+                <ActivityIndicator color={c.primary} />
               </View>
             ) : null
           }
           ListEmptyComponent={
             <View className="flex-1 items-center justify-center" style={{ gap: 8 }}>
-              <Ionicons name="chatbubble-ellipses-outline" size={36} color={c.dim} />
+              <Ionicons name="chatbubble-ellipses-outline" size={36} color={c.textDim} />
               <Text className={`text-[14px] ${textMuted}`}>No messages yet</Text>
             </View>
           }
@@ -323,19 +450,19 @@ export default function LiveAgentChat({ route, navigation }) {
           className="flex-row items-center px-3 py-2 mx-3 mb-2 rounded-[12px]"
           style={{
             gap: 8,
-            backgroundColor: window24h.state === 'closed' ? c.red + '22' : c.amber + '22',
+            backgroundColor: window24h.state === 'closed' ? c.danger + '22' : c.warning + '22',
             borderWidth: 1,
-            borderColor: window24h.state === 'closed' ? c.red : c.amber,
+            borderColor: window24h.state === 'closed' ? c.danger : c.warning,
           }}
         >
           <Ionicons
             name={window24h.state === 'closed' ? 'lock-closed' : 'time-outline'}
             size={14}
-            color={window24h.state === 'closed' ? c.red : c.amber}
+            color={window24h.state === 'closed' ? c.danger : c.warning}
           />
           <Text
             className="flex-1 text-[11px]"
-            style={{ color: window24h.state === 'closed' ? c.red : c.amber, fontWeight: '600' }}
+            style={{ color: window24h.state === 'closed' ? c.danger : c.warning, fontWeight: '600' }}
           >
             {window24h.state === 'closed'
               ? '24-hour service window closed — only template messages allowed.'
@@ -349,12 +476,33 @@ export default function LiveAgentChat({ route, navigation }) {
         className={`flex-row items-end px-3 py-2 ${rootBg}`}
         style={{ gap: 8, borderTopWidth: 1, borderTopColor: c.bgInput }}
       >
+        {/* "+" attach button */}
+        <TouchableOpacity
+          onPress={() => setAttachOpen(true)}
+          disabled={picking}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Attach media"
+          accessibilityState={{ disabled: picking, busy: picking }}
+          className="w-11 h-11 rounded-full items-center justify-center"
+          style={{
+            backgroundColor: dark ? '#141418' : '#F2F2F5',
+            opacity: picking ? 0.6 : 1,
+          }}
+        >
+          {picking ? (
+            <ActivityIndicator color={c.primary} size="small" />
+          ) : (
+            <Ionicons name="add" size={22} color={c.primary} />
+          )}
+        </TouchableOpacity>
+
         <View className={`flex-1 flex-row items-end rounded-[22px] px-3 ${inputBg}`} style={{ gap: 8 }}>
           <TextInput
             value={input}
             onChangeText={setInput}
             placeholder={connection.status === 'connected' ? 'Type a message' : 'Composing while offline…'}
-            placeholderTextColor={c.muted}
+            placeholderTextColor={c.textMuted}
             multiline
             className={`flex-1 py-2.5 text-[14px] leading-5 ${textInk}`}
             style={[{ maxHeight: 110 }, Platform.select({ web: { outlineStyle: 'none' } })]}
@@ -364,19 +512,45 @@ export default function LiveAgentChat({ route, navigation }) {
           onPress={handleSend}
           disabled={sending || !input.trim()}
           activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Send message"
+          accessibilityState={{ disabled: sending || !input.trim(), busy: sending }}
           className="w-11 h-11 rounded-full items-center justify-center"
           style={{
-            backgroundColor: input.trim() ? c.teal : (dark ? '#141418' : '#F2F2F5'),
+            backgroundColor: input.trim() ? c.primary : (dark ? '#141418' : '#F2F2F5'),
             opacity: sending ? 0.6 : 1,
           }}
         >
           {sending ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
-            <Ionicons name="send" size={17} color={input.trim() ? '#FFFFFF' : c.muted} />
+            <Ionicons name="send" size={17} color={input.trim() ? '#FFFFFF' : c.textMuted} />
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Attachment menu + sub-modals — render at the screen root so they
+          overlay the KeyboardAvoidingView correctly. */}
+      <LiveAgentAttachMenu
+        visible={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        onPickImage={pickAndSendImage}
+        onPickVideo={pickAndSendVideo}
+        onPickDocument={pickAndSendDocument}
+        onPickLocation={openLocation}
+        onPickTemplate={openTemplate}
+        locked={window24h?.state === 'closed'}
+      />
+      <LiveAgentLocationModal
+        visible={locationOpen}
+        onClose={() => setLocationOpen(false)}
+        onSubmit={handleSendLocation}
+      />
+      <LiveAgentTemplatePicker
+        visible={templateOpen}
+        onClose={() => setTemplateOpen(false)}
+        onSubmit={handleSendTemplate}
+      />
     </KeyboardAvoidingView>
   );
 }

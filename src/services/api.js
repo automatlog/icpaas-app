@@ -2,7 +2,7 @@
 // gsauth.com API service for WhatsApp, RCS, and SMS.
 
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as secureStorage from './secureStorage';
 import {
   buildInputData,
   buildWhatsAppSendPayload,
@@ -47,9 +47,11 @@ const STORAGE_KEYS = {
   token: 'icpaas_token',
 };
 
-// Demo bearer shared across gsauth.com + icpaas.in. Seeded on login so every
-// screen can call APIs without the user having to visit Config first.
-export const DEFAULT_API_TOKEN = 'cabb46ed-d032-4940-9e97-d20e6073b120';
+// Optional fallback bearer for development. Read from `EXPO_PUBLIC_DEFAULT_TOKEN`
+// (set in `.env`, `eas.json` or shell env). Empty string in production —
+// users must sign in to get a real token. Never hardcode a live token here:
+// the file is committed and any value would leak via the repo.
+export const DEFAULT_API_TOKEN = process.env.EXPO_PUBLIC_DEFAULT_TOKEN || '';
 
 const api = axios.create({
   baseURL: API_DOMAIN,
@@ -78,11 +80,11 @@ const omniApi = axios.create({
   },
 });
 
-// Reads the bearer from AsyncStorage on every request. Falls back to
-// DEFAULT_API_TOKEN so existing demo flows keep working until the real
-// login replaces the seeded token.
+// Reads the bearer from SecureStore (keychain) on every request. Falls
+// back to DEFAULT_API_TOKEN (env-only) when no token is saved — useful
+// for dev where signing in every reload is annoying.
 const attachAuth = async (config) => {
-  const stored = await AsyncStorage.getItem(STORAGE_KEYS.token);
+  const stored = await secureStorage.getItem(STORAGE_KEYS.token);
   config.headers.Authorization = `Bearer ${stored || DEFAULT_API_TOKEN}`;
   return config;
 };
@@ -283,19 +285,19 @@ export const AuthAPI = {
   },
 
   saveCredentials: async (token) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.token, token);
+    await secureStorage.setItem(STORAGE_KEYS.token, token);
   },
 
   clearCredentials: async () => {
-    await AsyncStorage.removeItem(STORAGE_KEYS.token);
+    await secureStorage.removeItem(STORAGE_KEYS.token);
   },
 
   isLoggedIn: async () => {
-    const token = await AsyncStorage.getItem(STORAGE_KEYS.token);
+    const token = await secureStorage.getItem(STORAGE_KEYS.token);
     return !!token;
   },
 
-  getToken: async () => AsyncStorage.getItem(STORAGE_KEYS.token),
+  getToken: async () => secureStorage.getItem(STORAGE_KEYS.token),
 };
 
 export const ChannelsAPI = {
@@ -1226,6 +1228,15 @@ export const LiveChatAPI = {
   assignAgent: ({ agentId, waNumber, channel, force = false }) =>
     omniApi.post('/WAMessage/UserLiveChat/AssignAgent', null, {
       params: { agentId, waNumber, channel, force },
+    }),
+
+  // POST /WAMessage/UserLiveChat/MarkMessagesAsRead
+  //   ?senderNumber=&messageId=&wabaNumber=
+  // Marks every inbound message from `senderNumber` on `wabaNumber` up to
+  // and including `messageId` (a wamid) as read on the server. Returns bool.
+  markAsRead: ({ senderNumber, messageId, wabaNumber }) =>
+    omniApi.post('/WAMessage/UserLiveChat/MarkMessagesAsRead', null, {
+      params: { senderNumber, messageId, wabaNumber },
     }),
 };
 

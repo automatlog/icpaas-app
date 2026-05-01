@@ -99,6 +99,10 @@ export default function Select({
       <TouchableOpacity
         onPress={onTriggerPress}
         activeOpacity={0.85}
+        accessibilityRole="combobox"
+        accessibilityLabel={placeholder || 'Select'}
+        accessibilityValue={{ text: value || 'No selection' }}
+        accessibilityState={{ expanded: open }}
         style={{ ...inputStyle(c), minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}
       >
         {icon && <Ionicons name={icon} size={16} color={c.textMuted} style={{ marginRight: 10 }} />}
@@ -111,7 +115,12 @@ export default function Select({
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {hasSelection && onClear && (
-            <TouchableOpacity onPress={(e) => { e.stopPropagation(); onClear(); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={(e) => { e.stopPropagation(); onClear(); }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear selection"
+            >
               <Ionicons name="close-circle" size={16} color={c.textMuted} />
             </TouchableOpacity>
           )}

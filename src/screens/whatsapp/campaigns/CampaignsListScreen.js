@@ -15,7 +15,8 @@ import {
   updateCampaignStatus,
 } from '../../../store/slices/campaignsSlice';
 import { pushNotification } from '../../../store/slices/notificationsSlice';
-import { BottomTabBar } from '../../shared/DashboardScreen';
+import BottomTabBar from '../../../components/BottomTabBar';
+import ScreenHeader from '../../../components/ScreenHeader';
 import toast from '../../../services/toast';
 
 const FILTERS = ['All', 'Live', 'Scheduled', 'Completed', 'Stuck', 'Failed'];
@@ -113,30 +114,28 @@ export default function CampaignsListScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? 56 : 36,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: c.rule,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>Campaigns</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('CampaignStep1')}
-          activeOpacity={0.85}
-          className="rounded-[10px] px-3 py-1.5 flex-row items-center"
-          style={{ backgroundColor: c.primary, gap: 4 }}
-        >
-          <Ionicons name="add" size={14} color="#FFFFFF" />
-          <Text className="text-[12px] font-bold text-white">New</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="megaphone-outline"
+        title="Campaigns"
+        right={(
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CampaignStep1')}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="New campaign"
+            style={{
+              flexDirection: 'row', alignItems: 'center',
+              paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+              backgroundColor: c.primary, gap: 4,
+            }}
+          >
+            <Ionicons name="add" size={14} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>New</Text>
+          </TouchableOpacity>
+        )}
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 130 }}

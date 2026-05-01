@@ -47,9 +47,11 @@ const stamp = () => {
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}, ${d.toLocaleTimeString()}`;
 };
 
-export default function CampaignScreen({ navigation }) {
+export default function CampaignScreen({ navigation, route: navRoute }) {
   const c = useBrand();
   const dispatch = useDispatch();
+  // Pre-selected template name when arriving from Templates → "send" icon.
+  const incomingTemplateName = navRoute?.params?.templateName || null;
 
   const [name, setName] = useState(stamp());
 
@@ -120,6 +122,15 @@ export default function CampaignScreen({ navigation }) {
       .then((res) => {
         const list = Array.isArray(res?.data) ? res.data : [];
         setTemplates(list);
+        // If we arrived via Templates → "Send", pre-select the named template.
+        if (incomingTemplateName) {
+          const incoming = list.find((t) => (t?.name || t?.id) === incomingTemplateName);
+          if (incoming) {
+            setTemplate(incoming);
+          } else {
+            toast.warning('Template not found', `"${incomingTemplateName}" isn't approved on ${sender.senderId}.`);
+          }
+        }
         if (!list.length) toast.warning('No templates', `Sender ${sender.senderId} has no approved templates yet.`);
       })
       .catch((e) => {

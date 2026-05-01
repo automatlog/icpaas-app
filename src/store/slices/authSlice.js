@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as secureStorage from '../../services/secureStorage';
 import { AuthAPI, DEFAULT_API_TOKEN } from '../../services/api';
 import { OMNI_HOST, OMNI_AUTH_LOGIN_PATH } from '../../config';
 import { resetLiveChat } from './liveChatSlice';
@@ -74,7 +74,7 @@ export const login = ({ username, password }) => async (dispatch) => {
   const remote = await tryRemoteLogin(username, password);
   if (remote) {
     if (!remote.ok) return { ok: false, error: remote.error };
-    await AsyncStorage.setItem('icpaas_token', remote.token);
+    await secureStorage.setItem('icpaas_token', remote.token);
     dispatch(loginSuccess(remote.user));
     return { ok: true };
   }

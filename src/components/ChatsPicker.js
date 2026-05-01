@@ -60,6 +60,8 @@ export default function ChatsPicker({ visible, onClose, onPick }) {
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
         <Pressable
           onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close chats picker"
           style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,23,42,0.18)' }]}
         />
 
@@ -88,6 +90,8 @@ export default function ChatsPicker({ visible, onClose, onPick }) {
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={() => onPick?.(ch)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${ch.label} chats`}
                 style={{ alignItems: 'center' }}
               >
                 <View

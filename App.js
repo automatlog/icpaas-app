@@ -17,10 +17,12 @@ import AppNavigator from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import LoadingScreen from './src/screens/auth/LoadingScreen';
 import AlertDialogHost from './src/components/AlertDialog';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import RealtimeProvider from './src/components/RealtimeProvider';
 import { store, persistor } from './src/store';
 import { setHydrated } from './src/store/slices/hydratedSlice';
 import { useFeed } from './src/theme';
+import { initPushNotifications } from './src/services/pushNotifications';
 
 function AppInner() {
   const c = useFeed(); // honours theme.mode override (default light)
@@ -38,6 +40,13 @@ function AppInner() {
     }, 4000);
     return () => clearTimeout(t);
   }, [dispatch]);
+
+  // Push notifications: requests permission, configures the foreground
+  // handler + Android channel, and bridges redux notification entries to
+  // OS banners. Safe to call repeatedly — internally idempotent.
+  useEffect(() => {
+    initPushNotifications();
+  }, []);
 
   // The OS status bar (Android) and the area behind it (iOS) match the
   // inset bands so transitions are seamless.
@@ -72,9 +81,13 @@ function AppInner() {
     <View style={outerStyle}>
       <StatusBar barStyle={barStyle} backgroundColor={statusBarBg} />
       <View style={innerStyle}>
-        <RealtimeProvider>
-          {isLoggedIn && isHydrated ? <AppNavigator /> : <AuthNavigator />}
-        </RealtimeProvider>
+        {/* ErrorBoundary catches render-phase throws in the navigator
+            tree so a single buggy screen can't blank the whole app. */}
+        <ErrorBoundary>
+          <RealtimeProvider>
+            {isLoggedIn && isHydrated ? <AppNavigator /> : <AuthNavigator />}
+          </RealtimeProvider>
+        </ErrorBoundary>
       </View>
       <FlashMessage position="top" />
       <AlertDialogHost />

@@ -21,6 +21,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import ScreenHeader from '../../components/ScreenHeader';
+import { SkeletonRow } from '../../components/Skeleton';
+import EmptyState from '../../components/EmptyState';
 import {
   selectChannels,
   selectSelectedChannel,
@@ -322,11 +324,10 @@ export default function LiveAgentInbox({ navigation, route }) {
 
       {/* List */}
       {chatList.loading && chatList.items.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          <ActivityIndicator color={c.primary} />
-          <Text style={{ color: c.textMuted, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' }}>
-            loading inbox
-          </Text>
+        <View style={{ flex: 1 }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonRow key={i} c={c} />
+          ))}
         </View>
       ) : (
         <FlatList
@@ -338,6 +339,11 @@ export default function LiveAgentInbox({ navigation, route }) {
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
+          // Each row is a fixed-height card (avatar 44 + paddingVertical 14×2
+          // = 72) plus a 1-px separator between rows. Hard-coding the layout
+          // lets RN skip the measure pass on every scroll tick — meaningful
+          // for inboxes with hundreds of rows.
+          getItemLayout={(_, index) => ({ length: 72, offset: 73 * index, index })}
           ItemSeparatorComponent={() => (
             <View style={{ height: 1, backgroundColor: c.rule, marginLeft: 76 }} />
           )}
@@ -412,15 +418,17 @@ export default function LiveAgentInbox({ navigation, route }) {
             );
           }}
           ListEmptyComponent={
-            <View style={{ alignItems: 'center', paddingVertical: 64, gap: 8 }}>
-              <Ionicons name="mail-outline" size={36} color={c.textDim} />
-              <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>No conversations</Text>
-              <Text style={{ color: c.textDim, fontSize: 12 }}>
-                {connection.status === 'disconnected'
-                  ? 'Offline — pull to retry when connection returns.'
-                  : 'New chats appear here in real time.'}
-              </Text>
-            </View>
+            <EmptyState
+              c={c}
+              icon="chatbubble-ellipses-outline"
+              accentIcons={['logo-whatsapp', 'logo-google']}
+              title="No conversations yet"
+              subtitle={
+                connection.status === 'disconnected'
+                  ? 'Offline — pull to retry when the connection comes back.'
+                  : 'Inbound WhatsApp and RCS messages will appear here in real time.'
+              }
+            />
           }
         />
       )}

@@ -195,6 +195,19 @@ const liveChatSlice = createSlice({
         state.chatList.items[i] = { ...state.chatList.items[i], UnReadCount: count };
       }
     },
+    // Local-only — clears the unread badge for a wa_id without waiting for
+    // a SignalR UpdateUnreadCount echo. Dispatched optimistically when the
+    // mark-as-read POST fires so the chat list reacts instantly.
+    clearUnreadFor(state, action) {
+      const { waId } = action.payload || {};
+      if (!waId) return;
+      const i = state.chatList.items.findIndex(
+        (c) => (c.WANumber || c.wa_id) === waId,
+      );
+      if (i >= 0) {
+        state.chatList.items[i] = { ...state.chatList.items[i], UnReadCount: 0 };
+      }
+    },
     updateDeliveryStatus(state, action) {
       // Payload: { messageId, status, timestamp }
       const { messageId: mid, status } = action.payload || {};
@@ -258,6 +271,7 @@ export const {
   prependThread,
   receiveLiveMessage,
   updateUnreadCount,
+  clearUnreadFor,
   updateDeliveryStatus,
   optimisticSend,
   sendResolved,

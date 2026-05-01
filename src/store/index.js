@@ -24,6 +24,7 @@ import notificationsReducer from './slices/notificationsSlice';
 import groupsReducer from './slices/groupsSlice';
 import themeReducer from './slices/themeSlice';
 import liveChatReducer from './slices/liveChatSlice';
+import formDraftsReducer from './slices/formDraftsSlice';
 import liveChatNotifier from './middleware/liveChatNotifier';
 
 const rootReducer = combineReducers({
@@ -39,6 +40,7 @@ const rootReducer = combineReducers({
   groups: groupsReducer,
   theme: themeReducer,
   liveChat: liveChatReducer,
+  formDrafts: formDraftsReducer,
 });
 
 const persistConfig = {
@@ -57,9 +59,21 @@ export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefault) =>
     getDefault({
+      // The serializable check walks the entire state tree on every
+      // action — fine in theory, but slices like `liveChat` (threads
+      // with hundreds of message objects) and `templates` (nested
+      // component arrays from gsauth) push the walk past the 32 ms
+      // warning threshold and made dev mode chatty. We exclude those
+      // hot slices and bump the warn threshold for the rest. The check
+      // is a no-op in production builds anyway.
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+        ignoredPaths: ['liveChat', 'templates', 'formDrafts', 'media'],
+        warnAfter: 200,
       },
+      // Same story for the immutability check — walking deeply nested
+      // template + thread objects exceeded the default budget.
+      immutableCheck: { warnAfter: 200 },
     }).concat(liveChatNotifier),
 });
 

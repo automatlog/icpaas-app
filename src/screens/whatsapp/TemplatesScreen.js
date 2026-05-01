@@ -10,8 +10,20 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../../theme';
 import { TemplatesAPI } from '../../services/api';
-import { BottomTabBar } from '../shared/DashboardScreen';
+import BottomTabBar from '../../components/BottomTabBar';
+import ScreenHeader from '../../components/ScreenHeader';
+import TemplatePreviewModal from '../../components/TemplatePreviewModal';
 import toast from '../../services/toast';
+import { getChannel } from '../../constants/channels';
+
+// Maps a channel id to the campaign composer route. Used by the "send"
+// action on each template card so tapping the icon lands the user in the
+// campaign for *that* product with the template pre-selected.
+const CAMPAIGN_ROUTE = {
+  whatsapp: 'WhatsAppCampaignStep1',
+  rcs: 'RcsCampaign',
+  sms: 'SmsCampaign',
+};
 
 // Category filters per WhatsApp template taxonomy.
 const CATEGORY_FILTERS = [
@@ -66,6 +78,14 @@ export default function TemplatesScreen({ navigation, route }) {
   const [err, setErr] = useState(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
+  const [preview, setPreview] = useState(null); // { template } or null
+
+  // Display-only pagination: gsauth doesn't paginate the template list, so
+  // we load everything once and reveal 8 cards at a time as the user
+  // scrolls. Search / category changes reset back to the first page so
+  // matches don't sit hidden below the fold.
+  const PAGE_SIZE = 8;
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
   const fetchTemplates = useCallback(async () => {
     setErr(null);
@@ -101,105 +121,171 @@ export default function TemplatesScreen({ navigation, route }) {
     });
   }, [templates, search, category]);
 
+  // Whenever the filtered set changes (new query, new filter, or fresh
+  // fetch), rewind pagination to the first page.
+  useEffect(() => {
+    setDisplayCount(PAGE_SIZE);
+  }, [search, category, templates]);
+
+  // Slice of `filtered` actually rendered. The full list still exists in
+  // memory so search continues to span everything — only the paint count
+  // is gated.
+  const visible = useMemo(() => filtered.slice(0, displayCount), [filtered, displayCount]);
+  const hasMore = filtered.length > displayCount;
+  const loadMore = useCallback(() => {
+    if (!hasMore) return;
+    setDisplayCount((n) => Math.min(n + PAGE_SIZE, filtered.length));
+  }, [hasMore, filtered.length]);
+
   const handleCopy = async (item) => {
     await Clipboard.setStringAsync(item.body || item.name || '');
     toast.success('Copied', `${item.name} copied to clipboard.`);
   };
 
+  // Send icon on a template card → land the user in the campaign composer
+  // for THIS channel with the template pre-selected. Falls back to the
+  // unified Send composer if the channel doesn't have a campaign route.
   const handleUse = (item) => {
-    navigation.navigate('Send', {
-      channel: String(item.channel || 'whatsapp').toLowerCase(),
-      templateName: item.name,
-    });
+    const ch = String(item.channel || channel).toLowerCase();
+    const route = CAMPAIGN_ROUTE[ch];
+    if (!route) {
+      navigation.navigate('Send', { channel: ch, templateName: item.name });
+      return;
+    }
+    if (ch === 'whatsapp') {
+      // The WhatsApp composer is a 3-step wizard; pre-seed the wizard
+      // draft so Step2 picks the template up via its own draft hydration.
+      navigation.navigate(route, { draft: { templateName: item.name } });
+    } else {
+      // RCS / SMS campaigns are single-screen — accept a templateName
+      // route param and pre-select on first render.
+      navigation.navigate(route, { templateName: item.name });
+    }
   };
 
+  // Tap card → open preview modal.
+  const handlePreview = (item) => setPreview(item);
+
+  // Channel-specific connection chip in the header subtitle.
+  const channelMeta = getChannel(channel) || { label: channel?.toUpperCase() };
+  const headerTitle = channel === 'whatsapp' ? 'Templates' : `${channelMeta.label} Templates`;
+
   const Header = (
-    <View style={{ paddingHorizontal: 18, paddingTop: Platform.OS === 'ios' ? 56 : 36, backgroundColor: c.bg }}>
-      {/* Top bar */}
-      <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <View className="flex-row items-center" style={{ gap: 8, flex: 1 }}>
-          <Text className="text-[18px] font-extrabold" style={{ color: c.text }}>
-            {channel === 'whatsapp' ? 'Templates' : `${channel.toUpperCase()} Templates`}
-          </Text>
-          <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.primarySoft }}>
-            <Text className="text-[10px] font-bold" style={{ color: c.primaryDeep }}>Active</Text>
-          </View>
-        </View>
-        <TouchableOpacity onPress={fetchTemplates} activeOpacity={0.7} className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: c.bgInput }}>
-          <Ionicons name="refresh" size={16} color={c.text} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('CreateTemplate', { channel })}
-          activeOpacity={0.85}
-          className="rounded-[10px] flex-row items-center px-3 py-2 ml-2"
-          style={{ backgroundColor: c.primary, gap: 4 }}
-        >
-          <Ionicons name="add" size={14} color="#FFFFFF" />
-          <Text className="text-[12px] font-bold text-white">New</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
-        <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.success }} />
-        <Text className="text-[12px] font-semibold" style={{ color: c.success }}>Connected · WhatsApp</Text>
-      </View>
-
-      <Text className="text-[12px] mb-3" style={{ color: c.textMuted }}>
-        Create, manage and personalize message templates
-      </Text>
-
-      {/* Search */}
-      <View
-        className="flex-row items-center rounded-[14px] px-4 mb-3"
-        style={{ backgroundColor: c.bgInput, gap: 10 }}
-      >
-        <Ionicons name="search-outline" size={16} color={c.textMuted} />
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search templates, messages…"
-          placeholderTextColor={c.textMuted}
-          className="flex-1 text-[13px]"
-          autoCorrect={false}
-          autoCapitalize="none"
-          style={[
-            { paddingVertical: Platform.OS === 'ios' ? 11 : 9, color: c.text },
-            Platform.select({ web: { outlineStyle: 'none' } }),
-          ]}
-        />
-        <Ionicons name="options-outline" size={16} color={c.textMuted} />
-      </View>
-
-      {/* Category filter chips */}
-      <View className="flex-row flex-wrap mb-2" style={{ gap: 6 }}>
-        {CATEGORY_FILTERS.map((f) => {
-          const active = category === f.id;
-          return (
+    <View style={{ backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        title={headerTitle}
+        badge="Active"
+        subtitle={{ text: `Connected · ${channelMeta.label}`, dotColor: c.success }}
+        right={(
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TouchableOpacity
-              key={f.id}
-              onPress={() => setCategory(f.id)}
-              activeOpacity={0.85}
-              className="flex-row items-center py-2 px-3 rounded-[14px]"
-              style={{ backgroundColor: active ? c.primary : c.bgInput, gap: 6 }}
+              onPress={fetchTemplates}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Reload templates"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{
+                width: 36, height: 36, borderRadius: 18,
+                alignItems: 'center', justifyContent: 'center',
+                backgroundColor: c.bgInput,
+              }}
             >
-              <Ionicons name={f.icon} size={12} color={active ? '#FFFFFF' : c.textMuted} />
-              <Text className="text-[12px]" style={{ color: active ? '#FFFFFF' : c.textMuted, fontWeight: active ? '700' : '500' }}>
-                {f.label}
-              </Text>
+              <Ionicons name="refresh" size={16} color={c.text} />
             </TouchableOpacity>
-          );
-        })}
-      </View>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('CreateTemplate', { channel })}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="New template"
+              style={{
+                flexDirection: 'row', alignItems: 'center',
+                paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+                backgroundColor: c.primary, gap: 4,
+              }}
+            >
+              <Ionicons name="add" size={14} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>New</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      />
 
-      {err ? (
-        <View className="rounded-[14px] p-3 mt-2 mb-2 border-l-[3px]" style={{ backgroundColor: c.bgInput, borderLeftColor: c.danger }}>
-          <Text className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: c.danger }}>Error</Text>
-          <Text className="text-[12px]" style={{ color: c.text }}>{err}</Text>
+      <View style={{ paddingHorizontal: 18, paddingTop: 12 }}>
+        <Text style={{ color: c.textMuted, fontSize: 12, marginBottom: 12 }}>
+          Create, manage and personalize message templates
+        </Text>
+
+        {/* Search */}
+        <View
+          style={{
+            flexDirection: 'row', alignItems: 'center',
+            backgroundColor: c.bgInput, borderRadius: 14,
+            paddingHorizontal: 16, gap: 10, marginBottom: 12,
+          }}
+        >
+          <Ionicons name="search-outline" size={16} color={c.textMuted} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search templates, messages…"
+            placeholderTextColor={c.textMuted}
+            autoCorrect={false}
+            autoCapitalize="none"
+            style={[
+              {
+                flex: 1, fontSize: 13, color: c.text,
+                paddingVertical: Platform.OS === 'ios' ? 11 : 9,
+              },
+              Platform.select({ web: { outlineStyle: 'none' } }),
+            ]}
+          />
+          <Ionicons name="options-outline" size={16} color={c.textMuted} />
         </View>
-      ) : null}
+
+        {/* Category filter chips */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+          {CATEGORY_FILTERS.map((f) => {
+            const active = category === f.id;
+            return (
+              <TouchableOpacity
+                key={f.id}
+                onPress={() => setCategory(f.id)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter ${f.label}`}
+                style={{
+                  flexDirection: 'row', alignItems: 'center',
+                  paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14,
+                  backgroundColor: active ? c.primary : c.bgInput, gap: 6,
+                }}
+              >
+                <Ionicons name={f.icon} size={12} color={active ? '#FFFFFF' : c.textMuted} />
+                <Text style={{ color: active ? '#FFFFFF' : c.textMuted, fontSize: 12, fontWeight: active ? '700' : '500' }}>
+                  {f.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {err ? (
+          <View
+            style={{
+              padding: 12, marginTop: 8, marginBottom: 8,
+              borderRadius: 14,
+              backgroundColor: c.bgInput,
+              borderLeftWidth: 3, borderLeftColor: c.danger,
+            }}
+          >
+            <Text style={{ color: c.danger, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.4, marginBottom: 4 }}>
+              Error
+            </Text>
+            <Text style={{ color: c.text, fontSize: 12 }}>{err}</Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -219,9 +305,17 @@ export default function TemplatesScreen({ navigation, route }) {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       {Header}
       <FlatList
-        data={filtered}
+        data={visible}
         keyExtractor={(item, i) => String(item.id ?? item.name ?? i)}
-        renderItem={({ item }) => <TemplateCard item={item} onCopy={handleCopy} onUse={handleUse} c={c} />}
+        renderItem={({ item }) => (
+          <TemplateCard
+            item={item}
+            onCopy={handleCopy}
+            onUse={handleUse}
+            onPreview={handlePreview}
+            c={c}
+          />
+        )}
         keyboardShouldPersistTaps="handled"
         numColumns={2}
         columnWrapperStyle={{ gap: 10 }}
@@ -233,6 +327,35 @@ export default function TemplatesScreen({ navigation, route }) {
             tintColor={c.primary}
           />
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          hasMore ? (
+            // Tappable fallback in case the user wants to advance manually
+            // (or onEndReached doesn't fire on a short list).
+            <TouchableOpacity
+              onPress={loadMore}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Load more templates"
+              style={{
+                marginTop: 8,
+                paddingVertical: 12,
+                borderRadius: 12,
+                backgroundColor: c.bgInput,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>
+                Load more · {filtered.length - displayCount} remaining
+              </Text>
+            </TouchableOpacity>
+          ) : filtered.length > 0 ? (
+            <Text style={{ textAlign: 'center', color: c.textDim, fontSize: 11, marginTop: 12 }}>
+              {filtered.length} template{filtered.length === 1 ? '' : 's'} · end of list
+            </Text>
+          ) : null
+        }
         ListEmptyComponent={
           !err ? (
             <View className="items-center py-12" style={{ gap: 8 }}>
@@ -241,7 +364,7 @@ export default function TemplatesScreen({ navigation, route }) {
               </View>
               <Text className="text-[15px] font-bold" style={{ color: c.text }}>No templates</Text>
               <Text className="text-[12px] text-center" style={{ color: c.textMuted, maxWidth: 280 }}>
-                Save an API key in Config, then pull down to refresh.
+                {search ? 'No matches for that search.' : 'Save an API key in Config, then pull down to refresh.'}
               </Text>
             </View>
           ) : null
@@ -249,17 +372,33 @@ export default function TemplatesScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}
       />
       <BottomTabBar c={c} navigation={navigation} active="home" />
+
+      <TemplatePreviewModal
+        c={c}
+        visible={preview != null}
+        template={preview}
+        onClose={() => setPreview(null)}
+        onUse={() => {
+          const item = preview;
+          setPreview(null);
+          if (item) handleUse(item);
+        }}
+      />
     </View>
   );
 }
 
-function TemplateCard({ item, onCopy, onUse, c }) {
+function TemplateCard({ item, onCopy, onUse, onPreview, c }) {
   const cat = CATEGORY_TINT(item.category);
   const st = STATUS_TINT(item.status, c);
   const updated = fmtDate(item.updatedAt || item.modifiedAt || item.createdAt);
 
   return (
-    <View
+    <TouchableOpacity
+      onPress={() => onPreview?.(item)}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={`Preview template ${item.name}`}
       className="rounded-[14px] p-3 mb-2.5"
       style={{ flex: 1, backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border, minHeight: 168 }}
     >
@@ -298,20 +437,27 @@ function TemplateCard({ item, onCopy, onUse, c }) {
 
       {/* 4 small action icons */}
       <View className="flex-row mt-auto pt-3" style={{ gap: 6 }}>
-        <ActionBtn c={c} icon="create-outline"  tint={c.primary} onPress={() => {}} />
-        <ActionBtn c={c} icon="copy-outline"    tint={c.primary} onPress={() => onCopy(item)} />
-        <ActionBtn c={c} icon="paper-plane-outline" tint={c.primary} onPress={() => onUse(item)} />
-        <ActionBtn c={c} icon="trash-outline"   tint={c.danger}  onPress={() => {}} />
+        <ActionBtn c={c} icon="create-outline"  tint={c.primary} onPress={() => {}} accessibilityLabel="Edit template" />
+        <ActionBtn c={c} icon="copy-outline"    tint={c.primary} onPress={() => onCopy(item)} accessibilityLabel="Copy template body" />
+        <ActionBtn c={c} icon="paper-plane-outline" tint={c.primary} onPress={() => onUse(item)} accessibilityLabel="Use in campaign" />
+        <ActionBtn c={c} icon="trash-outline"   tint={c.danger}  onPress={() => {}} accessibilityLabel="Delete template" />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
-function ActionBtn({ c, icon, tint, onPress }) {
+function ActionBtn({ c, icon, tint, onPress, accessibilityLabel }) {
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={(e) => {
+        // Prevent the row's outer Pressable (preview opener) from also
+        // firing when the user taps an action icon.
+        e?.stopPropagation?.();
+        onPress?.();
+      }}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       className="flex-1 h-8 rounded-[8px] items-center justify-center"
       style={{ borderWidth: 1, borderColor: tint + '55', backgroundColor: tint + '10' }}
     >

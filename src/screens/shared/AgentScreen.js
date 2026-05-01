@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeed, Fonts } from '../../theme';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const SEED_AGENTS = [
   { id: 'A-01', name: 'Rahul Mehra',  desk: 'Voice Desk',  ext: '1001', status: 'ON-CALL',   queue: 4, answered: 58, avgSec: 182, shift: 'Morning' },
@@ -101,17 +102,27 @@ export default function AgentScreen({ navigation }) {
 
   return (
     <View style={styles.root}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="people-circle-outline"
+        title="Agents"
+        right={(
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Add agent"
+            style={{
+              width: 36, height: 36, borderRadius: 18,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: c.bgInput,
+            }}
+          >
+            <Ionicons name="add" size={18} color={c.text} />
+          </TouchableOpacity>
+        )}
+      />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Agents</Text>
-          <TouchableOpacity style={styles.backBtn} activeOpacity={0.7}>
-            <Ionicons name="add" size={22} color={c.text} />
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.summaryRow}>
           <View style={styles.summaryCell}>
             <Text style={styles.summaryLabel}>On floor</Text>

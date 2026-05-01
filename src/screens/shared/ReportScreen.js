@@ -7,6 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFeed, Fonts } from '../../theme';
 import { VoiceAPI, IVRAPI } from '../../services/api';
+import { formatCurrency } from '../../services/format';
 import ScreenHeader from '../../components/ScreenHeader';
 
 const ymd = (d) => {
@@ -269,7 +270,7 @@ export default function ReportScreen({ navigation }) {
                   </View>
                   <View style={styles.cardCell}>
                     <Text style={styles.cellLabel}>Cost</Text>
-                    <Text style={styles.cellValue}>{cost != null ? `₹${Number(cost).toFixed(2)}` : '—'}</Text>
+                    <Text style={styles.cellValue}>{cost != null ? formatCurrency(cost) : '—'}</Text>
                   </View>
                 </View>
               </View>

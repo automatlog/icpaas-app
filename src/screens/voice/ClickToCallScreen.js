@@ -9,7 +9,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  Alert,
+  Alert, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
@@ -25,6 +25,7 @@ import ToggleRow from '../../components/ToggleRow';
 import SectionHeader from '../../components/SectionHeader';
 import Pill from '../../components/Pill';
 import ScreenHeader from '../../components/ScreenHeader';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 
 const TABS = [
   { id: 'single', label: 'Originate Call', icon: 'megaphone-outline' },
@@ -84,6 +85,11 @@ export default function ClickToCallScreen({ navigation }) {
   const [bulkSending, setBulkSending] = useState(false);
 
   const totalCount = 0; // wire to file-row counter once CSV parser is added
+
+  // Pull-to-refresh: agents/caller-IDs are static placeholders today, but the
+  // gesture stays in place so it lights up automatically once the gsauth
+  // /Voice/CallerIds + agents endpoints are wired in.
+  const { refreshing, onRefresh } = usePullToRefresh();
 
   // ── Single submit ─────────────────────────────────────────────────────
   const submitSingle = async () => {
@@ -212,6 +218,7 @@ export default function ClickToCallScreen({ navigation }) {
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 140, paddingHorizontal: 18 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
       >
         {tab === 'single' ? (
           <SingleTab

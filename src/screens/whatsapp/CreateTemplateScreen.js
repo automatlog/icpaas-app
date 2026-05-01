@@ -11,9 +11,11 @@ import { useDispatch } from 'react-redux';
 import { useBrand } from '../../theme';
 import { WhatsAppAPI, ChannelsAPI } from '../../services/api';
 import { pushNotification } from '../../store/slices/notificationsSlice';
-import { BottomTabBar } from '../shared/DashboardScreen';
+import BottomTabBar from '../../components/BottomTabBar';
+import ScreenHeader from '../../components/ScreenHeader';
 import toast from '../../services/toast';
 import FormField from '../../components/FormField';
+import useFormDraft from '../../hooks/useFormDraft';
 
 const CATEGORIES = [
   { id: 'MARKETING',     label: 'Marketing',     icon: 'megaphone',           desc: 'Promos, offers, retargeting.' },
@@ -35,28 +37,51 @@ export default function CreateTemplateScreen({ navigation, route }) {
   const c = useBrand();
   const dispatch = useDispatch();
 
+  // Composer fields (everything that's user-typed) live in a persisted draft
+  // so backgrounding the app or popping the stack doesn't lose work.
+  const [draft, patchDraft, clearDraft] = useFormDraft('whatsappCreateTemplate', {
+    channelId: route?.params?.wabaBusinessId || '',
+    name: '',
+    category: 'MARKETING',
+    language: 'en',
+    useHeader: false,
+    headerText: '',
+    headerExample: '',
+    bodyText: '',
+    bodyExamples: [],
+    useFooter: false,
+    footerText: '',
+    buttons: [],
+  });
+  const channelId    = draft.channelId;
+  const setChannelId = (v) => patchDraft({ channelId: typeof v === 'function' ? v(channelId) : v });
+  const name         = draft.name;
+  const setName      = (v) => patchDraft({ name: typeof v === 'function' ? v(name) : v });
+  const category     = draft.category;
+  const setCategory  = (v) => patchDraft({ category: typeof v === 'function' ? v(category) : v });
+  const language     = draft.language;
+  const setLanguage  = (v) => patchDraft({ language: typeof v === 'function' ? v(language) : v });
+  const useHeader    = draft.useHeader;
+  const setUseHeader = (v) => patchDraft({ useHeader: typeof v === 'function' ? v(useHeader) : v });
+  const headerText   = draft.headerText;
+  const setHeaderText = (v) => patchDraft({ headerText: typeof v === 'function' ? v(headerText) : v });
+  const headerExample = draft.headerExample;
+  const setHeaderExample = (v) => patchDraft({ headerExample: typeof v === 'function' ? v(headerExample) : v });
+  const bodyText     = draft.bodyText;
+  const setBodyText  = (v) => patchDraft({ bodyText: typeof v === 'function' ? v(bodyText) : v });
+  const bodyExamples = draft.bodyExamples;
+  const setBodyExamples = (v) => patchDraft({ bodyExamples: typeof v === 'function' ? v(bodyExamples) : v });
+  const useFooter    = draft.useFooter;
+  const setUseFooter = (v) => patchDraft({ useFooter: typeof v === 'function' ? v(useFooter) : v });
+  const footerText   = draft.footerText;
+  const setFooterText = (v) => patchDraft({ footerText: typeof v === 'function' ? v(footerText) : v });
+  const buttons      = draft.buttons;
+  const setButtons   = (v) => patchDraft({ buttons: typeof v === 'function' ? v(buttons) : v });
+
   const [channels, setChannels] = useState([]);
-  const [channelId, setChannelId] = useState(route?.params?.wabaBusinessId || '');
   const [showChannel, setShowChannel] = useState(false);
   const [loadingCh, setLoadingCh] = useState(true);
-
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('MARKETING');
-  const [language, setLanguage] = useState('en');
   const [showLang, setShowLang] = useState(false);
-
-  const [useHeader, setUseHeader] = useState(false);
-  const [headerText, setHeaderText] = useState('');
-  const [headerExample, setHeaderExample] = useState('');
-
-  const [bodyText, setBodyText] = useState('');
-  const [bodyExamples, setBodyExamples] = useState([]);
-
-  const [useFooter, setUseFooter] = useState(false);
-  const [footerText, setFooterText] = useState('');
-
-  const [buttons, setButtons] = useState([]);
-
   const [submitting, setSubmitting] = useState(false);
 
   // Auth-only mode rules: no URLs / media / emojis in body, params capped 15 chars.
@@ -139,6 +164,8 @@ export default function CreateTemplateScreen({ navigation, route }) {
         title: `Template "${payload.name}" submitted`,
         body: `Pending Meta review. Category: ${category}. Language: ${language}.`,
       }));
+      // Submitted successfully — wipe the persisted draft.
+      clearDraft();
       navigation.goBack();
     } catch (e) {
       toast.error('Submit failed', e?.message || 'Meta rejected the template.');
@@ -398,23 +425,31 @@ export default function CreateTemplateScreen({ navigation, route }) {
 
 function Header({ c, navigation, title, onSave, saving }) {
   return (
-    <View
-      className="flex-row items-center px-4"
-      style={{
-        paddingTop: Platform.OS === 'ios' ? 56 : 36,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: c.rule,
-      }}
-    >
-      <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-        <Ionicons name="arrow-back" size={22} color={c.text} />
-      </TouchableOpacity>
-      <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>{title}</Text>
-      <TouchableOpacity onPress={onSave} disabled={saving} className="w-10 h-10 items-center justify-center" activeOpacity={0.7}>
-        {saving ? <ActivityIndicator color={c.primary} size="small" /> : <Ionicons name="checkmark" size={22} color={c.primary} />}
-      </TouchableOpacity>
-    </View>
+    <ScreenHeader
+      c={c}
+      onBack={() => navigation.goBack()}
+      icon="document-text-outline"
+      title={title}
+      right={(
+        <TouchableOpacity
+          onPress={onSave}
+          disabled={saving}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Save template"
+          accessibilityState={{ disabled: !!saving, busy: !!saving }}
+          style={{
+            width: 36, height: 36, borderRadius: 18,
+            alignItems: 'center', justifyContent: 'center',
+            backgroundColor: c.primarySoft,
+          }}
+        >
+          {saving
+            ? <ActivityIndicator color={c.primary} size="small" />
+            : <Ionicons name="checkmark" size={18} color={c.primary} />}
+        </TouchableOpacity>
+      )}
+    />
   );
 }
 

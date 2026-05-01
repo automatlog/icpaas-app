@@ -12,6 +12,8 @@ import { selectGroups } from '../../../store/slices/groupsSlice';
 import AddRecipientsModal from '../../shared/AddRecipientsModal';
 import ScheduleModal from '../../shared/ScheduleModal';
 import Select from '../../../components/Select';
+import ScreenHeader from '../../../components/ScreenHeader';
+import useFormDraft from '../../../hooks/useFormDraft';
 
 const fmtNow = () => {
   const d = new Date();
@@ -24,21 +26,40 @@ const countNumbers = (raw) =>
 
 export default function CampaignStep1Screen({ navigation, route }) {
   const c = useBrand();
-  const draft = route?.params?.draft || {};
+  const routeDraft = route?.params?.draft || {};
   const groups = useSelector(selectGroups);
 
-  const [name, setName] = useState(draft.name || fmtNow());
-  const [channelId, setChannelId] = useState(draft.channelId || '');
+  // Persisted draft survives stack pops, app restarts. Route-params draft
+  // (passed back from Step2 via Previous) wins when present, since the user
+  // explicitly carried newer values backward.
+  const [persistedDraft, patchDraft] = useFormDraft('whatsappCampaign', {
+    name: '',
+    channelId: '',
+    numbers: '',
+    removeDup: true,
+    removeBlack: true,
+    scheduleNow: false,
+    schedTime: '',
+  });
+  const initial = { ...persistedDraft, ...routeDraft };
+
+  const [name, setName] = useState(initial.name || fmtNow());
+  const [channelId, setChannelId] = useState(initial.channelId || '');
   const [channels, setChannels] = useState([]);
   const [loadingCh, setLoadingCh] = useState(false);
   const [showChannels, setShowChannels] = useState(false);
   const [showRecipients, setShowRecipients] = useState(false);
-  const [numbers, setNumbers] = useState(draft.numbers || '');
-  const [removeDup, setRemoveDup] = useState(draft.removeDup ?? true);
-  const [removeBlack, setRemoveBlack] = useState(draft.removeBlack ?? true);
-  const [scheduleNow, setScheduleNow] = useState(draft.scheduleNow ?? false);
-  const [schedTime, setSchedTime]     = useState(draft.schedTime || '');
+  const [numbers, setNumbers] = useState(initial.numbers || '');
+  const [removeDup, setRemoveDup] = useState(initial.removeDup ?? true);
+  const [removeBlack, setRemoveBlack] = useState(initial.removeBlack ?? true);
+  const [scheduleNow, setScheduleNow] = useState(initial.scheduleNow ?? false);
+  const [schedTime, setSchedTime]     = useState(initial.schedTime || '');
   const [showSchedule, setShowSchedule] = useState(false);
+
+  // Mirror local state into the persisted draft on every change.
+  useEffect(() => {
+    patchDraft({ name, channelId, numbers, removeDup, removeBlack, scheduleNow, schedTime });
+  }, [patchDraft, name, channelId, numbers, removeDup, removeBlack, scheduleNow, schedTime]);
 
   useEffect(() => {
     setLoadingCh(true);
@@ -53,7 +74,7 @@ export default function CampaignStep1Screen({ navigation, route }) {
     if (!channelId) { Alert.alert('Required', 'Pick a WABA channel.'); return; }
     if (countNumbers(numbers) === 0) { Alert.alert('Required', 'Add recipient numbers.'); return; }
     navigation.navigate('CampaignStep2', {
-      draft: { ...draft, name: name.trim(), channelId, channels, numbers, removeDup, removeBlack, scheduleNow, schedTime },
+      draft: { ...routeDraft, name: name.trim(), channelId, channels, numbers, removeDup, removeBlack, scheduleNow, schedTime },
     });
   };
 
@@ -198,22 +219,13 @@ export default function CampaignStep1Screen({ navigation, route }) {
 
 function Header({ c, navigation, title }) {
   return (
-    <View
-      className="flex-row items-center px-4"
-      style={{
-        paddingTop: Platform.OS === 'ios' ? 56 : 36,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: c.rule,
-        backgroundColor: c.bg,
-      }}
-    >
-      <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-        <Ionicons name="arrow-back" size={22} color={c.text} />
-      </TouchableOpacity>
-      <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>{title}</Text>
-      <View style={{ width: 40 }} />
-    </View>
+    <ScreenHeader
+      c={c}
+      onBack={() => navigation.goBack()}
+      icon="megaphone-outline"
+      title={title}
+      badge="WhatsApp"
+    />
   );
 }
 

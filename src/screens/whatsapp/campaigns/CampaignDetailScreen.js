@@ -13,7 +13,8 @@ import {
   updateCampaignStatus,
 } from '../../../store/slices/campaignsSlice';
 import { pushNotification } from '../../../store/slices/notificationsSlice';
-import { BottomTabBar } from '../../shared/DashboardScreen';
+import BottomTabBar from '../../../components/BottomTabBar';
+import ScreenHeader from '../../../components/ScreenHeader';
 import toast from '../../../services/toast';
 
 const STATUS_TINT = {
@@ -320,25 +321,27 @@ export default function CampaignDetailScreen({ navigation, route }) {
 
 function Header({ c, navigation, title, onMore }) {
   return (
-    <View
-      className="flex-row items-center px-4"
-      style={{
-        paddingTop: Platform.OS === 'ios' ? 56 : 36,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: c.rule,
-      }}
-    >
-      <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-        <Ionicons name="arrow-back" size={22} color={c.text} />
-      </TouchableOpacity>
-      <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>{title}</Text>
-      {onMore ? (
-        <TouchableOpacity onPress={onMore} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="trash-outline" size={20} color={c.danger} />
+    <ScreenHeader
+      c={c}
+      onBack={() => navigation.goBack()}
+      icon="megaphone-outline"
+      title={title}
+      right={onMore ? (
+        <TouchableOpacity
+          onPress={onMore}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Delete campaign"
+          style={{
+            width: 36, height: 36, borderRadius: 18,
+            alignItems: 'center', justifyContent: 'center',
+            backgroundColor: c.bgInput,
+          }}
+        >
+          <Ionicons name="trash-outline" size={18} color={c.danger} />
         </TouchableOpacity>
-      ) : <View style={{ width: 40 }} />}
-    </View>
+      ) : null}
+    />
   );
 }
 

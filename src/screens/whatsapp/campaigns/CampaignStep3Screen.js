@@ -13,6 +13,8 @@ import toast from '../../../services/toast';
 import {
   Stepper, Card, SectionTitle, PrimaryButton, SecondaryButton,
 } from './CampaignStep1Screen';
+import ScreenHeader from '../../../components/ScreenHeader';
+import useFormDraft from '../../../hooks/useFormDraft';
 
 const toList = (raw) =>
   String(raw || '').split(/[\n,;\s]+/).map((s) => s.trim()).filter(Boolean);
@@ -24,6 +26,8 @@ export default function CampaignStep3Screen({ navigation, route }) {
   const dispatch = useDispatch();
   const draft = route?.params?.draft || {};
   const [launching, setLaunching] = useState(false);
+  // Step1 mirrors its inputs into this draft; Step3 owns the wipe-on-success.
+  const [, , clearWizardDraft] = useFormDraft('whatsappCampaign', {});
 
   const numbersRaw = useMemo(() => toList(draft.numbers), [draft.numbers]);
   const numbers = useMemo(() => (draft.removeDup ? dedup(numbersRaw) : numbersRaw), [numbersRaw, draft.removeDup]);
@@ -104,6 +108,9 @@ export default function CampaignStep3Screen({ navigation, route }) {
         }));
       }
 
+      // Wizard finished (any outcome short of a thrown exception) — wipe
+      // the persisted Step1 draft so the next launch starts blank.
+      clearWizardDraft();
       navigation.navigate('CampaignsList');
     } catch (e) {
       toast.error('Launch failed', e?.message || 'Unknown error');
@@ -162,22 +169,13 @@ export default function CampaignStep3Screen({ navigation, route }) {
 
 function Header({ c, navigation, title }) {
   return (
-    <View
-      className="flex-row items-center px-4"
-      style={{
-        paddingTop: Platform.OS === 'ios' ? 56 : 36,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: c.rule,
-        backgroundColor: c.bg,
-      }}
-    >
-      <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-        <Ionicons name="arrow-back" size={22} color={c.text} />
-      </TouchableOpacity>
-      <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>{title}</Text>
-      <View style={{ width: 40 }} />
-    </View>
+    <ScreenHeader
+      c={c}
+      onBack={() => navigation.goBack()}
+      icon="megaphone-outline"
+      title={title}
+      badge="WhatsApp"
+    />
   );
 }
 

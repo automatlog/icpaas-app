@@ -21,4 +21,10 @@ export const LIVE_CHAT_MESSAGE_PAGE_SIZE = 50;
 // fall back to the hard-coded demo credentials. Once the backend ships
 // (e.g. POST /api/auth/mobile-token returning { token, user }), set this
 // to its path and real auth flips on automatically.
+//
+// Verified 2026-05-01: POST https://icpaas.in/api/auth/mobile-token → 404.
+// Endpoint not deployed yet. Probed 6 likely path variations — none exist.
+// Keep this null until the backend confirms the endpoint is live AND the
+// UserLiveChat MVC controllers + WhatsAppProgressHub accept bearer auth
+// (currently both are cookie-only — see docs/liveAgentV1Status.md).
 export const OMNI_AUTH_LOGIN_PATH = null;

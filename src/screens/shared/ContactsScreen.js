@@ -17,7 +17,8 @@ import {
   removeGroup,
 } from '../../store/slices/groupsSlice';
 import { setContacts as setContactsAction, upsertContact } from '../../store/slices/contactsSlice';
-import { BottomTabBar } from './DashboardScreen';
+import BottomTabBar from '../../components/BottomTabBar';
+import ScreenHeader from '../../components/ScreenHeader';
 import toast from '../../services/toast';
 import FormField from '../../components/FormField';
 
@@ -45,22 +46,12 @@ export default function ContactsScreen({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? 56 : 36,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: c.rule,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>Contacts</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="people-outline"
+        title="Contacts"
+      />
 
       {/* Tab toggle */}
       <View className="flex-row mx-4 mt-3" style={{ gap: 4, borderBottomWidth: 1, borderBottomColor: c.rule }}>

@@ -50,6 +50,8 @@ export default function GradientButton({
   textStyle,
   colors,                // optional override; takes precedence over variant
   testID,
+  accessibilityLabel,    // overrides the auto-derived label (title)
+  accessibilityHint,
 }) {
   const v = VARIANTS[variant] || VARIANTS.primary;
   const s = SIZES[size] || SIZES.md;
@@ -62,6 +64,10 @@ export default function GradientButton({
       disabled={inactive}
       activeOpacity={0.85}
       testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: inactive, busy: loading }}
       style={[{ alignSelf: fullWidth ? 'stretch' : 'flex-start' }, style]}
     >
       <LinearGradient

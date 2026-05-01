@@ -22,10 +22,11 @@ import SectionHeader from '../../components/SectionHeader';
 import Pill from '../../components/Pill';
 import ScheduleModal from '../shared/ScheduleModal';
 import ScreenHeader from '../../components/ScreenHeader';
+import { formatCurrency } from '../../services/format';
 
 const VOICE_PLANS = [
-  { id: '15s', label: '15-second pulse · ₹0.18/pulse' },
-  { id: '30s', label: '30-second pulse · ₹0.32/pulse' },
+  { id: '15s', label: `15-second pulse · ${formatCurrency(0.18)}/pulse` },
+  { id: '30s', label: `30-second pulse · ${formatCurrency(0.32)}/pulse` },
 ];
 
 const CALLER_IDS = [

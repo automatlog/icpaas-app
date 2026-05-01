@@ -2,24 +2,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Platform, RefreshControl, Alert, useColorScheme,
+  Platform, RefreshControl, Alert,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { SMSAPI } from '../../services/api';
+import { useBrand } from '../../theme';
 import InfoRow from '../../components/InfoRow';
-
-const C = {
-  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0' },
-  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', pink: '#E6428A', cyan: '#2FB8C4' },
-};
+import ScreenHeader from '../../components/ScreenHeader';
+import { SkeletonCard } from '../../components/Skeleton';
+import EmptyState from '../../components/EmptyState';
 
 const TINTS = ['#F2A8B3', '#8FCFBD', '#D4B3E8', '#E8D080', '#E8B799', '#9CB89A'];
 
 export default function SenderIdScreen({ navigation }) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
+  const c = useBrand();
+  const dark = c.scheme === 'dark';
 
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,24 +55,33 @@ export default function SenderIdScreen({ navigation }) {
 
   return (
     <View className={`flex-1 ${rootBg}`}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="chatbubble-outline"
+        title="Sender IDs"
+        badge="SMS"
+        right={(
+          <TouchableOpacity
+            onPress={load}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Reload sender IDs"
+            style={{
+              width: 36, height: 36, borderRadius: 18,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: c.bgInput,
+            }}
+          >
+            <Ionicons name="refresh" size={16} color={c.text} />
+          </TouchableOpacity>
+        )}
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 120 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.pink} />}
+        contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 22, paddingBottom: 120 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.danger} />}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-widest uppercase ${textMuted}`}>SMS</Text>
-            <Text className={`text-[24px] font-bold tracking-tight ${textInk}`}>Sender IDs</Text>
-          </View>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={load} activeOpacity={0.7}>
-            <Ionicons name="refresh" size={18} color={c.ink} />
-          </TouchableOpacity>
-        </View>
-
         <View className={`flex-row rounded-[18px] p-4 mb-3 ${softBg}`} style={{ gap: 12 }}>
           <View className="flex-1">
             <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Senders</Text>
@@ -87,21 +94,26 @@ export default function SenderIdScreen({ navigation }) {
         </View>
 
         {loading ? (
-          <View className="py-16 items-center" style={{ gap: 10 }}>
-            <ActivityIndicator color={c.pink} />
-            <Text className={`text-xs tracking-widest uppercase ${textMuted}`}>loading sender ids</Text>
+          <View>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonCard key={i} c={c} />
+            ))}
           </View>
         ) : err ? (
-          <View className={`rounded-[16px] p-4 border-l-[3px] ${softBg}`} style={{ borderLeftColor: c.pink }}>
-            <Text className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: c.pink }}>Fetch error</Text>
+          <View className={`rounded-[16px] p-4 border-l-[3px] ${softBg}`} style={{ borderLeftColor: c.danger }}>
+            <Text className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: c.danger }}>Fetch error</Text>
             <Text className={`text-[13px] ${textInk}`}>{err}</Text>
           </View>
         ) : senders.length === 0 ? (
-          <View className="py-16 items-center" style={{ gap: 8 }}>
-            <Ionicons name="chatbubble-outline" size={44} color={c.dim} />
-            <Text className={`text-[15px] font-semibold ${textInk}`}>No SMS senders</Text>
-            <Text className={`text-xs ${textDim}`}>Save a gsauth token in Config.</Text>
-          </View>
+          <EmptyState
+            c={c}
+            icon="chatbubble-outline"
+            accentIcons={['checkmark-circle', 'shield-checkmark']}
+            title="No SMS senders"
+            subtitle="DLT-registered sender IDs from gsauth.com show up here once approved by the regulator."
+            ctaLabel="Open Config"
+            onCtaPress={() => navigation.navigate('Config')}
+          />
         ) : (
           senders.map((s, i) => {
             const tint = TINTS[i % TINTS.length];
@@ -121,7 +133,7 @@ export default function SenderIdScreen({ navigation }) {
                     onPress={() => navigation.navigate('SmsTemplates', { senderId: s.senderId })}
                     activeOpacity={0.85}
                     className="rounded-[14px] px-3 py-2 flex-row items-center"
-                    style={{ backgroundColor: c.ink, gap: 6 }}
+                    style={{ backgroundColor: c.text, gap: 6 }}
                   >
                     <Ionicons name="document-text-outline" size={12} color={c.bg} />
                     <Text className="text-[11px] font-semibold" style={{ color: c.bg }}>Templates</Text>

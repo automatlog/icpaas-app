@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Image,
-  Alert, Platform, ActivityIndicator, Switch,
+  Alert, Platform, ActivityIndicator, Switch, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -11,9 +11,11 @@ import { useBrand } from '../../theme';
 import { AuthAPI } from '../../services/api';
 import { logoutAndCleanup } from '../../store/slices/authSlice';
 import { selectThemeMode, setThemeMode } from '../../store/slices/themeSlice';
-import { BottomTabBar } from './DashboardScreen';
+import BottomTabBar from '../../components/BottomTabBar';
 import toast from '../../services/toast';
 import dialog from '../../services/dialog';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
+import haptics from '../../services/haptics';
 import FormField from '../../components/FormField';
 import ScreenHeader from '../../components/ScreenHeader';
 import Select from '../../components/Select';
@@ -52,10 +54,26 @@ export default function ProfileScreen({ navigation }) {
     AuthAPI.getToken().then((t) => setApiKey(t || ''));
   }, []);
 
+  // Pull-to-refresh: re-read the saved token from storage so the field
+  // reflects any change the user made in Config since opening Profile.
+  const { refreshing, onRefresh } = usePullToRefresh(async () => {
+    const t = await AuthAPI.getToken();
+    setApiKey(t || '');
+    setApiKeyDirty(false);
+    setKeyScopes(null);
+  });
+
   const copyKey = async () => {
-    if (!apiKey) { toast.warning('No API key', 'Save one in Config first.'); return; }
+    if (!apiKey) { toast.warning('No API token', 'Save one in Config first.'); return; }
+    const ok = await dialog.confirm({
+      title: 'Copy API token?',
+      message: 'This is a secret bearer token — anyone with it can send messages on your account. Only paste it into trusted tools.',
+      confirmText: 'Copy anyway',
+      cancelText: 'Cancel',
+    });
+    if (!ok) return;
     await Clipboard.setStringAsync(apiKey);
-    toast.success('Copied', 'Public API key copied to clipboard.');
+    toast.success('Copied', 'Token copied — keep it private.');
   };
 
   const saveAndTestKey = async () => {
@@ -130,6 +148,7 @@ export default function ProfileScreen({ navigation }) {
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 130 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
       >
         {/* Avatar + name card */}
         <View
@@ -284,16 +303,17 @@ export default function ProfileScreen({ navigation }) {
                 <TextInput value={pin} onChangeText={setPin} style={inputStyle(c)} placeholderTextColor={c.textMuted} placeholder="—" keyboardType="number-pad" />
               </FormField>
 
-              <FormField caps c={c} label="Public API Key" hint="Used for gsauth.com (WhatsApp / SMS / RCS) + icpaas.in (Voice / wallet).">
+              <FormField caps c={c} label="API Token" hint="Secret bearer for gsauth.com (WhatsApp / SMS / RCS) + icpaas.in (Voice / wallet). Treat like a password.">
                 <View className="flex-row items-center" style={{ gap: 8 }}>
                   <TextInput
                     value={apiKey}
                     onChangeText={(t) => { setApiKey(t); setApiKeyDirty(true); setKeyScopes(null); }}
                     style={[inputStyle(c), { flex: 1, fontFamily: 'monospace', fontSize: 12 }]}
                     placeholderTextColor={c.textMuted}
-                    placeholder="Paste your gsauth bearer here"
+                    placeholder="Paste your gsauth bearer token"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    secureTextEntry={!apiKeyDirty}
                   />
                   <TouchableOpacity
                     onPress={copyKey}
@@ -415,7 +435,7 @@ export default function ProfileScreen({ navigation }) {
                 </View>
                 <Switch
                   value={isDark}
-                  onValueChange={(v) => dispatch(setThemeMode(v ? 'dark' : 'light'))}
+                  onValueChange={(v) => { haptics.select(); dispatch(setThemeMode(v ? 'dark' : 'light')); }}
                   trackColor={{ false: c.bgInput, true: c.primary }}
                   thumbColor="#FFFFFF"
                 />
@@ -426,7 +446,7 @@ export default function ProfileScreen({ navigation }) {
               className="rounded-[20px] p-4 mb-4"
               style={{ backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border }}
             >
-              <SecurityRow c={c} icon="key-outline"        title="API key & wallet"     subtitle="Manage gsauth bearer + balance" onPress={() => navigation.navigate('Config')} />
+              <SecurityRow c={c} icon="key-outline"        title="API token & wallet"   subtitle="Manage gsauth bearer + balance" onPress={() => navigation.navigate('Config')} />
               <SecurityRow c={c} icon="logo-whatsapp"      title="WABA channels"        subtitle="WhatsApp Business numbers"      onPress={() => navigation.navigate('WabaChannels')} />
               <SecurityRow c={c} icon="musical-notes-outline" title="Voice media library" subtitle="Uploaded .wav files"           onPress={() => navigation.navigate('MediaLibrary')} />
               <SecurityRow c={c} icon="lock-closed-outline" title="Change passphrase"   subtitle="Update demo credentials"        onPress={() => toast.info('Coming soon', 'Passphrase change is not wired yet.')} last />

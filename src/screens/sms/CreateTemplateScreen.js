@@ -12,6 +12,7 @@ import { SMSAPI } from '../../services/api';
 import { pushNotification } from '../../store/slices/notificationsSlice';
 import toast from '../../services/toast';
 import GradientButton from '../../components/GradientButton';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const TYPES = [
   { id: 'Normal',         label: 'Normal',         icon: 'chatbubble-outline',     desc: 'Standard transactional or promotional.' },
@@ -84,20 +85,17 @@ export default function CreateTemplateScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="document-text-outline"
+        title="Create Template"
+        badge="SMS"
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 36, paddingBottom: 140, paddingHorizontal: 18 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 140, paddingHorizontal: 18 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
-          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
-            <Ionicons name="arrow-back" size={22} color={c.text} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: c.textMuted }}>SMS</Text>
-            <Text className="text-[20px] font-extrabold" style={{ color: c.text }}>Create template</Text>
-          </View>
-        </View>
-
         {/* Sender selector */}
         <Text className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: c.textMuted }}>Sender ID</Text>
         <TouchableOpacity
