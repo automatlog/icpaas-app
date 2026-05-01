@@ -30,6 +30,7 @@ import {
   sendLocation as sendLocationAction,
   sendTemplate as sendTemplateAction,
   uploadMedia,
+  markChatRead,
 } from '../../services/liveChatActions';
 import LiveAgentAttachMenu from '../../components/LiveAgentAttachMenu';
 import LiveAgentLocationModal from '../../components/LiveAgentLocationModal';
@@ -107,7 +108,12 @@ export default function LiveAgentChat({ route, navigation }) {
   const [locationOpen, setLocationOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [picking, setPicking] = useState(false); // image/video/doc upload spinner
+  // { messageId, snippet, fromMe } — bubble the user long-pressed to reply to.
+  const [replyTo, setReplyTo] = useState(null);
   const flatRef = useRef(null);
+  // Tracks the wamid of the last inbound message we already POSTed
+  // MarkMessagesAsRead for, so re-renders don't fire duplicate calls.
+  const lastMarkedIdRef = useRef(null);
 
   // Mark this conversation active so the slice suppresses unread bumps for
   // incoming messages addressed to it. Reset on unmount.
@@ -115,10 +121,36 @@ export default function LiveAgentChat({ route, navigation }) {
     if (!waId) return;
     dispatch(setActive({ waId, channel }));
     dispatch(loadMessages({ waId, channel }));
+    // Conversation switched — forget what we marked for the previous one
+    // and clear any reply state from the prior chat.
+    lastMarkedIdRef.current = null;
+    setReplyTo(null);
     return () => {
       dispatch(setActive({ waId: null, channel: null }));
     };
   }, [dispatch, waId, channel]);
+
+  // Mark-as-read: whenever the latest inbound message id changes (mount,
+  // pagination, or a SignalR ReceivedMessage while the chat is open), POST
+  // OmniApp's MarkMessagesAsRead so the server-side unread state matches
+  // what the agent has actually seen.
+  useEffect(() => {
+    if (!waId || !channel || !thread.messages?.length) return;
+
+    let latestInboundId = null;
+    for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
+      const m = thread.messages[i];
+      if (m?.ChatType === 'IN' && m?.MessageId) {
+        latestInboundId = m.MessageId;
+        break;
+      }
+    }
+    if (!latestInboundId) return;
+    if (latestInboundId === lastMarkedIdRef.current) return;
+
+    lastMarkedIdRef.current = latestInboundId;
+    dispatch(markChatRead({ waId, channel, messageId: latestInboundId }));
+  }, [dispatch, waId, channel, thread.messages]);
 
   // Inverted FlatList wants newest-first. Slice keeps oldest-first to match
   // the API; reverse only at render.
@@ -156,6 +188,8 @@ export default function LiveAgentChat({ route, navigation }) {
 
     setSending(true);
     setInput('');
+    const replyToMessageId = replyTo?.messageId || undefined;
+    setReplyTo(null);
 
     // After dispatch, the new row is at the END of the messages array (oldest-
     // first), which means index 0 of `reversed`. Inverted list shows that at
@@ -165,7 +199,7 @@ export default function LiveAgentChat({ route, navigation }) {
 
     // sendTextAction handles optimistic render + Meta Cloud API call (via
     // the gsauth proxy) + wamid reconciliation + Sent/Failed dispatch.
-    await dispatch(sendTextAction({ waId, channel, message: text }));
+    await dispatch(sendTextAction({ waId, channel, message: text, replyToMessageId }));
     setSending(false);
   };
 
@@ -323,9 +357,23 @@ export default function LiveAgentChat({ route, navigation }) {
     const me = item.ChatType === 'OUT';
     const text = item.MessageText || '';
     const time = item.ReceivedDate ? moment(item.ReceivedDate).format('h:mm A') : '';
+
+    // Long-press → set reply target. Need a real wamid (MessageId) — Meta
+    // requires it for the context block. Optimistic temp rows that haven't
+    // reconciled yet just don't allow reply.
+    const onLongPressBubble = () => {
+      const mid = item.MessageId;
+      if (!mid) return;
+      const snippet = (text || `[${item.MessageType || 'message'}]`).slice(0, 80);
+      setReplyTo({ messageId: mid, snippet, fromMe: me });
+    };
+
     return (
       <View className={`mb-2 ${me ? 'items-end' : 'items-start'}`}>
-        <View
+        <TouchableOpacity
+          onLongPress={onLongPressBubble}
+          activeOpacity={0.85}
+          delayLongPress={300}
           className="rounded-[18px] px-3.5 py-2.5 max-w-[82%]"
           style={{
             backgroundColor: me ? c.primary : (dark ? '#141418' : '#F2F2F5'),
@@ -333,13 +381,35 @@ export default function LiveAgentChat({ route, navigation }) {
             borderColor: item.DeliveryStatus === 'Failed' ? c.danger : 'transparent',
           }}
         >
+          {/* Quote-of-message preview shown when this bubble was itself a reply */}
+          {item.ReplyToMessageId ? (
+            <View
+              style={{
+                paddingLeft: 8,
+                paddingVertical: 4,
+                marginBottom: 6,
+                borderLeftWidth: 3,
+                borderLeftColor: me ? '#FFFFFF55' : c.primary,
+                opacity: 0.75,
+              }}
+            >
+              <Text
+                className="text-[11px]"
+                style={{ color: me ? '#FFFFFF' : c.textMuted, fontStyle: 'italic' }}
+                numberOfLines={2}
+              >
+                {item.ReplyToText || 'Replying to message'}
+              </Text>
+            </View>
+          ) : null}
+
           <Text
             className="text-[14px] leading-5"
             style={{ color: me ? '#FFFFFF' : c.text }}
           >
             {text}
           </Text>
-        </View>
+        </TouchableOpacity>
         <View
           className={`flex-row mt-1 px-1 items-center ${me ? 'flex-row-reverse' : ''}`}
           style={{ gap: 4 }}
@@ -470,6 +540,44 @@ export default function LiveAgentChat({ route, navigation }) {
           </Text>
         </View>
       )}
+
+      {/* Reply / quote chip — visible while a bubble is selected for reply.
+          Tap × to clear; otherwise the next text send carries the context. */}
+      {replyTo ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            marginHorizontal: 12,
+            marginBottom: 6,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: 10,
+            backgroundColor: c.primarySoft,
+            borderLeftWidth: 3,
+            borderLeftColor: c.primary,
+          }}
+        >
+          <Ionicons name="return-up-back" size={13} color={c.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.primary, fontSize: 10, fontWeight: '700' }}>
+              Replying to {replyTo.fromMe ? 'yourself' : (profileName || 'customer')}
+            </Text>
+            <Text style={{ color: c.text, fontSize: 12 }} numberOfLines={1}>
+              {replyTo.snippet}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setReplyTo(null)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel reply"
+          >
+            <Ionicons name="close" size={16} color={c.textMuted} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {/* Composer */}
       <View

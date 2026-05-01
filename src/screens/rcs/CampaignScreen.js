@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  Platform, Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
@@ -135,11 +135,11 @@ export default function CampaignScreen({ navigation, route }) {
   useEffect(() => { setVarValues({}); }, [template?.name]);
 
   const send = async () => {
-    if (!bot?.botId) { Alert.alert('Pick a bot', 'Select an RCS agent first.'); return; }
-    if (!template?.name) { Alert.alert('Pick a template', 'Choose an RCS template first.'); return; }
+    if (!bot?.botId) { dialog.warning({ title: 'Pick a bot', message: 'Select an RCS agent first.' }); return; }
+    if (!template?.name) { dialog.warning({ title: 'Pick a template', message: 'Choose an RCS template first.' }); return; }
     const list = numbers.split(/[,\n\s]+/).map((n) => n.trim()).filter(Boolean);
-    if (list.length === 0) { Alert.alert('No numbers', 'Add at least one recipient number.'); return; }
-    if (list.length > 5000) { Alert.alert('Too many numbers', 'Up to 5,000 numbers per request.'); return; }
+    if (list.length === 0) { dialog.warning({ title: 'No numbers', message: 'Add at least one recipient number.' }); return; }
+    if (list.length > 5000) { dialog.warning({ title: 'Too many numbers', message: 'Up to 5,000 numbers per request.' }); return; }
 
     const ok = await dialog.confirm({
       title: 'Send RCS campaign?',
@@ -151,7 +151,7 @@ export default function CampaignScreen({ navigation, route }) {
     // Validate every declared variable has a value.
     const missingVar = templateVars.find((name) => !String(varValues[name] || '').trim());
     if (missingVar) {
-      Alert.alert('Variable required', `Enter a value for "${missingVar}".`);
+      dialog.warning({ title: 'Variable required', message: `Enter a value for "${missingVar}".` });
       return;
     }
 
@@ -284,7 +284,7 @@ export default function CampaignScreen({ navigation, route }) {
             variant="info"
             size="sm"
             fullWidth={false}
-            onPress={() => Alert.alert('Upload Files', 'CSV / Excel upload coming soon.')}
+            onPress={() => dialog.info({ title: 'Upload Files', message: 'CSV / Excel upload coming soon.' })}
           />
           <GradientButton
             title="Groups"
@@ -390,7 +390,7 @@ export default function CampaignScreen({ navigation, route }) {
               title="Failed Over"
               icon="refresh"
               variant="secondary"
-              onPress={() => Alert.alert('Failed Over', 'Re-target failed numbers from a previous run.')}
+              onPress={() => dialog.info({ title: 'Failed Over', message: 'Re-target failed numbers from a previous run.' })}
             />
           </View>
           <View style={{ flex: 1 }}>

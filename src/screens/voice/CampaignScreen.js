@@ -5,7 +5,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  Platform, Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
@@ -80,15 +80,15 @@ export default function CampaignScreen({ navigation }) {
   ), [numbers]);
 
   const submit = async ({ test = false } = {}) => {
-    if (!callerId) { Alert.alert('Pick a caller ID', 'Select the caller ID for this campaign.'); return; }
+    if (!callerId) { dialog.warning({ title: 'Pick a caller ID', message: 'Select the caller ID for this campaign.' }); return; }
     if (!soundFile && !useObdFlow) {
-      Alert.alert('Pick a sound file', 'Choose a sound file or enable OBD Flow.');
+      dialog.warning({ title: 'Pick a sound file', message: 'Choose a sound file or enable OBD Flow.' });
       return;
     }
     const list = numbers.split(/[,\n\s]+/).map((n) => n.trim()).filter(Boolean);
     const recipients = test ? list.slice(0, 1) : list;
     if (recipients.length === 0) {
-      Alert.alert('No numbers', test ? 'Add at least one number to test.' : 'Add at least one recipient number.');
+      dialog.warning({ title: 'No numbers', message: test ? 'Add at least one number to test.' : 'Add at least one recipient number.' });
       return;
     }
 

@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Platform,
-  RefreshControl, Alert,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
@@ -18,6 +18,7 @@ import { pushNotification } from '../../../store/slices/notificationsSlice';
 import BottomTabBar from '../../../components/BottomTabBar';
 import ScreenHeader from '../../../components/ScreenHeader';
 import toast from '../../../services/toast';
+import dialog from '../../../services/dialog';
 
 const FILTERS = ['All', 'Live', 'Scheduled', 'Completed', 'Stuck', 'Failed'];
 
@@ -78,39 +79,43 @@ export default function CampaignsListScreen({ navigation }) {
     }
   };
 
-  const resendFailed = (cmp) => {
+  const resendFailed = async (cmp) => {
     if (!cmp.failed || cmp.failed === 0) { toast.info('No failures', 'Nothing to resend.'); return; }
-    Alert.alert('Resend failed?', `Re-target ${cmp.failed} failed recipient${cmp.failed === 1 ? '' : 's'}?`, [
-      { text: 'Cancel' },
-      {
-        text: 'Resend',
-        style: 'default',
-        onPress: () => {
-          dispatch(patchCampaign({
-            id: cmp.id,
-            patch: {
-              sent: (cmp.sent || 0) + cmp.failed,
-              failed: 0,
-              status: 'live',
-              lastResendAt: new Date().toISOString(),
-            },
-          }));
-          dispatch(pushNotification({
-            kind: 'campaign-success',
-            title: `Resend queued — ${cmp.name}`,
-            body: `${cmp.failed} failed recipient${cmp.failed === 1 ? '' : 's'} are being retried.`,
-          }));
-          toast.success('Resend queued', `${cmp.failed} numbers retried.`);
-        },
+    const ok = await dialog.confirm({
+      title: 'Resend failed?',
+      message: `Re-target ${cmp.failed} failed recipient${cmp.failed === 1 ? '' : 's'}?`,
+      confirmText: 'Resend',
+      cancelText: 'Cancel',
+      tone: 'warning',
+    });
+    if (!ok) return;
+    dispatch(patchCampaign({
+      id: cmp.id,
+      patch: {
+        sent: (cmp.sent || 0) + cmp.failed,
+        failed: 0,
+        status: 'live',
+        lastResendAt: new Date().toISOString(),
       },
-    ]);
+    }));
+    dispatch(pushNotification({
+      kind: 'campaign-success',
+      title: `Resend queued — ${cmp.name}`,
+      body: `${cmp.failed} failed recipient${cmp.failed === 1 ? '' : 's'} are being retried.`,
+    }));
+    toast.success('Resend queued', `${cmp.failed} numbers retried.`);
   };
 
-  const remove = (cmp) =>
-    Alert.alert('Delete campaign?', `${cmp.name} will be removed from this list.`, [
-      { text: 'Cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => dispatch(removeCampaign(cmp.id)) },
-    ]);
+  const remove = async (cmp) => {
+    const ok = await dialog.confirm({
+      title: 'Delete campaign?',
+      message: `${cmp.name} will be removed from this list.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (ok) dispatch(removeCampaign(cmp.id));
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>

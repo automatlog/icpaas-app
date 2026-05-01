@@ -22,10 +22,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../theme';
 import { CHANNELS } from '../constants/channels';
 
-const RADIUS = 92;
+const RADIUS = 100;
 const ANGLES = [-150, -110, -70, -30]; // 4 channels across 120° upper arc
-const CIRCLE_SIZE = 52;
-const ICON_SIZE   = 24;
+const CIRCLE_SIZE = 64;
+const ICON_SIZE   = 30;
+
+// Per-channel icon tint for the picker. Override of the canonical
+// channels.js `tint` because the picker uses a white background, so the
+// brand-deep colours that work on tinted bubbles need a punchier, more
+// recognisable shade here.
+const ICON_COLOR = {
+  whatsapp: '#25D366', // canonical WhatsApp green
+  rcs:      '#3B82F6', // RCS blue
+  voice:    '#F97316', // orange
+  sms:      '#A78BFA', // light purple / violet
+};
 
 export default function CampaignPicker({ visible, onClose, onPick }) {
   const c = useBrand();
@@ -99,17 +110,24 @@ export default function CampaignPicker({ visible, onClose, onPick }) {
                     width: CIRCLE_SIZE,
                     height: CIRCLE_SIZE,
                     borderRadius: CIRCLE_SIZE / 2,
-                    backgroundColor: c.primarySoft,
+                    backgroundColor: '#FFFFFF',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    shadowColor: c.primary,
-                    shadowOffset: { width: 0, height: 6 },
-                    shadowOpacity: 0.22,
+                    // Subtle elevated card look — softer than the previous
+                    // brand-tinted glow so the channel's own icon colour
+                    // carries the visual weight.
+                    shadowColor: '#0F172A',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.18,
                     shadowRadius: 10,
                     elevation: 6,
                   }}
                 >
-                  <Ionicons name={ch.icon} size={ICON_SIZE} color={c.primary} />
+                  <Ionicons
+                    name={ch.icon}
+                    size={ICON_SIZE}
+                    color={ICON_COLOR[ch.id] || c.primary}
+                  />
                 </View>
               </TouchableOpacity>
             </Animated.View>

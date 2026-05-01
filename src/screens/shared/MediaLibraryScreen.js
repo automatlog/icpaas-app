@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  ActivityIndicator, Platform, RefreshControl, Alert,
+  ActivityIndicator, Platform, RefreshControl,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
@@ -15,6 +15,7 @@ import { pushNotification } from '../../store/slices/notificationsSlice';
 import BottomTabBar from '../../components/BottomTabBar';
 import ScreenHeader from '../../components/ScreenHeader';
 import toast from '../../services/toast';
+import dialog from '../../services/dialog';
 import {
   validateForWhatsApp, MEDIA_KINDS, STICKER_ANIMATED_MAX, formatBytes, ALL_MIMES,
 } from '../../services/whatsappMediaSpec';
@@ -170,11 +171,16 @@ export default function MediaLibraryScreen({ navigation }) {
     toast.success('Copied', `${m.name || 'media'} URL copied.`);
   };
 
-  const remove = (m) =>
-    Alert.alert('Remove entry?', `${m.name} will be removed from this list (server file is unchanged).`, [
-      { text: 'Cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => dispatch(removeMedia(m.fileId)) },
-    ]);
+  const remove = async (m) => {
+    const ok = await dialog.confirm({
+      title: 'Remove entry?',
+      message: `${m.name} will be removed from this list (server file is unchanged).`,
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (ok) dispatch(removeMedia(m.fileId));
+  };
 
   const filtered = media.filter((m) => {
     if (filter === 'All') return true;

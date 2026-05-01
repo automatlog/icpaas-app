@@ -2,13 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Switch,
-  Platform, Alert, ActivityIndicator,
+  Platform, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { useBrand } from '../../../theme';
 import { WhatsAppAPI } from '../../../services/api';
 import { selectGroups } from '../../../store/slices/groupsSlice';
+import dialog from '../../../services/dialog';
 import AddRecipientsModal from '../../shared/AddRecipientsModal';
 import ScheduleModal from '../../shared/ScheduleModal';
 import Select from '../../../components/Select';
@@ -70,9 +71,9 @@ export default function CampaignStep1Screen({ navigation, route }) {
   }, []);
 
   const next = () => {
-    if (!name.trim()) { Alert.alert('Required', 'Enter campaign name.'); return; }
-    if (!channelId) { Alert.alert('Required', 'Pick a WABA channel.'); return; }
-    if (countNumbers(numbers) === 0) { Alert.alert('Required', 'Add recipient numbers.'); return; }
+    if (!name.trim()) { dialog.warning({ title: 'Campaign name required', message: 'Give your campaign a name so it shows up in reports.' }); return; }
+    if (!channelId) { dialog.warning({ title: 'Pick a WABA channel', message: 'Select the WhatsApp Business number this campaign will send from.' }); return; }
+    if (countNumbers(numbers) === 0) { dialog.warning({ title: 'Add recipients', message: 'Paste numbers, import a contact group, or upload a CSV.' }); return; }
     navigation.navigate('CampaignStep2', {
       draft: { ...routeDraft, name: name.trim(), channelId, channels, numbers, removeDup, removeBlack, scheduleNow, schedTime },
     });

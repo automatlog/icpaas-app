@@ -5,11 +5,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Platform, Alert,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../../theme';
+import dialog from '../../services/dialog';
 import InfoRow from '../../components/InfoRow';
 import ScreenHeader from '../../components/ScreenHeader';
 
@@ -29,7 +30,7 @@ export default function CallerIdScreen({ navigation }) {
 
   const copy = async (value, label) => {
     await Clipboard.setStringAsync(String(value));
-    Alert.alert('Copied', `${label}: ${value}`);
+    dialog.success({ title: 'Copied', message: `${label}: ${value}` });
   };
 
   const rootBg = dark ? 'bg-[#0A0A0D]' : 'bg-white';

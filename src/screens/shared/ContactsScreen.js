@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Platform,
-  Alert, ActivityIndicator,
+  ActivityIndicator,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import * as DocumentPicker from 'expo-document-picker';
@@ -20,6 +20,7 @@ import { setContacts as setContactsAction, upsertContact } from '../../store/sli
 import BottomTabBar from '../../components/BottomTabBar';
 import ScreenHeader from '../../components/ScreenHeader';
 import toast from '../../services/toast';
+import dialog from '../../services/dialog';
 import FormField from '../../components/FormField';
 
 const TABS = [
@@ -355,11 +356,16 @@ function GroupsTab({ c, groups, dispatch }) {
     }
   };
 
-  const remove = (g) =>
-    Alert.alert('Delete group?', `${g.name} (${(g.numbers || []).length} numbers) will be removed.`, [
-      { text: 'Cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => dispatch(removeGroup(g.id)) },
-    ]);
+  const remove = async (g) => {
+    const ok = await dialog.confirm({
+      title: 'Delete group?',
+      message: `${g.name} (${(g.numbers || []).length} numbers) will be removed.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (ok) dispatch(removeGroup(g.id));
+  };
 
   return (
     <ScrollView

@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Platform, Alert,
+  ActivityIndicator, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
@@ -12,6 +12,7 @@ import { useBrand } from '../../theme';
 import { RCSAPI } from '../../services/api';
 import { pushNotification } from '../../store/slices/notificationsSlice';
 import toast from '../../services/toast';
+import dialog from '../../services/dialog';
 import GradientButton from '../../components/GradientButton';
 import ScreenHeader from '../../components/ScreenHeader';
 
@@ -48,9 +49,9 @@ export default function CreateTemplateScreen({ navigation }) {
   }, []);
 
   const submit = async () => {
-    if (!botId) { Alert.alert('Missing bot', 'Pick an RCS bot ID first.'); return; }
-    if (!name.trim()) { Alert.alert('Missing name', 'Template name is required.'); return; }
-    if (!textMessage.trim()) { Alert.alert('Missing message', 'Text message body is required.'); return; }
+    if (!botId) { dialog.warning({ title: 'Missing bot', message: 'Pick an RCS bot ID first.' }); return; }
+    if (!name.trim()) { dialog.warning({ title: 'Missing name', message: 'Template name is required.' }); return; }
+    if (!textMessage.trim()) { dialog.warning({ title: 'Missing message', message: 'Text message body is required.' }); return; }
 
     setSubmitting(true);
     try {
@@ -73,7 +74,7 @@ export default function CreateTemplateScreen({ navigation }) {
       toast.success('Template created', name.trim());
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Failed', e?.message || 'Could not create template');
+      dialog.error({ title: 'Failed', message: e?.message || 'Could not create template' });
     } finally {
       setSubmitting(false);
     }

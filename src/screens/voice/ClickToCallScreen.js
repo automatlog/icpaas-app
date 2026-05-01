@@ -9,7 +9,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  Alert, RefreshControl,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
@@ -93,8 +93,8 @@ export default function ClickToCallScreen({ navigation }) {
 
   // ── Single submit ─────────────────────────────────────────────────────
   const submitSingle = async () => {
-    if (!singleAgent) { Alert.alert('Pick agent', 'Select an agent first.'); return; }
-    if (!receiver.trim()) { Alert.alert('Receiver missing', 'Enter the receiver phone number.'); return; }
+    if (!singleAgent) { dialog.warning({ title: 'Pick agent', message: 'Select an agent first.' }); return; }
+    if (!receiver.trim()) { dialog.warning({ title: 'Receiver missing', message: 'Enter the receiver phone number.' }); return; }
 
     const ok = await dialog.confirm({
       title: 'Originate call?',
@@ -127,9 +127,9 @@ export default function ClickToCallScreen({ navigation }) {
 
   // ── Bulk submit ───────────────────────────────────────────────────────
   const submitBulk = async () => {
-    if (!bulkAgent.trim()) { Alert.alert('Agent missing', 'Enter agent name(s).'); return; }
-    if (!bulkCaller.trim()) { Alert.alert('Caller ID missing', 'Enter caller ID.'); return; }
-    if (!bulkFile) { Alert.alert('File missing', 'Upload a CSV with receiver numbers.'); return; }
+    if (!bulkAgent.trim()) { dialog.warning({ title: 'Agent missing', message: 'Enter agent name(s).' }); return; }
+    if (!bulkCaller.trim()) { dialog.warning({ title: 'Caller ID missing', message: 'Enter caller ID.' }); return; }
+    if (!bulkFile) { dialog.warning({ title: 'File missing', message: 'Upload a CSV with receiver numbers.' }); return; }
 
     const ok = await dialog.confirm({
       title: 'Originate bulk call?',
@@ -409,7 +409,7 @@ const BulkTab = ({
 
       <FormField c={c} label="File" hint="Upload a CSV or Excel file containing receiver phone numbers.">
         <TouchableOpacity
-          onPress={() => Alert.alert('File picker', 'CSV / Excel picker not yet wired. Will be implemented when the bulk endpoint is finalised.')}
+          onPress={() => dialog.info({ title: 'File picker', message: 'CSV / Excel picker not yet wired. Will be implemented when the bulk endpoint is finalised.' })}
           activeOpacity={0.85}
           style={[
             inputStyle(c),

@@ -38,7 +38,9 @@ import {
   loadCounts,
   loadChatList,
   loadMoreChatList,
+  markAllChatsRead,
 } from '../../services/liveChatActions';
+import toast from '../../services/toast';
 
 const FILTERS = [
   { id: 'All',        label: 'All',        countKey: 'AllCount' },
@@ -192,6 +194,20 @@ export default function LiveAgentInbox({ navigation, route }) {
 
   const totalUnread = counts.UnReadChatCount || 0;
   const isWhatsApp = channelKey === 'whatsapp';
+  // Sum from the rendered list so the button reacts even before the next
+  // GetChatCount lands (badges clear instantly on tap via clearUnreadFor).
+  const visibleUnread = (chatList.items || []).reduce(
+    (sum, row) => sum + (row.UnReadCount || 0),
+    0,
+  );
+
+  const handleMarkAllRead = async () => {
+    if (visibleUnread === 0) return;
+    const res = await dispatch(markAllChatsRead());
+    if (res?.cleared > 0) {
+      toast.success('Marked as read', `Cleared ${res.cleared} conversation${res.cleared === 1 ? '' : 's'}.`);
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -202,7 +218,29 @@ export default function LiveAgentInbox({ navigation, route }) {
         title="Live Agent"
         badge={isWhatsApp ? 'WhatsApp' : 'RCS'}
         subtitle={`${totalUnread} unread · ${selectedChannel === 'All' ? 'all channels' : selectedChannel}`}
-        right={<ConnectionPill status={connection.status} c={c} />}
+        right={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {visibleUnread > 0 && (
+              <TouchableOpacity
+                onPress={handleMarkAllRead}
+                activeOpacity={0.85}
+                hitSlop={8}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 4,
+                  paddingHorizontal: 8, paddingVertical: 4,
+                  borderRadius: 999,
+                  backgroundColor: c.primarySoft,
+                }}
+              >
+                <Ionicons name="checkmark-done" size={13} color={c.primary} />
+                <Text style={{ color: c.primary, fontSize: 10, fontWeight: '700' }}>
+                  Mark all read
+                </Text>
+              </TouchableOpacity>
+            )}
+            <ConnectionPill status={connection.status} c={c} />
+          </View>
+        }
       />
 
       <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>

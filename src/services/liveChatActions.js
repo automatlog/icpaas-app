@@ -15,6 +15,7 @@ import {
   optimisticSend,
   sendResolved,
   sendFailed,
+  clearUnreadFor,
 } from '../store/slices/liveChatSlice';
 
 // Tolerates both the camelCase JSON the controller emits and the PascalCase
@@ -244,3 +245,68 @@ export const sendReaction  = (a) => sendLiveChatMessage({ ...a, kind: 'reaction'
 //   1) const { id } = await uploadMedia({ channel, file, mimeType });
 //   2) dispatch(sendImage({ waId, channel, id, caption }));
 export const uploadMedia = sender.uploadMedia;
+
+// ---------- mark-as-read ----------
+//
+// POSTs OmniApp's MarkMessagesAsRead and clears the chat-list unread badge
+// optimistically. `messageId` is the wamid of the latest inbound bubble the
+// agent has now seen — server marks every IN message up to and including
+// that id as Read for the (sender, waba) pair.
+//
+// Returns { ok: true } when the server accepts; { ok: false, error } on
+// transport failure (404 / 302 / network). Optimistic clear stays — the UI
+// shouldn't bounce the badge back when the network is just flaky.
+export const markChatRead = ({ waId, channel, messageId }) => async (dispatch) => {
+  if (!waId || !channel || !messageId) return { ok: false, error: 'missing args' };
+
+  // Optimistic: clear the badge before the round-trip.
+  dispatch(clearUnreadFor({ waId }));
+
+  try {
+    await LiveChatAPI.markAsRead({
+      senderNumber: waId,
+      messageId,
+      wabaNumber: channel,
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'mark-as-read failed' };
+  }
+};
+
+// Inbox-level "mark every visible chat as read".
+//
+// For each row with UnReadCount > 0 we always dispatch the local
+// clearUnreadFor (the agent's badge clears instantly), then best-effort
+// POST MarkMessagesAsRead using whatever message id the row carries. Note:
+// chatList rows expose the last message id of either direction — it might
+// be an OUT row, in which case OmniApp may no-op. The local clear is the
+// guaranteed UX win; server-side sync is best-effort.
+export const markAllChatsRead = () => async (dispatch, getState) => {
+  const items = getState()?.liveChat?.chatList?.items || [];
+  const targets = items.filter((row) => (row.UnReadCount || 0) > 0);
+
+  // Optimistic clear for every row first so the UI feels instant.
+  targets.forEach((row) => {
+    const waId = row.WANumber || row.wa_id;
+    if (waId) dispatch(clearUnreadFor({ waId }));
+  });
+
+  // Best-effort server calls in parallel; swallow individual failures so one
+  // 302 doesn't prevent the rest from firing.
+  await Promise.allSettled(
+    targets.map((row) => {
+      const waId = row.WANumber || row.wa_id;
+      const channel = row.WABANumber;
+      const messageId = row.WAInboxId;
+      if (!waId || !channel || !messageId) return Promise.resolve();
+      return LiveChatAPI.markAsRead({
+        senderNumber: waId,
+        messageId,
+        wabaNumber: channel,
+      }).catch(() => {});
+    }),
+  );
+
+  return { ok: true, cleared: targets.length };
+};

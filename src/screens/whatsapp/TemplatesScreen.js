@@ -142,9 +142,28 @@ export default function TemplatesScreen({ navigation, route }) {
     toast.success('Copied', `${item.name} copied to clipboard.`);
   };
 
+  // Mirror Step2's Flows-template detector so the wizard's "Template Type"
+  // dropdown lands on the correct option (Flows vs Default) without the
+  // user having to set it manually.
+  const isFlowsTemplate = (t) => {
+    if (!t) return false;
+    if (String(t.template_type || t.templateType || t.type || '').toLowerCase().includes('flow')) return true;
+    if (t.category && String(t.category).toLowerCase().includes('flow')) return true;
+    if (Array.isArray(t.components)) {
+      return t.components.some((cmp) => {
+        const buttons = cmp.buttons || cmp.Buttons;
+        if (!Array.isArray(buttons)) return false;
+        return buttons.some((b) => String(b.type || '').toUpperCase() === 'FLOW');
+      });
+    }
+    return false;
+  };
+
   // Send icon on a template card → land the user in the campaign composer
-  // for THIS channel with the template pre-selected. Falls back to the
-  // unified Send composer if the channel doesn't have a campaign route.
+  // for THIS channel with everything we already know pre-filled: WABA
+  // channel (phoneNumberId), Template Category, Template Type, and the
+  // template name itself. Saves the user from re-picking three dropdowns
+  // they already implicitly chose by tapping send on a specific row.
   const handleUse = (item) => {
     const ch = String(item.channel || channel).toLowerCase();
     const route = CAMPAIGN_ROUTE[ch];
@@ -153,9 +172,19 @@ export default function TemplatesScreen({ navigation, route }) {
       return;
     }
     if (ch === 'whatsapp') {
-      // The WhatsApp composer is a 3-step wizard; pre-seed the wizard
-      // draft so Step2 picks the template up via its own draft hydration.
-      navigation.navigate(route, { draft: { templateName: item.name } });
+      // The WhatsApp composer is a 3-step wizard. Step1's `routeDraft`
+      // is spread into the draft handed to Step2 via `next()`, so any
+      // fields we set here propagate through the wizard.
+      const draft = {
+        templateName: item.name,
+        // phoneNumberId is what Step1 stores as `channelId`; the field
+        // is added in TemplatesAPI.getWhatsApp() when no specific WABA
+        // is requested (the standard case from this screen).
+        channelId: item.phoneNumberId || '',
+        category: item.category || '',
+        type: isFlowsTemplate(item) ? 'Flows' : 'Default',
+      };
+      navigation.navigate(route, { draft });
     } else {
       // RCS / SMS campaigns are single-screen — accept a templateName
       // route param and pre-select on first render.

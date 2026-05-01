@@ -25,6 +25,11 @@ import {
   updateUnreadCount,
   updateDeliveryStatus,
 } from '../store/slices/liveChatSlice';
+import {
+  loadCounts,
+  loadChatList,
+  loadMessages,
+} from './liveChatActions';
 
 const TOKEN_KEY = 'icpaas_token';
 
@@ -51,6 +56,28 @@ const buildConnection = () =>
     .configureLogging(signalR.LogLevel.Warning)
     .build();
 
+// Re-pull anything that might have changed during a SignalR drop. Called
+// from onreconnected (and exposed for manual "refresh" affordances). The
+// server is source of truth — events that fired while we were offline
+// won't replay, so we re-read counts + the chat list and the active thread.
+//
+// Each action no-ops gracefully when the relevant ids/filters aren't set
+// (e.g. user logged in but never opened the inbox), so it's safe to fire
+// unconditionally.
+export const refetchAfterReconnect = () => {
+  const state = store.getState();
+  const lc = state?.liveChat;
+  if (!lc) return;
+  const channel = lc.selectedChannel || 'All';
+  const chatType = lc.chatList?.filter || 'All';
+  const search = lc.chatList?.search || '';
+  store.dispatch(loadCounts({ channel, chatType }));
+  store.dispatch(loadChatList({ channel, chatType, search }));
+  if (lc.activeWaId && lc.activeChannel) {
+    store.dispatch(loadMessages({ waId: lc.activeWaId, channel: lc.activeChannel }));
+  }
+};
+
 const wireHandlers = (conn) => {
   conn.on('ReceivedMessage', (chat) => {
     store.dispatch(receiveLiveMessage(chat));
@@ -71,6 +98,9 @@ const wireHandlers = (conn) => {
   });
   conn.onreconnected(() => {
     store.dispatch(connectionStatusChanged({ status: 'connected' }));
+    // Bring the UI back in sync — events that fired during the drop never
+    // replay over SignalR, so we re-pull the lists explicitly.
+    refetchAfterReconnect();
   });
   conn.onclose((error) => {
     store.dispatch(

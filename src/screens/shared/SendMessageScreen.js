@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Platform, Alert, useColorScheme,
+  ActivityIndicator, Platform, useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -19,6 +19,7 @@ import {
 } from '../../services/rcsHelpers';
 import useFormDraft from '../../hooks/useFormDraft';
 import { useBrand } from '../../theme';
+import dialog from '../../services/dialog';
 import ScreenHeader from '../../components/ScreenHeader';
 
 // Channel chip rail consumes the canonical channel list (single source of
@@ -178,7 +179,7 @@ export default function SendMessageScreen({ navigation, route }) {
 
   const handleSend = async () => {
     const toNum = to.trim();
-    if (!toNum) { Alert.alert('Required', 'Enter a recipient number.'); return; }
+    if (!toNum) { dialog.warning({ title: 'Required', message: 'Enter a recipient number.' }); return; }
     setSending(true);
     try {
       if (channel === 'whatsapp') {
@@ -199,11 +200,11 @@ export default function SendMessageScreen({ navigation, route }) {
       } else if (channel === 'voice') {
         await VoiceAPI.makeCall({ number: toNum, callerId: text.trim() || 'TEST', mediaFileId: 1 });
       }
-      Alert.alert('Sent', `${channel.toUpperCase()} dispatched to ${toNum}`);
+      dialog.success({ title: 'Sent', message: `${channel.toUpperCase()} dispatched to ${toNum}` });
       // Composer succeeded — wipe the draft so the next visit starts blank.
       clearDraft();
     } catch (e) {
-      Alert.alert('Send failed', e?.message || 'Unknown error');
+      dialog.error({ title: 'Send failed', message: e?.message || 'Unknown error' });
     } finally {
       setSending(false);
     }

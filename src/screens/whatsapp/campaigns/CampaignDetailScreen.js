@@ -1,7 +1,7 @@
 // src/screens/CampaignDetailScreen.js — Per-campaign drilldown
 import React, { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Platform, Alert, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, Platform, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
@@ -16,6 +16,7 @@ import { pushNotification } from '../../../store/slices/notificationsSlice';
 import BottomTabBar from '../../../components/BottomTabBar';
 import ScreenHeader from '../../../components/ScreenHeader';
 import toast from '../../../services/toast';
+import dialog from '../../../services/dialog';
 
 const STATUS_TINT = {
   live:      { bg: '#D1FAE5', fg: '#047857', label: 'Live',      icon: 'pulse' },
@@ -122,50 +123,58 @@ export default function CampaignDetailScreen({ navigation, route }) {
     }
   };
 
-  const resendFailed = () => {
+  const resendFailed = async () => {
     if (failed === 0) { toast.info('No failures', 'Nothing to resend.'); return; }
-    Alert.alert('Resend failed?', `Re-target ${failed} failed recipient${failed === 1 ? '' : 's'}?`, [
-      { text: 'Cancel' },
-      {
-        text: 'Resend',
-        onPress: () => {
-          dispatch(patchCampaign({
-            id: cmp.id,
-            patch: {
-              sent: sent + failed,
-              failed: 0,
-              status: 'live',
-              lastResendAt: new Date().toISOString(),
-            },
-          }));
-          dispatch(pushNotification({
-            kind: 'campaign-success',
-            title: `Resend queued — ${cmp.name}`,
-            body: `${failed} failed recipient${failed === 1 ? '' : 's'} are being retried.`,
-          }));
-          toast.success('Resend queued', `${failed} numbers retried.`);
-        },
+    const ok = await dialog.confirm({
+      title: 'Resend failed?',
+      message: `Re-target ${failed} failed recipient${failed === 1 ? '' : 's'}?`,
+      confirmText: 'Resend',
+      cancelText: 'Cancel',
+      tone: 'warning',
+    });
+    if (!ok) return;
+    dispatch(patchCampaign({
+      id: cmp.id,
+      patch: {
+        sent: sent + failed,
+        failed: 0,
+        status: 'live',
+        lastResendAt: new Date().toISOString(),
       },
-    ]);
+    }));
+    dispatch(pushNotification({
+      kind: 'campaign-success',
+      title: `Resend queued — ${cmp.name}`,
+      body: `${failed} failed recipient${failed === 1 ? '' : 's'} are being retried.`,
+    }));
+    toast.success('Resend queued', `${failed} numbers retried.`);
   };
 
-  const cancel = () =>
-    Alert.alert('Cancel campaign?', `${cmp.name} will be marked completed and stopped.`, [
-      { text: 'Back' },
-      { text: 'Cancel campaign', style: 'destructive', onPress: () => {
-        dispatch(updateCampaignStatus({ campaignId: cmp.id, status: 'completed' }));
-        toast.info('Cancelled', `${cmp.name} marked complete.`);
-      } },
-    ]);
+  const cancel = async () => {
+    const ok = await dialog.confirm({
+      title: 'Cancel campaign?',
+      message: `${cmp.name} will be marked completed and stopped.`,
+      confirmText: 'Cancel campaign',
+      cancelText: 'Back',
+      danger: true,
+    });
+    if (!ok) return;
+    dispatch(updateCampaignStatus({ campaignId: cmp.id, status: 'completed' }));
+    toast.info('Cancelled', `${cmp.name} marked complete.`);
+  };
 
-  const remove = () =>
-    Alert.alert('Delete campaign?', `${cmp.name} will be removed.`, [
-      { text: 'Cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => {
-        dispatch(removeCampaign(cmp.id));
-        navigation.goBack();
-      } },
-    ]);
+  const remove = async () => {
+    const ok = await dialog.confirm({
+      title: 'Delete campaign?',
+      message: `${cmp.name} will be removed.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
+    dispatch(removeCampaign(cmp.id));
+    navigation.goBack();
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>

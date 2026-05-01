@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Platform, Alert,
+  ActivityIndicator, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
@@ -11,6 +11,7 @@ import { useBrand } from '../../theme';
 import { SMSAPI } from '../../services/api';
 import { pushNotification } from '../../store/slices/notificationsSlice';
 import toast from '../../services/toast';
+import dialog from '../../services/dialog';
 import GradientButton from '../../components/GradientButton';
 import ScreenHeader from '../../components/ScreenHeader';
 
@@ -51,9 +52,9 @@ export default function CreateTemplateScreen({ navigation }) {
   }, []);
 
   const submit = async () => {
-    if (!senderId) { Alert.alert('Missing sender', 'Pick an SMS sender ID first.'); return; }
-    if (!name.trim()) { Alert.alert('Missing name', 'Template name is required.'); return; }
-    if (!text.trim()) { Alert.alert('Missing message', 'Message text is required.'); return; }
+    if (!senderId) { dialog.warning({ title: 'Missing sender', message: 'Pick an SMS sender ID first.' }); return; }
+    if (!name.trim()) { dialog.warning({ title: 'Missing name', message: 'Template name is required.' }); return; }
+    if (!text.trim()) { dialog.warning({ title: 'Missing message', message: 'Message text is required.' }); return; }
 
     setSubmitting(true);
     try {
@@ -75,7 +76,7 @@ export default function CreateTemplateScreen({ navigation }) {
       toast.success('Template created', name.trim());
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Failed', e?.message || 'Could not create template');
+      dialog.error({ title: 'Failed', message: e?.message || 'Could not create template' });
     } finally {
       setSubmitting(false);
     }

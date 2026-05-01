@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  Platform, Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
@@ -177,12 +177,12 @@ export default function CampaignScreen({ navigation, route: navRoute }) {
   }, [previewText]);
 
   const send = async () => {
-    if (!sender?.senderId) { Alert.alert('Pick sender', 'Select a sender ID first.'); return; }
-    if (!messageText.trim() && !template) { Alert.alert('No message', 'Pick a template or type a message.'); return; }
+    if (!sender?.senderId) { dialog.warning({ title: 'Pick sender', message: 'Select a sender ID first.' }); return; }
+    if (!messageText.trim() && !template) { dialog.warning({ title: 'No message', message: 'Pick a template or type a message.' }); return; }
 
     const list = numbers.split(/[,\n\s]+/).map((n) => n.trim()).filter(Boolean);
-    if (list.length === 0) { Alert.alert('No numbers', 'Add at least one recipient number.'); return; }
-    if (list.length > 5000) { Alert.alert('Too many numbers', 'Up to 5,000 numbers per request.'); return; }
+    if (list.length === 0) { dialog.warning({ title: 'No numbers', message: 'Add at least one recipient number.' }); return; }
+    if (list.length > 5000) { dialog.warning({ title: 'Too many numbers', message: 'Up to 5,000 numbers per request.' }); return; }
 
     const ok = await dialog.confirm({
       title: 'Send SMS campaign?',
@@ -196,7 +196,7 @@ export default function CampaignScreen({ navigation, route: navRoute }) {
     if (varCount > 0) {
       const emptyIdx = varValues.findIndex((v) => !String(v || '').trim());
       if (emptyIdx !== -1) {
-        Alert.alert('Variable required', `Fill variable #${emptyIdx + 1} before sending.`);
+        dialog.warning({ title: 'Variable required', message: `Fill variable #${emptyIdx + 1} before sending.` });
         return;
       }
     }
@@ -458,7 +458,7 @@ export default function CampaignScreen({ navigation, route: navRoute }) {
               icon="cloud-upload-outline"
               variant="info"
               size="sm"
-              onPress={() => Alert.alert('Upload Files', 'CSV / Excel upload coming soon.')}
+              onPress={() => dialog.info({ title: 'Upload Files', message: 'CSV / Excel upload coming soon.' })}
             />
           </View>
         </Row>

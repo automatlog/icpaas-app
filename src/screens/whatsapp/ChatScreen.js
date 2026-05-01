@@ -2,11 +2,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, useColorScheme,
+  KeyboardAvoidingView, Platform, ActivityIndicator, useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { WhatsAppAPI } from '../../services/api';
+import dialog from '../../services/dialog';
 import {
   setConversationMessages,
   appendConversationMessage,
@@ -94,7 +95,7 @@ export default function ChatScreen({ route, navigation }) {
       await WhatsAppAPI.sendReply({ to: conversation.phone, message: msg, type: 'text' });
       updateMessage(conversation.id, tempMsg.id, { status: 'delivered' });
     } catch (e) {
-      Alert.alert('Send failed', e?.message || 'Please try again');
+      dialog.error({ title: 'Send failed', message: e?.message || 'Please try again' });
     } finally {
       setSending(false);
     }
