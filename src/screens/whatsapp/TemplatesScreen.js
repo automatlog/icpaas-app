@@ -71,6 +71,13 @@ const fmtDate = (iso) => {
 export default function TemplatesScreen({ navigation, route }) {
   const c = useBrand();
   const channel = route?.params?.channel || 'whatsapp';
+  // Optional channel-scope filters — set when arriving from a Business
+  // Channel (WABA) row's "Templates" button. The fetch is narrowed to the
+  // selected wabaBusinessId; RCS / SMS scope through botId / senderId.
+  const wabaBusinessId = route?.params?.wabaBusinessId || null;
+  const botId = route?.params?.botId || null;
+  const senderId = route?.params?.senderId || null;
+  const channelLabel = route?.params?.channelLabel || null;
 
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,11 +97,14 @@ export default function TemplatesScreen({ navigation, route }) {
   const fetchTemplates = useCallback(async () => {
     setErr(null);
     try {
-      const res = await TemplatesAPI.getByChannel(channel);
+      const res = await TemplatesAPI.getByChannel(channel, {
+        wabaBusinessId, botId, senderId,
+      });
       const list = Array.isArray(res?.data) ? res.data : [];
       setTemplates(list);
       if (!list.length) {
-        toast.info('No templates', `${channel.toUpperCase()} returned an empty list.`);
+        const scope = channelLabel ? `${channel.toUpperCase()} (${channelLabel})` : channel.toUpperCase();
+        toast.info('No templates', `${scope} returned an empty list.`);
       }
     } catch (e) {
       setTemplates([]);
@@ -105,7 +115,7 @@ export default function TemplatesScreen({ navigation, route }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [channel]);
+  }, [channel, wabaBusinessId, botId, senderId, channelLabel]);
 
   useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
 
@@ -198,6 +208,12 @@ export default function TemplatesScreen({ navigation, route }) {
   // Channel-specific connection chip in the header subtitle.
   const channelMeta = getChannel(channel) || { label: channel?.toUpperCase() };
   const headerTitle = channel === 'whatsapp' ? 'Templates' : `${channelMeta.label} Templates`;
+  // When scoped to a single channel, surface its label in the subtitle so
+  // the user knows the list isn't all templates across the account.
+  const scopeLabel = channelLabel || (wabaBusinessId ? wabaBusinessId.slice(0, 12) + '…' : null);
+  const subtitleText = scopeLabel
+    ? `Filtered · ${scopeLabel}`
+    : `Connected · ${channelMeta.label}`;
 
   const Header = (
     <View style={{ backgroundColor: c.bg }}>
@@ -206,7 +222,7 @@ export default function TemplatesScreen({ navigation, route }) {
         onBack={() => navigation.goBack()}
         title={headerTitle}
         badge="Active"
-        subtitle={{ text: `Connected · ${channelMeta.label}`, dotColor: c.success }}
+        subtitle={{ text: subtitleText, dotColor: c.success }}
         right={(
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TouchableOpacity

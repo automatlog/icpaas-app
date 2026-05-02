@@ -7,7 +7,17 @@
 // the green margin showing beyond.
 import './global.css';
 import React, { useEffect, useMemo, useState } from 'react';
-import { StatusBar, View, Platform } from 'react-native';
+import { StatusBar, View, Platform, LogBox } from 'react-native';
+
+// expo-notifications prints an informational WARN on every bundle load in
+// Expo Go because Android remote-push was removed in SDK 53. The warning
+// is harmless — local notifications still work — and disappears the moment
+// you switch to a development build. Suppress it in dev so the Metro
+// console stays scannable.
+LogBox.ignoreLogs([
+  '`expo-notifications` functionality is not fully supported in Expo Go',
+  'expo-notifications: Android Push notifications (remote notifications)',
+]);
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import FlashMessage from 'react-native-flash-message';
 import { Provider, useSelector, useDispatch } from 'react-redux';

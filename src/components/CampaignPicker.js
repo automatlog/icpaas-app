@@ -22,10 +22,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../theme';
 import { CHANNELS } from '../constants/channels';
 
-const RADIUS = 100;
-const ANGLES = [-150, -110, -70, -30]; // 4 channels across 120° upper arc
-const CIRCLE_SIZE = 64;
-const ICON_SIZE   = 30;
+// Tighter arc — circles sit closer to the FAB so the picker reads as
+// part of the button rather than a floating halo. Angles narrow slightly
+// to stop the outer circles drifting into the screen edges.
+const RADIUS = 80;
+const ANGLES = [-180, -120, -60, -0]; // 4 channels across a tighter ~110° upper arc
+const CIRCLE_SIZE = 60;
+const ICON_SIZE   = 28;
 
 // Per-channel icon tint for the picker. Override of the canonical
 // channels.js `tint` because the picker uses a white background, so the

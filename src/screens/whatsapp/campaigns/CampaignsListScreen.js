@@ -17,6 +17,7 @@ import {
 import { pushNotification } from '../../../store/slices/notificationsSlice';
 import BottomTabBar from '../../../components/BottomTabBar';
 import ScreenHeader from '../../../components/ScreenHeader';
+import CampaignPicker from '../../../components/CampaignPicker';
 import toast from '../../../services/toast';
 import dialog from '../../../services/dialog';
 
@@ -54,6 +55,10 @@ export default function CampaignsListScreen({ navigation }) {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  // +New opens the same speed-dial picker the centre-FAB uses, so the
+  // user can branch into a WhatsApp / RCS / SMS / Voice composer instead
+  // of being forced down the WhatsApp wizard.
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -126,7 +131,7 @@ export default function CampaignsListScreen({ navigation }) {
         title="Campaigns"
         right={(
           <TouchableOpacity
-            onPress={() => navigation.navigate('CampaignStep1')}
+            onPress={() => setPickerOpen(true)}
             activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel="New campaign"
@@ -209,7 +214,7 @@ export default function CampaignsListScreen({ navigation }) {
             </Text>
             {list.length === 0 ? (
               <TouchableOpacity
-                onPress={() => navigation.navigate('CampaignStep1')}
+                onPress={() => setPickerOpen(true)}
                 activeOpacity={0.85}
                 className="rounded-[10px] px-4 py-2.5 flex-row items-center mt-2"
                 style={{ backgroundColor: c.primary, gap: 6 }}
@@ -235,6 +240,17 @@ export default function CampaignsListScreen({ navigation }) {
       </ScrollView>
 
       <BottomTabBar c={c} navigation={navigation} active="campaign" />
+
+      {/* Speed-dial fan over the +New button. Picks WhatsApp / RCS / SMS /
+          Voice campaign route from the canonical CHANNELS constant. */}
+      <CampaignPicker
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={(ch) => {
+          setPickerOpen(false);
+          navigation.navigate(ch.route);
+        }}
+      />
     </View>
   );
 }

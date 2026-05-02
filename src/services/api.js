@@ -1238,6 +1238,132 @@ export const LiveChatAPI = {
     omniApi.post('/WAMessage/UserLiveChat/MarkMessagesAsRead', null, {
       params: { senderNumber, messageId, wabaNumber },
     }),
+
+  // GET /WAMessage/UserLiveChat/GetContacts?number=&channel=
+  // → { notes: [...], contact: { IsFavourite, IsBlock, CreatedDate }, history: [...] }
+  getContacts: ({ number, channel }) =>
+    omniApi.get('/WAMessage/UserLiveChat/GetContacts', {
+      params: { number, channel },
+    }),
+
+  // GET /WAMessage/UserLiveChat/GetAgents
+  // → list of agents under the same parent (excluding the caller).
+  getAgents: () => omniApi.get('/WAMessage/UserLiveChat/GetAgents'),
+
+  // POST /WAMessage/UserLiveChat/BlockUser?number=&wabaNumber=
+  blockUser: ({ number, wabaNumber }) =>
+    omniApi.post('/WAMessage/UserLiveChat/BlockUser', null, {
+      params: { number, wabaNumber },
+    }),
+
+  // POST /WAMessage/UserLiveChat/UnblockUser?number=&wabaNumber=
+  unblockUser: ({ number, wabaNumber }) =>
+    omniApi.post('/WAMessage/UserLiveChat/UnblockUser', null, {
+      params: { number, wabaNumber },
+    }),
+
+  // POST /WAMessage/UserLiveChat/UpdateFavourite?waNumber=&channel=&isFavourite=
+  updateFavourite: ({ waNumber, channel, isFavourite }) =>
+    omniApi.post('/WAMessage/UserLiveChat/UpdateFavourite', null, {
+      params: { waNumber, channel, isFavourite },
+    }),
+
+  // POST /WAMessage/UserLiveChat/SaveNotes?noteId=&text=&waNumber=&channel=
+  // noteId=0 for create, >0 for update. Returns the persisted note.
+  saveNote: ({ noteId = 0, text, waNumber, channel }) =>
+    omniApi.post('/WAMessage/UserLiveChat/SaveNotes', null, {
+      params: { noteId, text, waNumber, channel },
+    }),
+
+  // POST /WAMessage/UserLiveChat/DeleteNotes?noteId=&waNumber=&channel=
+  deleteNote: ({ noteId, waNumber, channel }) =>
+    omniApi.post('/WAMessage/UserLiveChat/DeleteNotes', null, {
+      params: { noteId, waNumber, channel },
+    }),
+};
+
+// ---------------------------------------------------------------------------
+// AgentAPI — admin surface for managing agents on OmniApp.
+// All endpoints sit on the AgentList MVC controller and expect a logged-in
+// admin (cookie-auth today; bearer once backend ships the bearer scheme).
+// ---------------------------------------------------------------------------
+export const AgentAPI = {
+  // GET /WAMessage/AgentList/GetAgentList
+  list: () => omniApi.get('/WAMessage/AgentList/GetAgentList'),
+
+  // GET /WAMessage/AgentList/GetAgent?agentId=
+  get: (agentId) =>
+    omniApi.get('/WAMessage/AgentList/GetAgent', { params: { agentId } }),
+
+  // GET /WAMessage/AgentList/CheckDataAvailability?field=&inputValue=
+  // field is one of: 'UserName' | 'EmailId' | 'MobileNumber'
+  checkAvailability: (field, inputValue) =>
+    omniApi.get('/WAMessage/AgentList/CheckDataAvailability', {
+      params: { field, inputValue },
+    }),
+
+  // POST /WAMessage/AgentList/AddOrEditAgent
+  // Form-encoded UserViewModels. UserId=0 for create, >0 for edit. RoleId is
+  // set server-side to EnumUserRoles.Agent. Password regex (server-validated):
+  //   8–15 chars, ≥1 lower, ≥1 upper, ≥1 digit, ≥1 special.
+  addOrEditAgent: ({
+    userId = 0,
+    userName,
+    password,
+    mobileNumber,
+    emailId,
+    accountExpiryDate,
+    accountStatus = 1, // EnumAccountStatus.Active
+    selectedProductIds = [],
+  } = {}) => {
+    const fd = new FormData();
+    fd.append('UserId', String(userId));
+    fd.append('UserName', userName || '');
+    if (password) fd.append('Password', password);
+    fd.append('MobileNumber', mobileNumber || '');
+    fd.append('EmailId', emailId || '');
+    if (accountExpiryDate) fd.append('AccountExpiryDate', accountExpiryDate);
+    fd.append('AccountStatus', String(accountStatus));
+    selectedProductIds.forEach((id) =>
+      fd.append('SelectedProductIds', String(id)),
+    );
+    return omniApi.post('/WAMessage/AgentList/AddOrEditAgent', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  // POST /WAMessage/AgentList/DeleteAgent?agentId=
+  delete: (agentId) =>
+    omniApi.post('/WAMessage/AgentList/DeleteAgent', null, { params: { agentId } }),
+
+  // POST /WAMessage/AgentList/UpdateAllChatAssign?agentUserId=&isAllChatAssign=
+  setAllChatAssign: (agentUserId, isAllChatAssign) =>
+    omniApi.post('/WAMessage/AgentList/UpdateAllChatAssign', null, {
+      params: { agentUserId, isAllChatAssign },
+    }),
+
+  // POST /WAMessage/AgentList/UpdateIsSendTemplate?agentUserId=&isSendTemplate=
+  setSendTemplate: (agentUserId, isSendTemplate) =>
+    omniApi.post('/WAMessage/AgentList/UpdateIsSendTemplate', null, {
+      params: { agentUserId, isSendTemplate },
+    }),
+
+  // GET /WAMessage/AgentList/GetActiveChannels
+  getActiveChannels: () => omniApi.get('/WAMessage/AgentList/GetActiveChannels'),
+};
+
+// Product IDs as expected by SelectedProductIds. Mirrors EnumProducts in
+// OmniApp.Domain/Commons/CommonEnums.cs (line ~656). Update if the backend
+// enum changes.
+export const PRODUCT_IDS = {
+  IVR: 1,
+  Voice: 2,
+  ClickToCall: 3,
+  TextToSpeech: 4,
+  SMS: 5,
+  WhatsApp: 6,
+  Email: 7,
+  RCSMessage: 8,
 };
 
 // Convenience builder for the common text-only send path. Returns a FormData

@@ -83,15 +83,9 @@ export default function WabaChannelScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         {/* Summary */}
-        <View className={`flex-row rounded-[18px] p-4 mb-3 ${softBg}`} style={{ gap: 12 }}>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Channels</Text>
-            <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`}>{channels.length}</Text>
-          </View>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Source</Text>
-            <Text className={`text-[11px] font-mono mt-1.5 ${textInk}`}>gsauth.com/v23.0</Text>
-          </View>
+        <View className={`rounded-[18px] p-4 mb-3 ${softBg}`}>
+          <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Channels</Text>
+          <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`}>{channels.length}</Text>
         </View>
 
         {loading ? (
@@ -133,8 +127,18 @@ export default function WabaChannelScreen({ navigation }) {
                     </Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => navigation.navigate('Templates')}
+                    onPress={() => navigation.navigate('Templates', {
+                      channel: 'whatsapp',
+                      // Pre-filter the template list to this channel's
+                      // wabaBusinessId — TemplatesScreen reads these route
+                      // params and narrows the list before render.
+                      wabaBusinessId: ch.wabaBusinessId,
+                      phoneNumberId: ch.phoneNumberId,
+                      channelLabel: ch.label || ch.wabaNumber || ch.phoneNumberId,
+                    })}
                     activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Templates for ${ch.label || ch.wabaNumber || ch.phoneNumberId}`}
                     className="rounded-[14px] px-3 py-2 flex-row items-center"
                     style={{ backgroundColor: c.text, gap: 6 }}
                   >

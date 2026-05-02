@@ -18,7 +18,10 @@ import { useBrand } from '../../theme';
 import {
   selectThread,
   selectConnection,
+  selectChannels,
+  selectSelectedChannel,
   setActive,
+  removeMessage,
 } from '../../store/slices/liveChatSlice';
 import {
   loadMessages,
@@ -26,16 +29,26 @@ import {
   sendText as sendTextAction,
   sendImage as sendImageAction,
   sendVideo as sendVideoAction,
+  sendAudio as sendAudioAction,
   sendDocument as sendDocumentAction,
+  sendSticker as sendStickerAction,
   sendLocation as sendLocationAction,
   sendTemplate as sendTemplateAction,
+  sendReaction as sendReactionAction,
   uploadMedia,
   markChatRead,
 } from '../../services/liveChatActions';
 import LiveAgentAttachMenu from '../../components/LiveAgentAttachMenu';
 import LiveAgentLocationModal from '../../components/LiveAgentLocationModal';
 import LiveAgentTemplatePicker from '../../components/LiveAgentTemplatePicker';
+import LiveAgentBubbleActions from '../../components/LiveAgentBubbleActions';
+import LiveAgentForwardModal from '../../components/LiveAgentForwardModal';
+import LiveAgentChatHeaderMenu from '../../components/LiveAgentChatHeaderMenu';
+import LiveAgentAssignSheet from '../../components/LiveAgentAssignSheet';
+import LiveAgentVoiceRecorder from '../../components/LiveAgentVoiceRecorder';
+import LiveAgentJourneyPanel from '../../components/LiveAgentJourneyPanel';
 import toast from '../../services/toast';
+import dialog from '../../services/dialog';
 
 const initialsOf = (name = '') =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
@@ -101,6 +114,8 @@ export default function LiveAgentChat({ route, navigation }) {
   const dispatch = useDispatch();
   const thread = useSelector(selectThread(waId)) || EMPTY_THREAD;
   const connection = useSelector(selectConnection);
+  const channels = useSelector(selectChannels);
+  const selectedChannel = useSelector(selectSelectedChannel);
 
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -110,6 +125,18 @@ export default function LiveAgentChat({ route, navigation }) {
   const [picking, setPicking] = useState(false); // image/video/doc upload spinner
   // { messageId, snippet, fromMe } — bubble the user long-pressed to reply to.
   const [replyTo, setReplyTo] = useState(null);
+  // { messageId, snippet, fromMe, type } — bubble currently selected for the
+  // action sheet (Reply / React).
+  const [bubbleAction, setBubbleAction] = useState(null);
+  // Bubble currently being forwarded — opens LiveAgentForwardModal when set.
+  const [forwardSource, setForwardSource] = useState(null);
+  // Header overflow menu + agent assign sheet visibility.
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  // Voice-note recording in progress.
+  const [recording, setRecording] = useState(false);
+  // Customer journey panel visibility (notes + history + metadata).
+  const [journeyOpen, setJourneyOpen] = useState(false);
   const flatRef = useRef(null);
   // Tracks the wamid of the last inbound message we already POSTed
   // MarkMessagesAsRead for, so re-renders don't fire duplicate calls.
@@ -347,6 +374,147 @@ export default function LiveAgentChat({ route, navigation }) {
     }
   };
 
+  // Bubble action sheet — Reply stages the bubble; React fires sendReaction
+  // immediately and closes the sheet.
+  const handleReplyFromAction = () => {
+    if (!bubbleAction) return;
+    setReplyTo({
+      messageId: bubbleAction.messageId,
+      snippet: bubbleAction.snippet,
+      fromMe: bubbleAction.fromMe,
+    });
+    setBubbleAction(null);
+  };
+
+  const handleReactFromAction = async (emoji) => {
+    if (!bubbleAction) return;
+    const target = bubbleAction;
+    setBubbleAction(null);
+    try {
+      await dispatch(sendReactionAction({
+        waId,
+        channel,
+        messageId: target.messageId,
+        emoji,
+      }));
+    } catch (e) {
+      toast.error('Reaction failed', e?.message || 'Try again.');
+    }
+  };
+
+  const handleForwardFromAction = () => {
+    if (!bubbleAction) return;
+    setForwardSource(bubbleAction);
+    setBubbleAction(null);
+  };
+
+  // Voice notes — Recorder mounts on toggle, hands back the file URI when
+  // the agent taps stop. Cancel just unmounts.
+  const handleVoiceComplete = async ({ uri, mimeType }) => {
+    setRecording(false);
+    if (!uri) return;
+    setPicking(true);
+    try {
+      const fname = `voice-${Date.now()}.${mimeType === 'audio/mpeg' ? 'mp3' : 'm4a'}`;
+      const upload = await uploadMedia({
+        channel,
+        file: { uri, name: fname, type: mimeType },
+        mimeType,
+      });
+      const id = upload?.id || upload?.media?.[0]?.id;
+      if (!id) {
+        toast.error('Voice note failed', 'Meta did not return a media id.');
+        return;
+      }
+      setTimeout(() => flatRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
+      await dispatch(sendAudioAction({ waId, channel, id }));
+    } catch (e) {
+      toast.error('Voice note failed', e?.message || 'Try again.');
+    } finally {
+      setPicking(false);
+    }
+  };
+
+  const handleVoiceCancel = (reason) => {
+    setRecording(false);
+    if (reason === 'mic-permission-denied') {
+      toast.warning('Permission needed', 'Allow microphone access to record voice notes.');
+    }
+  };
+
+  // Sticker — picks a webp from device, uploads, sends. Meta requires WebP
+  // (static ≤ 100 KB, animated ≤ 500 KB) — server will reject other types.
+  const pickAndSendSticker = async () => {
+    setAttachOpen(false);
+    if (!ensureCanSend()) return;
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'image/webp',
+      multiple: false,
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType || 'image/webp';
+    if (!mimeType.includes('webp')) {
+      toast.warning('Stickers must be WebP', 'Pick a .webp file (static or animated).');
+      return;
+    }
+    await uploadAndSend({
+      kind: 'Sticker',
+      file: fileFromAsset(asset, mimeType, asset.name || `sticker-${Date.now()}.webp`),
+      mimeType,
+      sendAction: sendStickerAction,
+      sendArgs: {},
+    });
+  };
+
+  const handleForwardSubmit = async ({ waId: toWaId, channel: toChannel, source }) => {
+    setForwardSource(null);
+    if (!toWaId || !toChannel || !source) return;
+    // v1 — text only. The forward modal blocks non-text submits, but we
+    // also guard here for safety.
+    if (source.type && source.type !== 'text') {
+      toast.info('Text-only forward', 'Re-pick media from the destination chat.');
+      return;
+    }
+    try {
+      await dispatch(sendTextAction({
+        waId: toWaId,
+        channel: toChannel,
+        message: source.snippet,
+      }));
+      toast.success('Forwarded', `Sent to ${toWaId}`);
+    } catch (e) {
+      toast.error('Forward failed', e?.message || 'Try again.');
+    }
+  };
+
+  // Tap a Failed text bubble → confirm → drop the failed row + re-dispatch
+  // sendTextAction. v1 covers text only; for media/template the original
+  // payload isn't preserved on the row.
+  const handleRetryFailed = async (item) => {
+    if (item.MessageType !== 'text' && item.MessageType !== undefined) {
+      toast.info('Retry not supported',
+        'Resend isn’t available yet for media or templates — re-pick from the +.');
+      return;
+    }
+    const ok = await dialog.confirm({
+      title: 'Resend message?',
+      message: item.MessageText || 'Send this message again.',
+      confirmText: 'Resend',
+      cancelText: 'Cancel',
+    });
+    if (!ok) return;
+    dispatch(removeMessage({ waId, inboxId: item.WAInboxId }));
+    setTimeout(() => flatRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
+    await dispatch(sendTextAction({
+      waId,
+      channel,
+      message: item.MessageText,
+      replyToMessageId: item.ReplyToMessageId || undefined,
+    }));
+  };
+
   const rootBg = dark ? 'bg-[#0A0A0D]' : 'bg-white';
   const softBg = dark ? 'bg-[#141418]' : 'bg-[#F2F2F5]';
   const inputBg = dark ? 'bg-[#1C1C22]' : 'bg-[#ECECEF]';
@@ -358,27 +526,32 @@ export default function LiveAgentChat({ route, navigation }) {
     const text = item.MessageText || '';
     const time = item.ReceivedDate ? moment(item.ReceivedDate).format('h:mm A') : '';
 
-    // Long-press → set reply target. Need a real wamid (MessageId) — Meta
-    // requires it for the context block. Optimistic temp rows that haven't
-    // reconciled yet just don't allow reply.
+    // Long-press → open action sheet. Need a real wamid (MessageId) — Meta
+    // requires it for both reply context and reaction targeting. Optimistic
+    // temp rows that haven't reconciled yet have no actions available.
     const onLongPressBubble = () => {
       const mid = item.MessageId;
       if (!mid) return;
       const snippet = (text || `[${item.MessageType || 'message'}]`).slice(0, 80);
-      setReplyTo({ messageId: mid, snippet, fromMe: me });
+      setBubbleAction({ messageId: mid, snippet, fromMe: me, type: item.MessageType });
     };
+
+    const isFailed = item.DeliveryStatus === 'Failed';
 
     return (
       <View className={`mb-2 ${me ? 'items-end' : 'items-start'}`}>
         <TouchableOpacity
           onLongPress={onLongPressBubble}
+          onPress={isFailed ? () => handleRetryFailed(item) : undefined}
           activeOpacity={0.85}
           delayLongPress={300}
+          accessibilityRole={isFailed ? 'button' : undefined}
+          accessibilityLabel={isFailed ? 'Tap to retry sending this message' : undefined}
           className="rounded-[18px] px-3.5 py-2.5 max-w-[82%]"
           style={{
             backgroundColor: me ? c.primary : (dark ? '#141418' : '#F2F2F5'),
-            borderWidth: item.DeliveryStatus === 'Failed' ? 1 : 0,
-            borderColor: item.DeliveryStatus === 'Failed' ? c.danger : 'transparent',
+            borderWidth: isFailed ? 1 : 0,
+            borderColor: isFailed ? c.danger : 'transparent',
           }}
         >
           {/* Quote-of-message preview shown when this bubble was itself a reply */}
@@ -416,9 +589,9 @@ export default function LiveAgentChat({ route, navigation }) {
         >
           <Text className={`text-[10px] ${textMuted}`}>{time}</Text>
           {me && <StatusIcon status={item.DeliveryStatus} c={c} />}
-          {item.DeliveryStatus === 'Failed' && item.ErrorMessage && (
-            <Text className="text-[10px] ml-1" style={{ color: c.danger }} numberOfLines={1}>
-              {item.ErrorMessage}
+          {isFailed && (
+            <Text className="text-[10px] ml-1" style={{ color: c.danger, fontWeight: '600' }} numberOfLines={1}>
+              {item.ErrorMessage ? `${item.ErrorMessage} · tap to retry` : 'Tap to retry'}
             </Text>
           )}
         </View>
@@ -470,6 +643,7 @@ export default function LiveAgentChat({ route, navigation }) {
             </View>
           </View>
           <TouchableOpacity
+            onPress={() => setHeaderMenuOpen(true)}
             className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`}
             activeOpacity={0.7}
             accessibilityRole="button"
@@ -579,6 +753,15 @@ export default function LiveAgentChat({ route, navigation }) {
         </View>
       ) : null}
 
+      {/* Voice-note recorder — only mounted while recording. Owns mic
+          permission + the audio session + the timer + the cancel/stop UX. */}
+      {recording ? (
+        <LiveAgentVoiceRecorder
+          onComplete={handleVoiceComplete}
+          onCancel={handleVoiceCancel}
+        />
+      ) : null}
+
       {/* Composer */}
       <View
         className={`flex-row items-end px-3 py-2 ${rootBg}`}
@@ -587,15 +770,15 @@ export default function LiveAgentChat({ route, navigation }) {
         {/* "+" attach button */}
         <TouchableOpacity
           onPress={() => setAttachOpen(true)}
-          disabled={picking}
+          disabled={picking || recording}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Attach media"
-          accessibilityState={{ disabled: picking, busy: picking }}
+          accessibilityState={{ disabled: picking || recording, busy: picking }}
           className="w-11 h-11 rounded-full items-center justify-center"
           style={{
             backgroundColor: dark ? '#141418' : '#F2F2F5',
-            opacity: picking ? 0.6 : 1,
+            opacity: (picking || recording) ? 0.6 : 1,
           }}
         >
           {picking ? (
@@ -616,25 +799,44 @@ export default function LiveAgentChat({ route, navigation }) {
             style={[{ maxHeight: 110 }, Platform.select({ web: { outlineStyle: 'none' } })]}
           />
         </View>
-        <TouchableOpacity
-          onPress={handleSend}
-          disabled={sending || !input.trim()}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Send message"
-          accessibilityState={{ disabled: sending || !input.trim(), busy: sending }}
-          className="w-11 h-11 rounded-full items-center justify-center"
-          style={{
-            backgroundColor: input.trim() ? c.primary : (dark ? '#141418' : '#F2F2F5'),
-            opacity: sending ? 0.6 : 1,
-          }}
-        >
-          {sending ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Ionicons name="send" size={17} color={input.trim() ? '#FFFFFF' : c.textMuted} />
-          )}
-        </TouchableOpacity>
+        {input.trim() ? (
+          <TouchableOpacity
+            onPress={handleSend}
+            disabled={sending}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            accessibilityState={{ disabled: sending, busy: sending }}
+            className="w-11 h-11 rounded-full items-center justify-center"
+            style={{
+              backgroundColor: c.primary,
+              opacity: sending ? 0.6 : 1,
+            }}
+          >
+            {sending ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Ionicons name="send" size={17} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
+        ) : (
+          // Empty composer → show mic. Tapping starts recording (handled by
+          // LiveAgentVoiceRecorder which mounts above the composer).
+          <TouchableOpacity
+            onPress={() => setRecording(true)}
+            disabled={picking || recording}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Record voice note"
+            className="w-11 h-11 rounded-full items-center justify-center"
+            style={{
+              backgroundColor: c.primary,
+              opacity: (picking || recording) ? 0.6 : 1,
+            }}
+          >
+            <Ionicons name="mic" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Attachment menu + sub-modals — render at the screen root so they
@@ -645,6 +847,7 @@ export default function LiveAgentChat({ route, navigation }) {
         onPickImage={pickAndSendImage}
         onPickVideo={pickAndSendVideo}
         onPickDocument={pickAndSendDocument}
+        onPickSticker={pickAndSendSticker}
         onPickLocation={openLocation}
         onPickTemplate={openTemplate}
         locked={window24h?.state === 'closed'}
@@ -656,8 +859,54 @@ export default function LiveAgentChat({ route, navigation }) {
       />
       <LiveAgentTemplatePicker
         visible={templateOpen}
+        channel={channel}
         onClose={() => setTemplateOpen(false)}
         onSubmit={handleSendTemplate}
+      />
+      <LiveAgentBubbleActions
+        visible={!!bubbleAction}
+        bubble={bubbleAction}
+        onClose={() => setBubbleAction(null)}
+        onReply={handleReplyFromAction}
+        onReact={handleReactFromAction}
+        onForward={handleForwardFromAction}
+      />
+      <LiveAgentForwardModal
+        visible={!!forwardSource}
+        source={forwardSource}
+        channels={channels}
+        defaultChannel={selectedChannel || channel}
+        onClose={() => setForwardSource(null)}
+        onForward={handleForwardSubmit}
+      />
+      <LiveAgentChatHeaderMenu
+        visible={headerMenuOpen}
+        waNumber={waId}
+        channel={channel}
+        profileName={profileName}
+        onClose={() => setHeaderMenuOpen(false)}
+        onAssign={() => setAssignOpen(true)}
+        onViewContact={() => setJourneyOpen(true)}
+        onFavouriteChanged={(isFav) =>
+          toast.success(isFav ? 'Favourited' : 'Removed favourite', profileName || waId)}
+        onBlockChanged={(isBlocked) =>
+          toast.success(isBlocked ? 'Blocked' : 'Unblocked', profileName || waId)}
+      />
+      <LiveAgentJourneyPanel
+        visible={journeyOpen}
+        waNumber={waId}
+        channel={channel}
+        profileName={profileName}
+        onClose={() => setJourneyOpen(false)}
+      />
+      <LiveAgentAssignSheet
+        visible={assignOpen}
+        waNumber={waId}
+        channel={channel}
+        onClose={() => setAssignOpen(false)}
+        onAssigned={({ agentName }) =>
+          toast.success('Assigned', `Conversation handed to ${agentName}.`)}
+        onError={(msg) => toast.error('Assign failed', msg)}
       />
     </KeyboardAvoidingView>
   );

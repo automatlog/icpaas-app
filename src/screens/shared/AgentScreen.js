@@ -1,72 +1,78 @@
-// src/screens/AgentScreen.js — Feed minimal agent roster
-import React, { useMemo, useState } from 'react';
+// src/screens/shared/AgentScreen.js
+//
+// Real agent roster — backed by AgentAPI.list(). Replaces the previous
+// mock SEED_AGENTS. Each row supports tap-to-edit (re-uses CreateAgentScreen
+// in edit mode) and a delete action under the overflow icon.
+//
+// Until backend bearer auth lands on AgentList, every list/edit/delete
+// call will 302; the screen surfaces that as an empty list + retry hint.
+//
+// LoginAsUser (impersonation) is intentionally not surfaced — OmniApp's
+// endpoint swaps the server cookie session, which doesn't translate to a
+// bearer-auth mobile context. Wait for backend impersonation-token support.
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
-  Platform,
+  Platform, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeed, Fonts } from '../../theme';
 import ScreenHeader from '../../components/ScreenHeader';
+import { AgentAPI } from '../../services/api';
+import toast from '../../services/toast';
+import dialog from '../../services/dialog';
 
-const SEED_AGENTS = [
-  { id: 'A-01', name: 'Rahul Mehra',  desk: 'Voice Desk',  ext: '1001', status: 'ON-CALL',   queue: 4, answered: 58, avgSec: 182, shift: 'Morning' },
-  { id: 'A-02', name: 'Ananya Iyer',  desk: 'IVR Inbound', ext: '1014', status: 'AVAILABLE', queue: 0, answered: 41, avgSec: 144, shift: 'Morning' },
-  { id: 'A-03', name: 'Kabir Singh',  desk: 'Campaigns',   ext: '1022', status: 'BREAK',     queue: 0, answered: 19, avgSec: 97,  shift: 'Night'   },
-  { id: 'A-04', name: 'Sneha Patel',  desk: 'Voice Desk',  ext: '1007', status: 'ON-CALL',   queue: 2, answered: 62, avgSec: 201, shift: 'Morning' },
-  { id: 'A-05', name: 'Vikram Rao',   desk: 'IVR Inbound', ext: '1030', status: 'AWAY',      queue: 0, answered: 12, avgSec: 88,  shift: 'Night'   },
-  { id: 'A-06', name: 'Priya Bose',   desk: 'WhatsApp',    ext: '1041', status: 'AVAILABLE', queue: 1, answered: 74, avgSec: 63,  shift: 'Morning' },
-  { id: 'A-07', name: 'Tanmay Ghosh', desk: 'RCS Studio',  ext: '1055', status: 'AVAILABLE', queue: 0, answered: 8,  avgSec: 120, shift: 'Night'   },
-  { id: 'A-08', name: 'Meera Joshi',  desk: 'Voice Desk',  ext: '1019', status: 'ON-CALL',   queue: 3, answered: 47, avgSec: 166, shift: 'Night'   },
-];
-
-const fmtSec = (s) => {
-  const m = Math.floor(s / 60);
-  const rem = String(s % 60).padStart(2, '0');
-  return `${m}:${rem}`;
+// Maps EnumAccountStatus (UserEnums.cs:10) to a status pill.
+const STATUS_BY_CODE = {
+  1: { label: 'ACTIVE',   key: 'AVAILABLE' },
+  2: { label: 'INACTIVE', key: 'AWAY' },
+  3: { label: 'BLOCKED',  key: 'BREAK' },
 };
 
-const initials = (name) => name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
+const initials = (name = '') =>
+  name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
+
+// Defensive normaliser — OmniApp returns either camel or Pascal depending
+// on which controller serialiser fired.
+const normaliseAgent = (raw) => ({
+  userId:        raw.userId        ?? raw.UserId        ?? raw.AgentUserId ?? raw.id,
+  userName:      raw.userName      ?? raw.UserName      ?? raw.name        ?? '',
+  emailId:       raw.emailId       ?? raw.EmailId       ?? raw.email       ?? '',
+  mobileNumber:  raw.mobileNumber  ?? raw.MobileNumber  ?? raw.mobile      ?? '',
+  accountStatus: raw.accountStatus ?? raw.AccountStatus ?? 1,
+  // Optional product/role flags — surfaced when present.
+  isAllChatAssign: !!(raw.isAllChatAssign ?? raw.IsAllChatAssign),
+  isSendTemplate:  !!(raw.isSendTemplate  ?? raw.IsSendTemplate),
+});
 
 const makeStyles = (c) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg },
-  scroll: { paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 120 },
-
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
-  backBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: c.bgSoft, alignItems: 'center', justifyContent: 'center' },
-  title: { color: c.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.6, flex: 1, fontFamily: Fonts.sans },
-
-  summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
+  scroll: { paddingTop: 4, paddingHorizontal: 22, paddingBottom: 120 },
+  summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 18, marginTop: 12 },
   summaryCell: { flex: 1, backgroundColor: c.bgSoft, borderRadius: 18, padding: 14 },
   summaryLabel: { color: c.textMuted, fontSize: 11, fontWeight: '500', marginBottom: 4 },
   summaryValue: { color: c.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
-
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.bgSoft, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 4, marginBottom: 14 },
   searchInput: { flex: 1, color: c.text, fontSize: 14, fontFamily: Fonts.sans, paddingVertical: Platform.OS === 'ios' ? 12 : 8, ...Platform.select({ web: { outlineStyle: 'none' } }) },
-
   filterRow: { flexDirection: 'row', gap: 6, marginBottom: 18, flexWrap: 'wrap' },
   chip: { paddingVertical: 7, paddingHorizontal: 14, borderRadius: 16, backgroundColor: c.bgSoft },
   chipActive: { backgroundColor: c.text },
   chipLabel: { color: c.textMuted, fontSize: 12, fontWeight: '500' },
   chipLabelActive: { color: c.bg, fontWeight: '600' },
-
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.bgSoft, borderRadius: 18, padding: 14, marginBottom: 10 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#0A0A0D', fontSize: 14, fontWeight: '700', fontFamily: Fonts.sans },
   grow: { flex: 1 },
   name: { color: c.text, fontSize: 15, fontWeight: '600' },
   meta: { color: c.textMuted, fontSize: 11, marginTop: 2 },
-  right: { alignItems: 'flex-end', gap: 4 },
+  right: { alignItems: 'flex-end', gap: 4, flexDirection: 'row' },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  stats: { flexDirection: 'row', gap: 8 },
-  statCell: { alignItems: 'flex-end' },
-  statNum: { color: c.text, fontSize: 12, fontWeight: '600', fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) },
-  statKey: { color: c.textDim, fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
-
+  iconBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginLeft: 6, backgroundColor: c.bgInput },
   emptyBlock: { paddingVertical: 48, alignItems: 'center', gap: 8 },
   emptyHead: { color: c.text, fontSize: 16, fontWeight: '600' },
-  emptyBody: { color: c.textMuted, fontSize: 12 },
+  emptyBody: { color: c.textMuted, fontSize: 12, textAlign: 'center', paddingHorizontal: 24 },
 });
 
 export default function AgentScreen({ navigation }) {
@@ -74,31 +80,94 @@ export default function AgentScreen({ navigation }) {
   const styles = useMemo(() => makeStyles(c), [c]);
 
   const STATUS = {
-    'ON-CALL':   { color: c.accentPink,   tint: c.tintRose },
-    'AVAILABLE': { color: c.accentCyan,   tint: c.tintMint },
-    'BREAK':     { color: c.accentOrange, tint: c.tintYellow },
-    'AWAY':      { color: c.textMuted,    tint: c.tintLavender },
+    AVAILABLE: { color: c.accentCyan,   tint: c.tintMint },
+    BREAK:     { color: c.accentOrange, tint: c.tintYellow },
+    AWAY:      { color: c.textMuted,    tint: c.tintLavender },
   };
 
+  const [agents, setAgents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('ALL');
-  const filters = ['ALL', 'ON-CALL', 'AVAILABLE', 'BREAK', 'AWAY'];
+  const [deletingId, setDeletingId] = useState(null);
+
+  const filters = ['ALL', 'ACTIVE', 'INACTIVE', 'BLOCKED'];
+
+  const fetchAgents = useCallback(async () => {
+    try {
+      setError(null);
+      const res = await AgentAPI.list();
+      const raw = Array.isArray(res) ? res : (res?.data || res?.agents || []);
+      setAgents(raw.map(normaliseAgent));
+    } catch (e) {
+      setError(e?.message || 'Could not load agents.');
+      setAgents([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', fetchAgents);
+    return unsub;
+  }, [navigation, fetchAgents]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAgents();
+  };
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return SEED_AGENTS.filter((a) => {
-      if (filter !== 'ALL' && a.status !== filter) return false;
+    return agents.filter((a) => {
+      const status = STATUS_BY_CODE[a.accountStatus]?.label || 'ACTIVE';
+      if (filter !== 'ALL' && status !== filter) return false;
       if (!q) return true;
       return (
-        a.name.toLowerCase().includes(q) ||
-        a.desk.toLowerCase().includes(q) ||
-        a.ext.includes(q)
+        a.userName.toLowerCase().includes(q) ||
+        a.emailId.toLowerCase().includes(q) ||
+        a.mobileNumber.includes(q)
       );
     });
-  }, [query, filter]);
+  }, [agents, query, filter]);
 
-  const onCall = SEED_AGENTS.filter((a) => a.status === 'ON-CALL').length;
-  const avail = SEED_AGENTS.filter((a) => a.status === 'AVAILABLE').length;
+  const counts = useMemo(() => ({
+    total: agents.length,
+    active: agents.filter((a) => a.accountStatus === 1).length,
+    inactive: agents.filter((a) => a.accountStatus === 2).length,
+  }), [agents]);
+
+  const handleEdit = (agent) => {
+    navigation.navigate('CreateAgent', { agentId: agent.userId });
+  };
+
+  const handleDelete = async (agent) => {
+    const ok = await dialog.confirm({
+      title: 'Delete agent?',
+      message: `${agent.userName} will lose access to OmniApp. Their chat assignments will be released.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
+    setDeletingId(agent.userId);
+    try {
+      await AgentAPI.delete(agent.userId);
+      setAgents((prev) => prev.filter((a) => a.userId !== agent.userId));
+      toast.success('Agent deleted', agent.userName);
+    } catch (e) {
+      const status = e?.status;
+      const hint = status === 302 || status === 401
+        ? 'Backend bearer auth on AgentList isn’t live yet.'
+        : (e?.message || 'Try again.');
+      toast.error('Delete failed', hint);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -109,6 +178,7 @@ export default function AgentScreen({ navigation }) {
         title="Agents"
         right={(
           <TouchableOpacity
+            onPress={() => navigation.navigate('CreateAgent')}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel="Add agent"
@@ -122,19 +192,26 @@ export default function AgentScreen({ navigation }) {
           </TouchableOpacity>
         )}
       />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} />
+        }
+      >
         <View style={styles.summaryRow}>
           <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>On floor</Text>
-            <Text style={styles.summaryValue}>{SEED_AGENTS.length}</Text>
+            <Text style={styles.summaryLabel}>Total</Text>
+            <Text style={styles.summaryValue}>{counts.total}</Text>
           </View>
           <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>On call</Text>
-            <Text style={[styles.summaryValue, { color: c.accentPink }]}>{onCall}</Text>
+            <Text style={styles.summaryLabel}>Active</Text>
+            <Text style={[styles.summaryValue, { color: c.accentCyan }]}>{counts.active}</Text>
           </View>
           <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Available</Text>
-            <Text style={[styles.summaryValue, { color: c.accentCyan }]}>{avail}</Text>
+            <Text style={styles.summaryLabel}>Inactive</Text>
+            <Text style={[styles.summaryValue, { color: c.textMuted }]}>{counts.inactive}</Text>
           </View>
         </View>
 
@@ -142,8 +219,9 @@ export default function AgentScreen({ navigation }) {
           <Ionicons name="search-outline" size={16} color={c.textMuted} />
           <TextInput
             value={query} onChangeText={setQuery}
-            placeholder="Search name, desk, extension"
+            placeholder="Search name, email, mobile"
             placeholderTextColor={c.textMuted}
+            autoCapitalize="none"
             style={styles.searchInput}
           />
         </View>
@@ -156,45 +234,87 @@ export default function AgentScreen({ navigation }) {
           ))}
         </View>
 
-        {list.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyBlock}>
+            <ActivityIndicator color={c.primary} />
+            <Text style={styles.emptyBody}>Loading agents…</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.emptyBlock}>
+            <Ionicons name="cloud-offline-outline" size={40} color={c.danger} />
+            <Text style={styles.emptyHead}>Couldn’t load agents</Text>
+            <Text style={styles.emptyBody}>
+              {error.includes('302') || error.toLowerCase().includes('unauth')
+                ? 'OmniApp bearer auth on AgentList isn’t live yet — try again later.'
+                : error}
+            </Text>
+            <TouchableOpacity
+              onPress={fetchAgents}
+              activeOpacity={0.85}
+              style={{
+                marginTop: 8, paddingHorizontal: 16, paddingVertical: 10,
+                borderRadius: 12, backgroundColor: c.primary,
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : list.length === 0 ? (
           <View style={styles.emptyBlock}>
             <Ionicons name="people-outline" size={40} color={c.textDim} />
-            <Text style={styles.emptyHead}>No match</Text>
-            <Text style={styles.emptyBody}>Clear filters or search another desk.</Text>
+            <Text style={styles.emptyHead}>{agents.length === 0 ? 'No agents yet' : 'No match'}</Text>
+            <Text style={styles.emptyBody}>
+              {agents.length === 0
+                ? 'Tap + to create the first agent.'
+                : 'Clear filters or search another field.'}
+            </Text>
           </View>
         ) : (
           list.map((a) => {
-            const s = STATUS[a.status] || STATUS.AWAY;
+            const code = a.accountStatus;
+            const statusEntry = STATUS_BY_CODE[code] || STATUS_BY_CODE[1];
+            const s = STATUS[statusEntry.key] || STATUS.AVAILABLE;
+            const isDeleting = deletingId === a.userId;
             return (
-              <View key={a.id} style={styles.card}>
+              <TouchableOpacity
+                key={a.userId}
+                activeOpacity={0.85}
+                onPress={() => handleEdit(a)}
+                style={styles.card}
+              >
                 <View style={[styles.avatar, { backgroundColor: s.tint }]}>
-                  <Text style={styles.avatarText}>{initials(a.name)}</Text>
+                  <Text style={styles.avatarText}>{initials(a.userName)}</Text>
                 </View>
                 <View style={styles.grow}>
-                  <Text style={styles.name}>{a.name}</Text>
-                  <Text style={styles.meta}>{a.desk} · x{a.ext} · {a.shift}</Text>
+                  <Text style={styles.name} numberOfLines={1}>{a.userName}</Text>
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {a.emailId || a.mobileNumber || '—'}
+                    {a.isAllChatAssign ? ' · all chats' : ''}
+                    {a.isSendTemplate ? ' · templates' : ''}
+                  </Text>
                 </View>
                 <View style={styles.right}>
                   <View style={[styles.statusBadge, { backgroundColor: s.color + '22' }]}>
                     <View style={[styles.statusDot, { backgroundColor: s.color }]} />
-                    <Text style={[styles.statusLabel, { color: s.color }]}>{a.status}</Text>
+                    <Text style={[styles.statusLabel, { color: s.color }]}>
+                      {statusEntry.label}
+                    </Text>
                   </View>
-                  <View style={styles.stats}>
-                    <View style={styles.statCell}>
-                      <Text style={styles.statNum}>{a.queue}</Text>
-                      <Text style={styles.statKey}>Q</Text>
-                    </View>
-                    <View style={styles.statCell}>
-                      <Text style={styles.statNum}>{a.answered}</Text>
-                      <Text style={styles.statKey}>Ans</Text>
-                    </View>
-                    <View style={styles.statCell}>
-                      <Text style={styles.statNum}>{fmtSec(a.avgSec)}</Text>
-                      <Text style={styles.statKey}>Avg</Text>
-                    </View>
-                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleDelete(a)}
+                    disabled={isDeleting}
+                    activeOpacity={0.7}
+                    hitSlop={6}
+                    style={styles.iconBtn}
+                  >
+                    {isDeleting ? (
+                      <ActivityIndicator size="small" color={c.danger} />
+                    ) : (
+                      <Ionicons name="trash-outline" size={14} color={c.danger} />
+                    )}
+                  </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}

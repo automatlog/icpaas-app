@@ -247,6 +247,20 @@ const liveChatSlice = createSlice({
         m.WAInboxId === tempId ? { ...m, DeliveryStatus: 'Failed', ErrorMessage: error || 'Send failed' } : m,
       );
     },
+    // Strip a single bubble from a thread by WAInboxId (or MessageId).
+    // Used by the retry-failed path so the old failed row vanishes before
+    // the new optimistic one appears.
+    removeMessage(state, action) {
+      const { waId, inboxId, messageId } = action.payload || {};
+      if (!waId) return;
+      const thread = state.threads[waId];
+      if (!thread) return;
+      thread.messages = thread.messages.filter((m) => {
+        if (inboxId && m.WAInboxId === inboxId) return false;
+        if (messageId && m.MessageId === messageId) return false;
+        return true;
+      });
+    },
 
     // ---------- reset ----------
     resetLiveChat() {
@@ -276,6 +290,7 @@ export const {
   optimisticSend,
   sendResolved,
   sendFailed,
+  removeMessage,
   resetLiveChat,
 } = liveChatSlice.actions;
 

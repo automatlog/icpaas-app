@@ -20,6 +20,7 @@ const TINTS = {
   document: { bg: '#F59E0B', icon: 'document-text-outline' },
   location: { bg: '#10B981', icon: 'location-outline' },
   template: { bg: '#EC4899', icon: 'layers-outline' },
+  sticker:  { bg: '#06B6D4', icon: 'happy-outline' },
 };
 
 const Row = ({ kind, label, hint, disabled, onPress, c }) => {
@@ -62,6 +63,7 @@ export default function LiveAgentAttachMenu({
   onPickVideo,
   onPickDocument,
   onPickLocation,
+  onPickSticker,
   onPickTemplate,
   // Locked == window expired (24-h rule). Most kinds disabled, template
   // surfaces as the only allowed path.
@@ -164,6 +166,16 @@ export default function LiveAgentAttachMenu({
             onPress={onPickLocation}
             c={c}
           />
+          {onPickSticker ? (
+            <Row
+              kind="sticker"
+              label="Sticker"
+              hint="WebP only · static ≤100KB · animated ≤500KB"
+              disabled={locked}
+              onPress={onPickSticker}
+              c={c}
+            />
+          ) : null}
           {onPickTemplate ? (
             <Row
               kind="template"

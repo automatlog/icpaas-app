@@ -41,24 +41,26 @@ const fmt = (iso) => {
   } catch { return '—'; }
 };
 
-// Demo recipient feed — generated from campaign aggregate so the user can see
-// what a real per-recipient drilldown looks like. Replace with /CampaignReport
-// API once the backend endpoint is exposed for mobile.
-const seedRecipients = (cmp) => {
+// Real recipient feed for a campaign:
+//   1. New campaigns persist `cmp.recipients` with the actual numbers +
+//      per-number Promise.allSettled outcome (set in CampaignStep3 launch).
+//   2. Older campaigns dispatched before that change don't have the field —
+//      synthesize a minimal placeholder list that at least respects the
+//      `total` / `failed` counts so the screen still renders.
+const resolveRecipients = (cmp) => {
   if (!cmp) return [];
-  const sample = [
-    '919876543210', '918765432109', '917654321098', '916543210987',
-    '915432109876', '914321098765', '913210987654', '912109876543',
-  ];
-  const total = Math.min(Math.max(Number(cmp.total) || 0, 0), 12);
+  if (Array.isArray(cmp.recipients) && cmp.recipients.length) {
+    return cmp.recipients;
+  }
+  const total = Math.min(Math.max(Number(cmp.total) || 0, 0), 50);
   const failed = Math.min(Number(cmp.failed) || 0, total);
   const list = [];
   for (let i = 0; i < total; i += 1) {
     const isFailed = i < failed;
     list.push({
       id: `${cmp.id}_${i}`,
-      number: sample[i % sample.length],
-      status: isFailed ? 'failed' : (cmp.status === 'live' ? (i < 3 ? 'sent' : 'delivered') : 'delivered'),
+      number: 'unknown',
+      status: isFailed ? 'failed' : (cmp.status === 'live' ? 'sent' : 'delivered'),
       ts: cmp.createdAt,
       error: isFailed ? 'Recipient not on WhatsApp' : null,
     });
@@ -82,7 +84,7 @@ export default function CampaignDetailScreen({ navigation, route }) {
   const [recipFilter, setRecipFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
 
-  const recipients = useMemo(() => seedRecipients(cmp), [cmp]);
+  const recipients = useMemo(() => resolveRecipients(cmp), [cmp]);
   const filteredRecipients = useMemo(() => {
     if (recipFilter === 'all') return recipients;
     return recipients.filter((r) => r.status === recipFilter);

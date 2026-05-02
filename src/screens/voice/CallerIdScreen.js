@@ -53,15 +53,9 @@ export default function CallerIdScreen({ navigation }) {
         contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 22, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className={`flex-row rounded-[18px] p-4 mb-3 ${softBg}`} style={{ gap: 12 }}>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Numbers</Text>
-            <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`}>{callers.length}</Text>
-          </View>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Source</Text>
-            <Text className={`text-[11px] font-mono mt-1.5 ${textInk}`}>icpaas.in/Voice</Text>
-          </View>
+        <View className={`rounded-[18px] p-4 mb-3 ${softBg}`}>
+          <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Numbers</Text>
+          <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`}>{callers.length}</Text>
         </View>
 
         {loading ? (

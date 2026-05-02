@@ -30,6 +30,10 @@
     },
     "ios": {
       "bundleIdentifier": "com.icpaas.omniapp"
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-audio"
+    ]
   }
 }

@@ -41,6 +41,7 @@ import {
   markAllChatsRead,
 } from '../../services/liveChatActions';
 import toast from '../../services/toast';
+import LiveAgentNewChatModal from '../../components/LiveAgentNewChatModal';
 
 const FILTERS = [
   { id: 'All',        label: 'All',        countKey: 'AllCount' },
@@ -120,6 +121,7 @@ export default function LiveAgentInbox({ navigation, route }) {
 
   const [searchInput, setSearchInput] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
   const debounceRef = useRef(null);
 
   const filter = chatList.filter;
@@ -470,6 +472,39 @@ export default function LiveAgentInbox({ navigation, route }) {
           }
         />
       )}
+
+      {/* FAB — start a new conversation */}
+      <TouchableOpacity
+        onPress={() => setNewChatOpen(true)}
+        activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityLabel="Start new conversation"
+        style={{
+          position: 'absolute',
+          bottom: 24, right: 20,
+          width: 56, height: 56, borderRadius: 28,
+          alignItems: 'center', justifyContent: 'center',
+          backgroundColor: c.primary,
+          shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.2, shadowRadius: 10, elevation: 8,
+        }}
+      >
+        <Ionicons name="create" size={22} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Modal handles validation; on submit we navigate into the chat
+          with the new waId/channel. Empty thread is normal — composer's
+          "+" → Template covers the no-24h-window first send. */}
+      <LiveAgentNewChatModal
+        visible={newChatOpen}
+        channels={channels}
+        defaultChannel={selectedChannel}
+        onClose={() => setNewChatOpen(false)}
+        onContinue={({ waId, channel, profileName }) => {
+          setNewChatOpen(false);
+          navigation.navigate('LiveAgentChat', { waId, channel, profileName });
+        }}
+      />
     </View>
   );
 }

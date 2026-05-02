@@ -23,11 +23,12 @@ const CHATS_CHANNELS = [
   { ...getChannel('rcs'),      route: 'RcsInbox', routeParams: { channel: 'rcs' } },
 ];
 
-const RADIUS = 96;
-// Two icons, slightly tighter spread than the 4-channel campaign arc.
-const ANGLES = [-130, -50];
-const CIRCLE_SIZE = 64;
-const ICON_SIZE   = 30;
+// Tighter than CampaignPicker — only 2 icons, so they sit nearer the
+// Chats tab and closer to each other for a tidier pair.
+const RADIUS = 50;
+const ANGLES = [-135, -45];
+const CIRCLE_SIZE = 60;
+const ICON_SIZE   = 28;
 
 // Per-channel icon tint — mirrors CampaignPicker's map so both pickers
 // read consistently.

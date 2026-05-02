@@ -16,6 +16,7 @@ import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import ProfileScreen from '../screens/shared/ProfileScreen';
 import ApiDocsScreen from '../screens/shared/ApiDocsScreen';
 import ContactsScreen from '../screens/shared/ContactsScreen';
+import CreateAgentScreen from '../screens/shared/CreateAgentScreen';
 
 // WhatsApp screens
 import WhatsAppChatScreen from '../screens/whatsapp/ChatScreen';
@@ -113,6 +114,7 @@ export default function AppNavigator() {
         <Stack.Screen name="You" component={ProfileScreen} />
         <Stack.Screen name="ApiDocs" component={ApiDocsScreen} />
         <Stack.Screen name="Contacts" component={ContactsScreen} />
+        <Stack.Screen name="CreateAgent" component={CreateAgentScreen} />
 
         {/* WhatsApp */}
         <Stack.Screen

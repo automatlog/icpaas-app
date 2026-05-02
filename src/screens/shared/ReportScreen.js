@@ -1,283 +1,444 @@
-// src/screens/ReportScreen.js — Feed minimal voice/IVR report
+// src/screens/shared/ReportScreen.js — Campaign Activity report
+//
+// Mobile mirror of icpaas.in's WhatsApp / Campaign Activity report. Five
+// sub-tabs (Campaign / Delivery / Schedule / Fallback / API), a date-range
+// chip, a Filter Records strip, and a per-campaign card list with all of
+// the desktop columns laid out vertically so a phone can read them.
+//
+// Data sources:
+//   - campaignsSlice  → Campaign Report, Schedule Report, Fallback Report
+//   - VoiceAPI / IVRAPI → Delivery Report (real call dispositions)
+//   - Static placeholder for API Report until the audit endpoint is wired
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Platform, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFeed, Fonts } from '../../theme';
+import { useSelector } from 'react-redux';
+import { useBrand } from '../../theme';
 import { VoiceAPI, IVRAPI } from '../../services/api';
+import { selectCampaigns } from '../../store/slices/campaignsSlice';
 import { formatCurrency } from '../../services/format';
 import ScreenHeader from '../../components/ScreenHeader';
+import EmptyState from '../../components/EmptyState';
+import { SkeletonCard } from '../../components/Skeleton';
 
-const ymd = (d) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+const TABS = [
+  { id: 'campaign', label: 'Campaign',  icon: 'megaphone-outline' },
+  { id: 'delivery', label: 'Delivery',  icon: 'paper-plane-outline' },
+  { id: 'schedule', label: 'Schedule',  icon: 'calendar-outline' },
+  { id: 'fallback', label: 'Fallback',  icon: 'git-branch-outline' },
+  { id: 'api',      label: 'API',       icon: 'code-slash-outline' },
+];
+
+const STATUS_TINT = (status, c) => {
+  const s = String(status || '').toLowerCase();
+  if (s === 'completed' || s.includes('answer')) return { bg: '#D1FAE5', fg: '#047857' };
+  if (s === 'live'      || s.includes('runn'))   return { bg: '#DBEAFE', fg: '#1D4ED8' };
+  if (s === 'scheduled')                          return { bg: '#FEF3C7', fg: '#B45309' };
+  if (s === 'stuck'     || s.includes('partial')) return { bg: '#FEF3C7', fg: '#B45309' };
+  if (s === 'failed'    || s.includes('reject') || s.includes('fail')) return { bg: '#FEE2E2', fg: '#B91C1C' };
+  return { bg: c.bgInput, fg: c.textMuted };
 };
 
-const daysAgo = (n) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return ymd(d);
-};
-
-const fmtTime = (iso) => {
+const fmtDateLong = (iso) => {
   if (!iso) return '—';
   try {
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return iso;
-  }
+    if (Number.isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString('en-GB', {
+      weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  } catch { return String(iso); }
 };
 
-const TABS = [
-  { id: 'obd', label: 'Outbound',  icon: 'call-outline' },
-  { id: 'ibd', label: 'Inbound',   icon: 'call-outline' },
-];
+const fmtDateShort = (iso) => {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+  } catch { return String(iso); }
+};
 
-const makeStyles = (c) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: c.bg },
-  scroll: { paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 120 },
-
-  topBar: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 10 },
-  backBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: c.bgSoft, alignItems: 'center', justifyContent: 'center' },
-  title: { color: c.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.6, flex: 1, fontFamily: Fonts.sans },
-
-  tabs: { flexDirection: 'row', backgroundColor: c.bgSoft, borderRadius: 22, padding: 4, marginBottom: 20 },
-  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 18 },
-  tabActive: { backgroundColor: c.bgInput },
-  tabLabel: { color: c.textMuted, fontSize: 14, fontWeight: '500' },
-  tabLabelActive: { color: c.text, fontWeight: '600' },
-
-  rangeRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  dateField: { flex: 1 },
-  dateLabel: { color: c.textMuted, fontSize: 11, marginBottom: 6, fontWeight: '500', letterSpacing: 0.5 },
-  dateInput: {
-    backgroundColor: c.bgSoft,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
-    color: c.text,
-    fontSize: 14,
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
-    ...Platform.select({ web: { outlineStyle: 'none' } }),
-  },
-  fetchBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, backgroundColor: c.text, borderRadius: 16, marginBottom: 20 },
-  fetchLabel: { color: c.bg, fontSize: 14, fontWeight: '600' },
-
-  summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  summaryCell: { flex: 1, backgroundColor: c.bgSoft, borderRadius: 18, padding: 14 },
-  summaryLabel: { color: c.textMuted, fontSize: 11, fontWeight: '500', marginBottom: 4 },
-  summaryValue: { color: c.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
-
-  emptyBlock: { paddingVertical: 60, alignItems: 'center', gap: 8 },
-  emptyHead: { color: c.text, fontSize: 17, fontWeight: '600' },
-  emptyBody: { color: c.textMuted, fontSize: 13, textAlign: 'center', maxWidth: 280 },
-
-  errBlock: { backgroundColor: c.bgSoft, borderRadius: 16, padding: 16, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: c.accentPink },
-  errKicker: { color: c.accentPink, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
-  errText: { color: c.text, fontSize: 13 },
-
-  card: { backgroundColor: c.bgSoft, borderRadius: 18, padding: 14, marginBottom: 10 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  cardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  cardGrow: { flex: 1 },
-  cardNumber: { color: c.text, fontSize: 14, fontWeight: '600', fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) },
-  cardTime: { color: c.textMuted, fontSize: 11, marginTop: 2 },
-  cardStatusBadge: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
-  cardStatusLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  cardRow: { flexDirection: 'row', gap: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.rule },
-  cardCell: { flex: 1 },
-  cellLabel: { color: c.textDim, fontSize: 10, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
-  cellValue: { color: c.text, fontSize: 12, fontWeight: '500' },
-});
+const dateOnly = (iso) => {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch { return '—'; }
+};
 
 export default function ReportScreen({ navigation }) {
-  const c = useFeed();
-  const styles = useMemo(() => makeStyles(c), [c]);
-  const scrollPad = useMemo(
-    () => ({ ...styles.scroll, paddingTop: 16 }),
-    [styles.scroll],
-  );
+  const c = useBrand();
+  const campaigns = useSelector(selectCampaigns);
 
-  const [tab, setTab] = useState('obd');
-  const [fromDate, setFromDate] = useState(daysAgo(14));
-  const [toDate, setToDate] = useState(ymd(new Date()));
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState('campaign');
+  const [range, setRange] = useState({
+    from: new Date(Date.now() - 14 * 86400 * 1000),
+    to: new Date(),
+  });
+  const [voiceRows, setVoiceRows] = useState([]);
+  const [loadingVoice, setLoadingVoice] = useState(false);
+  const [voiceErr, setVoiceErr] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [err, setErr] = useState(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  const fetchRows = useCallback(async () => {
-    setLoading(true);
-    setErr(null);
+  const fromDateStr = range.from.toISOString().slice(0, 10);
+  const toDateStr   = range.to.toISOString().slice(0, 10);
+  const rangeLabel = `${dateOnly(range.from)} — ${dateOnly(range.to)}`;
+
+  // Voice / IVR delivery report — fetched only when the Delivery tab is on.
+  const fetchDelivery = useCallback(async () => {
+    setLoadingVoice(true); setVoiceErr(null);
     try {
-      if (tab === 'obd') {
-        const res = await VoiceAPI.getDeliveryReport({ fromDate, toDate, reportType: 'OBD' });
-        setRows(res?.data || []);
-      } else {
-        const res = await IVRAPI.getInboundReports({ fromDate, toDate, exportToCsv: false });
-        setRows(res?.data || []);
-      }
+      const res = await VoiceAPI.getDeliveryReport({ fromDate: fromDateStr, toDate: toDateStr, reportType: 'OBD' });
+      setVoiceRows(res?.data || []);
     } catch (e) {
-      setErr(e?.message || 'Failed to load report');
-      setRows([]);
+      setVoiceErr(e?.message || 'Failed to load report');
+      setVoiceRows([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setLoadingVoice(false); setRefreshing(false);
     }
-  }, [tab, fromDate, toDate]);
+  }, [fromDateStr, toDateStr]);
 
-  useEffect(() => { fetchRows(); }, [fetchRows]);
+  useEffect(() => {
+    if (tab === 'delivery') fetchDelivery();
+  }, [tab, fetchDelivery]);
 
-  const answered = rows.filter((r) =>
-    String(r.callStatus || r.disposition || '').toUpperCase().includes('ANSWER'),
-  ).length;
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    if (tab === 'delivery') fetchDelivery();
+    else setTimeout(() => setRefreshing(false), 400);
+  }, [tab, fetchDelivery]);
 
-  const statusColor = (status) => {
-    const s = String(status).toUpperCase();
-    if (s.includes('ANSWER')) return c.accentCyan;
-    if (s.includes('FAIL') || s.includes('REJECT') || s.includes('BUSY')) return c.accentPink;
-    if (s.includes('CANCEL') || s.includes('NOANSWER')) return c.accentOrange;
-    return c.textMuted;
-  };
+  // Per-tab row source.
+  const rows = useMemo(() => {
+    if (tab === 'campaign') return campaigns;
+    if (tab === 'schedule') return campaigns.filter((cmp) => cmp.status === 'scheduled');
+    if (tab === 'fallback') return campaigns.filter((cmp) => (cmp.failed || 0) > 0);
+    if (tab === 'delivery') return voiceRows;
+    return [];
+  }, [tab, campaigns, voiceRows]);
+
+  const isLoading = tab === 'delivery' && loadingVoice;
+  const tabErr = tab === 'delivery' ? voiceErr : null;
 
   return (
-    <View style={styles.root}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScreenHeader
         c={c}
         onBack={() => navigation.goBack()}
         icon="bar-chart-outline"
-        title="Reports"
-        right={
-          <TouchableOpacity
-            onPress={fetchRows}
-            activeOpacity={0.7}
-            style={{
-              width: 36, height: 36, borderRadius: 18,
-              alignItems: 'center', justifyContent: 'center',
-              backgroundColor: c.bgInput,
-            }}
-          >
-            <Ionicons name="refresh" size={16} color={c.text} />
-          </TouchableOpacity>
-        }
+        title="Campaign Activity"
+        subtitle="Home · WhatsApp · Reports"
       />
+
+      {/* Sub-tab strip — horizontally scrollable so all 5 tabs stay reachable on narrow screens. */}
       <ScrollView
-        contentContainerStyle={scrollPad}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRows(); }} tintColor={c.accentPink} />}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8 }}
+        style={{ borderBottomWidth: 1, borderBottomColor: c.rule, flexGrow: 0 }}
       >
-        <View style={styles.tabs}>
-          {TABS.map((t) => (
-            <TouchableOpacity key={t.id} onPress={() => setTab(t.id)} style={[styles.tab, tab === t.id && styles.tabActive]} activeOpacity={0.8}>
-              <Ionicons name={t.id === 'obd' ? 'arrow-up-outline' : 'arrow-down-outline'} size={14} color={tab === t.id ? c.text : c.textMuted} />
-              <Text style={[styles.tabLabel, tab === t.id && styles.tabLabelActive]}>{t.label}</Text>
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <TouchableOpacity
+              key={t.id}
+              onPress={() => setTab(t.id)}
+              activeOpacity={0.85}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${t.label} report`}
+              style={{
+                flexDirection: 'row', alignItems: 'center',
+                paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12,
+                gap: 6,
+                backgroundColor: active ? c.primary : c.bgInput,
+              }}
+            >
+              <Ionicons name={t.icon} size={13} color={active ? '#FFFFFF' : c.textMuted} />
+              <Text
+                style={{
+                  color: active ? '#FFFFFF' : c.textMuted,
+                  fontSize: 12, fontWeight: active ? '700' : '500',
+                }}
+              >
+                {t.label} Report
+              </Text>
             </TouchableOpacity>
-          ))}
-        </View>
+          );
+        })}
+      </ScrollView>
 
-        <View style={styles.rangeRow}>
-          <View style={styles.dateField}>
-            <Text style={styles.dateLabel}>From</Text>
-            <TextInput
-              value={fromDate} onChangeText={setFromDate}
-              placeholder="yyyy-mm-dd" placeholderTextColor={c.textDim}
-              style={styles.dateInput}
-            />
-          </View>
-          <View style={styles.dateField}>
-            <Text style={styles.dateLabel}>To</Text>
-            <TextInput
-              value={toDate} onChangeText={setToDate}
-              placeholder="yyyy-mm-dd" placeholderTextColor={c.textDim}
-              style={styles.dateInput}
-            />
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.fetchBtn} onPress={fetchRows} activeOpacity={0.85}>
-          <Ionicons name="search-outline" size={16} color={c.bg} />
-          <Text style={styles.fetchLabel}>Fetch report</Text>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 130 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
+      >
+        {/* Date range chip */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`Date range ${rangeLabel}, tap to change`}
+          style={{
+            flexDirection: 'row', alignItems: 'center',
+            paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14,
+            backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border,
+            marginBottom: 12, gap: 10,
+          }}
+        >
+          <Ionicons name="calendar-outline" size={16} color={c.primary} />
+          <Text style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '600' }}>{rangeLabel}</Text>
+          <Ionicons name="chevron-down" size={14} color={c.textMuted} />
         </TouchableOpacity>
 
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Rows</Text>
-            <Text style={styles.summaryValue}>{rows.length}</Text>
+        {/* Filter Records collapsible */}
+        <TouchableOpacity
+          onPress={() => setFilterOpen((v) => !v)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: filterOpen }}
+          accessibilityLabel="Filter records"
+          style={{
+            flexDirection: 'row', alignItems: 'center',
+            paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14,
+            backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border,
+            marginBottom: 12, gap: 10,
+          }}
+        >
+          <Ionicons name="funnel-outline" size={16} color={c.primary} />
+          <Text style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '700' }}>Filter Records</Text>
+          <Ionicons name={filterOpen ? 'chevron-up' : 'chevron-down'} size={14} color={c.textMuted} />
+        </TouchableOpacity>
+
+        {filterOpen ? (
+          <View
+            style={{
+              padding: 12, borderRadius: 14, marginBottom: 12,
+              backgroundColor: c.bgInput, gap: 6,
+            }}
+          >
+            <Text style={{ color: c.textMuted, fontSize: 11 }}>
+              Filter widgets coming soon — will narrow rows by template, status, channel.
+            </Text>
           </View>
-          <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Answered</Text>
-            <Text style={[styles.summaryValue, { color: c.accentCyan }]}>{answered}</Text>
-          </View>
-          <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Missed</Text>
-            <Text style={[styles.summaryValue, { color: c.accentPink }]}>{rows.length - answered}</Text>
-          </View>
+        ) : null}
+
+        {/* Result count + tab name */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, paddingHorizontal: 2 }}>
+          <Text style={{ color: c.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+            {TABS.find((t) => t.id === tab)?.label} · {rows.length} record{rows.length === 1 ? '' : 's'}
+          </Text>
         </View>
 
-        {loading ? (
-          <View style={styles.emptyBlock}>
-            <ActivityIndicator color={c.accentPink} />
-            <Text style={styles.emptyBody}>Loading ledger…</Text>
+        {/* Body */}
+        {isLoading ? (
+          <View>
+            {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} c={c} />)}
           </View>
-        ) : err ? (
-          <View style={styles.errBlock}>
-            <Text style={styles.errKicker}>Error</Text>
-            <Text style={styles.errText}>{err}</Text>
+        ) : tabErr ? (
+          <View
+            style={{
+              padding: 14, borderRadius: 14,
+              backgroundColor: c.bgInput,
+              borderLeftWidth: 3, borderLeftColor: c.danger,
+            }}
+          >
+            <Text style={{ color: c.danger, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>
+              Fetch error
+            </Text>
+            <Text style={{ color: c.text, fontSize: 13 }}>{tabErr}</Text>
           </View>
         ) : rows.length === 0 ? (
-          <View style={styles.emptyBlock}>
-            <Ionicons name="document-text-outline" size={40} color={c.textDim} />
-            <Text style={styles.emptyHead}>Nothing here</Text>
-            <Text style={styles.emptyBody}>No dispatches in this range. Widen your dates.</Text>
+          <EmptyState
+            c={c}
+            icon="document-text-outline"
+            accentIcons={['calendar-outline', 'megaphone-outline']}
+            title="No records in this range"
+            subtitle="Widen the date range, or launch a campaign to see entries here."
+            ctaLabel="Open campaigns"
+            onCtaPress={() => navigation.navigate('CampaignsList')}
+          />
+        ) : tab === 'delivery' ? (
+          rows.map((r, i) => <DeliveryCard key={i} c={c} row={r} />)
+        ) : tab === 'api' ? (
+          <View
+            style={{
+              padding: 16, borderRadius: 14,
+              backgroundColor: c.bgInput, gap: 6,
+            }}
+          >
+            <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>API Report</Text>
+            <Text style={{ color: c.textMuted, fontSize: 12 }}>
+              Audit endpoint not yet wired. Hooks into gsauth.com /audit/log when available.
+            </Text>
           </View>
         ) : (
-          rows.map((r, i) => {
-            const number = r.number || r.caller || r.destination || '—';
-            const when = r.callInitDate || r.callDateTime || r.startTime || r.answeredTime;
-            const status = r.callStatus || r.disposition || '—';
-            const action = r.actionType || r.ibdActionType || r.interface || '—';
-            const dur = r.callDuration ?? r.duration ?? r.ibdBillSec;
-            const cost = r.finalCost ?? r.cost;
-            const sc = statusColor(status);
-            return (
-              <View key={i} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={[styles.cardIcon, { backgroundColor: sc + '22' }]}>
-                    <Ionicons name="call" size={16} color={sc} />
-                  </View>
-                  <View style={styles.cardGrow}>
-                    <Text style={styles.cardNumber}>{String(number)}</Text>
-                    <Text style={styles.cardTime}>{fmtTime(when)}</Text>
-                  </View>
-                  <View style={[styles.cardStatusBadge, { backgroundColor: sc + '22' }]}>
-                    <Text style={[styles.cardStatusLabel, { color: sc }]}>{String(status)}</Text>
-                  </View>
-                </View>
-                <View style={styles.cardRow}>
-                  <View style={styles.cardCell}>
-                    <Text style={styles.cellLabel}>Action</Text>
-                    <Text style={styles.cellValue}>{String(action)}</Text>
-                  </View>
-                  <View style={styles.cardCell}>
-                    <Text style={styles.cellLabel}>Duration</Text>
-                    <Text style={styles.cellValue}>{dur != null ? `${Math.round(Number(dur))}s` : '—'}</Text>
-                  </View>
-                  <View style={styles.cardCell}>
-                    <Text style={styles.cellLabel}>Cost</Text>
-                    <Text style={styles.cellValue}>{cost != null ? formatCurrency(cost) : '—'}</Text>
-                  </View>
-                </View>
-              </View>
-            );
-          })
+          rows.map((cmp) => <CampaignCard key={cmp.id} c={c} cmp={cmp} navigation={navigation} />)
         )}
       </ScrollView>
     </View>
   );
 }
+
+// Mobile-friendly card mirroring the desktop columns. Each labelled row is
+// a key/value pair so the report still reads at narrow widths.
+const Field = ({ c, label, value, mono }) => (
+  <View style={{ marginBottom: 6 }}>
+    <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>
+      {label}
+    </Text>
+    <Text
+      style={{
+        color: c.text,
+        fontSize: 12,
+        marginTop: 2,
+        ...(mono ? { fontFamily: 'monospace' } : {}),
+      }}
+      numberOfLines={2}
+    >
+      {value || '—'}
+    </Text>
+  </View>
+);
+
+const ActionBtn = ({ c, icon, tint, accessibilityLabel, onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.85}
+    accessibilityRole="button"
+    accessibilityLabel={accessibilityLabel}
+    style={{
+      width: 32, height: 32, borderRadius: 8,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: (tint || c.primary) + '22',
+      borderWidth: 1, borderColor: (tint || c.primary) + '55',
+    }}
+  >
+    <Ionicons name={icon} size={14} color={tint || c.primary} />
+  </TouchableOpacity>
+);
+
+const CampaignCard = ({ c, cmp, navigation }) => {
+  const status = STATUS_TINT(cmp.status, c);
+  const cost = (cmp.sent || 0) * 0.0006; // gsauth WhatsApp marketing approx; replace once /finalCost is wired
+  const isJourney = !!cmp.journey || !!cmp.isJourney;
+
+  return (
+    <View
+      style={{
+        padding: 14, marginBottom: 12, borderRadius: 16,
+        backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border,
+      }}
+    >
+      {/* Top row: campaign date + status pill */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: c.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>
+            Campaign Date
+          </Text>
+          <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginTop: 2 }}>
+            {fmtDateLong(cmp.createdAt)}
+          </Text>
+        </View>
+        <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: status.bg }}>
+          <Text style={{ color: status.fg, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>
+            {String(cmp.status || 'unknown').toUpperCase()}
+          </Text>
+        </View>
+      </View>
+
+      <Field c={c} label="Campaign Info" value={`Name: ${cmp.name || '—'}\nType: ${cmp.category || 'Normal'}`} />
+      <Field c={c} label="Template Info" value={`Name: ${cmp.templateName || '—'}\nType: ${cmp.category || '—'}`} />
+      <Field c={c} label="Interface / Channel" value={`Interface: ${cmp.channel ? String(cmp.channel).toUpperCase() : 'Web'}\nChannel: ${cmp.channelId || '—'}`} mono />
+      <Field
+        c={c}
+        label="Scheduled Info"
+        value={cmp.schedTime ? `IsScheduled: Yes\nScheduleDate: ${cmp.schedTime}` : 'IsScheduled: No\nScheduleDate: N/A'}
+      />
+
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+        <View style={{ flex: 1 }}>
+          <Field c={c} label="Is Journey" value={isJourney ? 'Yes' : 'No'} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field c={c} label="Cost" value={formatCurrency(cost)} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field c={c} label="Total" value={String(cmp.total ?? '—')} />
+        </View>
+      </View>
+
+      {cmp.failed > 0 ? (
+        <View
+          style={{
+            marginTop: 4, padding: 8, borderRadius: 10,
+            backgroundColor: c.danger + '15',
+            borderLeftWidth: 2, borderLeftColor: c.danger,
+          }}
+        >
+          <Text style={{ color: c.danger, fontSize: 11, fontWeight: '700' }}>
+            {cmp.failed} of {cmp.total} failed
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Action row */}
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: c.rule }}>
+        <ActionBtn c={c} icon="list" accessibilityLabel="View row details" onPress={() => navigation.navigate('CampaignDetail', { id: cmp.id })} />
+        <ActionBtn c={c} icon="eye-outline" accessibilityLabel="Preview campaign" onPress={() => navigation.navigate('CampaignDetail', { id: cmp.id })} />
+        <ActionBtn c={c} icon="download-outline" accessibilityLabel="Export campaign" onPress={() => {}} />
+        <ActionBtn c={c} icon="refresh" tint={c.success} accessibilityLabel="Retry / refresh" onPress={() => {}} />
+      </View>
+    </View>
+  );
+};
+
+// Voice / IVR delivery row — same card shape as campaigns so the screen
+// reads consistently across tabs.
+const DeliveryCard = ({ c, row }) => {
+  const number = row.number || row.caller || row.destination || '—';
+  const when = row.callInitDate || row.callDateTime || row.startTime || row.answeredTime;
+  const status = row.callStatus || row.disposition || '—';
+  const dur = row.callDuration ?? row.duration ?? row.ibdBillSec;
+  const cost = row.finalCost ?? row.cost;
+  const tint = STATUS_TINT(status, c);
+
+  return (
+    <View
+      style={{
+        padding: 14, marginBottom: 12, borderRadius: 16,
+        backgroundColor: c.bgCard, borderWidth: 1, borderColor: c.border,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: tint.bg }}>
+          <Ionicons name="call" size={16} color={tint.fg} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', fontFamily: 'monospace' }}>{String(number)}</Text>
+          <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 2 }}>{fmtDateShort(when)}</Text>
+        </View>
+        <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: tint.bg }}>
+          <Text style={{ color: tint.fg, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>{String(status)}</Text>
+        </View>
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Field c={c} label="Duration" value={dur != null ? `${Math.round(Number(dur))}s` : '—'} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field c={c} label="Cost" value={cost != null ? formatCurrency(cost) : '—'} />
+        </View>
+      </View>
+    </View>
+  );
+};

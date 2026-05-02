@@ -70,6 +70,22 @@ export default function CampaignStep3Screen({ navigation, route }) {
       const failed = results.filter((r) => !r.ok).length;
       const sent = results.length - failed;
 
+      // Persist the real per-recipient outcome alongside the aggregate
+      // counts so CampaignDetail can render the actual numbers + their
+      // delivery status, instead of falling back to seed data.
+      const ts = new Date().toISOString();
+      const recipients = numbers.map((number, i) => {
+        const r = results[i];
+        const ok = !!r?.ok;
+        return {
+          id: `${number}_${i}`,
+          number,
+          status: ok ? 'sent' : 'failed',
+          ts,
+          error: ok ? null : (r?.e?.message || r?.e?.toString?.() || 'Unknown error'),
+        };
+      });
+
       dispatch(upsertCampaign({
         id: `cmp_${Date.now()}`,
         name: draft.name,
@@ -80,9 +96,10 @@ export default function CampaignStep3Screen({ navigation, route }) {
         total: numbers.length,
         sent,
         failed,
+        recipients,
         status: failed === numbers.length ? 'failed' : (failed > 0 ? 'stuck' : (draft.scheduleNow && draft.schedTime ? 'scheduled' : 'live')),
         schedTime: draft.scheduleNow && draft.schedTime ? draft.schedTime : null,
-        createdAt: new Date().toISOString(),
+        createdAt: ts,
       }));
 
       if (failed === 0) {

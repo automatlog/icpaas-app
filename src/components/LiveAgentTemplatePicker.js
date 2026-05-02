@@ -15,10 +15,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal, View, Text, TextInput, TouchableOpacity, FlatList, Pressable,
-  ActivityIndicator, useColorScheme, Platform,
+  ActivityIndicator, useColorScheme, Platform, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { WhatsAppAPI } from '../services/api';
+import { uploadMedia } from '../services/liveChatActions';
+import toast from '../services/toast';
 
 const C = {
   dark:  { sheet: '#17171B', ink: '#FFFFFF', muted: '#9A9AA2', input: '#0F0F12', border: '#26262C', teal: '#2094ab', dim: '#5C5C63' },
@@ -64,12 +68,35 @@ const inspectTemplate = (template) => {
   };
 };
 
+// Inspect the BUTTONS component for URL-style buttons that take a dynamic
+// suffix. Returns [{ index, text, exampleUrl }] in stable order.
+const findUrlButtonSlots = (template) => {
+  const buttonsBlock = (template?.components || []).find(
+    (c) => String(c.type || '').toUpperCase() === 'BUTTONS',
+  );
+  const buttons = buttonsBlock?.buttons || [];
+  const slots = [];
+  buttons.forEach((b, idx) => {
+    const t = String(b.type || '').toUpperCase();
+    if (t === 'URL' && Array.isArray(b.example) && b.example.length > 0) {
+      slots.push({
+        index: idx,
+        text: b.text || `Button ${idx + 1}`,
+        exampleUrl: b.example?.[0] || '',
+      });
+    }
+  });
+  return slots;
+};
+
 // ---------- main component ----------
 export default function LiveAgentTemplatePicker({
   visible,
   onClose,
   onSubmit,
   initialFilter = '',
+  // Channel needed to upload media headers (Meta /media is per-WABA).
+  channel,
 }) {
   const scheme = useColorScheme();
   const dark = scheme === 'dark';
@@ -83,6 +110,11 @@ export default function LiveAgentTemplatePicker({
   const [headerVar, setHeaderVar] = useState('');
   const [bodyVars, setBodyVars] = useState([]);
   const [sending, setSending] = useState(false);
+  // For image/video/document headers: { id, kind } captured after upload.
+  const [headerMedia, setHeaderMedia] = useState(null);
+  const [uploadingHeader, setUploadingHeader] = useState(false);
+  // For URL buttons: index → user-supplied dynamic suffix.
+  const [buttonParams, setButtonParams] = useState({});
 
   // Reset on open + load templates lazily.
   useEffect(() => {
@@ -91,6 +123,9 @@ export default function LiveAgentTemplatePicker({
       setSelected(null);
       setHeaderVar('');
       setBodyVars([]);
+      setHeaderMedia(null);
+      setUploadingHeader(false);
+      setButtonParams({});
       setSending(false);
       return;
     }
@@ -131,7 +166,66 @@ export default function LiveAgentTemplatePicker({
     const info = inspectTemplate(template);
     setHeaderVar('');
     setBodyVars(Array(info.bodyVarCount).fill(''));
+    setHeaderMedia(null);
+    setUploadingHeader(false);
+    setButtonParams({});
     setMode('fill');
+  };
+
+  // Pick + upload a media header. Routes through the appropriate device
+  // picker for the template's header format, then uploads to Meta /media
+  // via uploadMedia and stores the returned id for build time.
+  const pickHeaderMedia = async (kind) => {
+    if (!channel) {
+      toast.warning('No channel', 'Open a chat before picking a media header.');
+      return;
+    }
+    setUploadingHeader(true);
+    try {
+      let asset = null;
+      let mimeType = null;
+      if (kind === 'image' || kind === 'video') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          toast.warning('Permission needed', `Allow access to pick a header ${kind}.`);
+          return;
+        }
+        const r = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: kind === 'image'
+            ? (ImagePicker.MediaTypeOptions?.Images || 'images')
+            : (ImagePicker.MediaTypeOptions?.Videos || 'videos'),
+          quality: 0.8,
+        });
+        if (r.canceled || !r.assets?.[0]) return;
+        asset = r.assets[0];
+        mimeType = asset.mimeType || (kind === 'image' ? 'image/jpeg' : 'video/mp4');
+      } else {
+        const r = await DocumentPicker.getDocumentAsync({
+          type: '*/*',
+          multiple: false,
+          copyToCacheDirectory: true,
+        });
+        if (r.canceled || !r.assets?.[0]) return;
+        asset = r.assets[0];
+        mimeType = asset.mimeType || 'application/pdf';
+      }
+      const file = {
+        uri: asset.uri,
+        name: asset.fileName || asset.name || `header-${Date.now()}`,
+        type: mimeType,
+      };
+      const res = await uploadMedia({ channel, file, mimeType });
+      const id = res?.id || res?.media?.[0]?.id;
+      if (!id) {
+        toast.error('Upload failed', 'Meta did not return a media id.');
+        return;
+      }
+      setHeaderMedia({ id, kind, fileName: asset.fileName || asset.name });
+    } catch (e) {
+      toast.error('Upload failed', e?.message || 'Try again.');
+    } finally {
+      setUploadingHeader(false);
+    }
   };
 
   const backToList = () => {
@@ -142,20 +236,47 @@ export default function LiveAgentTemplatePicker({
   const handleSubmit = async () => {
     if (!selected || sending) return;
     const info = inspectTemplate(selected);
+    const urlSlots = findUrlButtonSlots(selected);
 
     const components = [];
+
+    // Header — text variant if there's a {{1}}, media variant if the
+    // template's HEADER format is image/video/document and we have a media id.
     if (info.headerHasTextVar) {
       components.push({
         type: 'header',
         parameters: [{ type: 'text', text: headerVar.trim() || ' ' }],
       });
+    } else if (info.headerNeedsMedia && headerMedia) {
+      components.push({
+        type: 'header',
+        parameters: [{
+          type: headerMedia.kind, // 'image' | 'video' | 'document'
+          [headerMedia.kind]: { id: headerMedia.id },
+        }],
+      });
     }
+
+    // Body — one text parameter per {{N}}.
     if (info.bodyVarCount > 0) {
       components.push({
         type: 'body',
         parameters: bodyVars.map((v) => ({ type: 'text', text: (v || '').trim() || ' ' })),
       });
     }
+
+    // Buttons — one component per URL button (sub_type='url'). Index is the
+    // button's position in the BUTTONS block per Meta's spec.
+    urlSlots.forEach((slot) => {
+      const value = (buttonParams[slot.index] || '').trim();
+      if (!value) return;
+      components.push({
+        type: 'button',
+        sub_type: 'url',
+        index: String(slot.index),
+        parameters: [{ type: 'text', text: value }],
+      });
+    });
 
     setSending(true);
     try {
@@ -200,11 +321,6 @@ export default function LiveAgentTemplatePicker({
           <Text style={{ color: c.ink, fontSize: 14, fontWeight: '700', flex: 1 }} numberOfLines={1}>
             {item.name}
           </Text>
-          {!info.fillable && (
-            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: '#F59E0B22' }}>
-              <Text style={{ color: '#F59E0B', fontSize: 9, fontWeight: '700' }}>ADVANCED</Text>
-            </View>
-          )}
           <Text style={{ color: c.muted, fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>
             {String(item.language || 'en')}
           </Text>
@@ -230,7 +346,12 @@ export default function LiveAgentTemplatePicker({
     if (!selected) return null;
     const info = inspectTemplate(selected);
     return (
-      <View style={{ paddingTop: 4 }}>
+      <ScrollView
+        style={{ paddingTop: 4 }}
+        contentContainerStyle={{ paddingBottom: 6 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <TouchableOpacity onPress={backToList} hitSlop={12}>
             <Ionicons name="chevron-back" size={20} color={c.ink} />
@@ -246,16 +367,62 @@ export default function LiveAgentTemplatePicker({
         </View>
 
         {info.headerNeedsMedia && (
-          <View style={{
-            padding: 10, marginBottom: 10, borderRadius: 10,
-            backgroundColor: '#F59E0B22', borderWidth: 1, borderColor: '#F59E0B',
-          }}>
-            <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '700' }}>
-              Header expects {info.headerFormat.toLowerCase()} — media-variable templates not yet supported here.
+          <View style={{ marginBottom: 10 }}>
+            <Text style={{ color: c.muted, fontSize: 11, marginBottom: 6 }}>
+              {`HEADER ${info.headerFormat}`}
             </Text>
-            <Text style={{ color: '#F59E0B', fontSize: 10, marginTop: 2 }}>
-              Will send with a placeholder header. Use OmniApp web for full support.
-            </Text>
+            {headerMedia ? (
+              <View
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 8,
+                  padding: 10, borderRadius: 10,
+                  backgroundColor: '#10B98122',
+                  borderWidth: 1, borderColor: '#10B981',
+                }}
+              >
+                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '700' }}>
+                    {`${headerMedia.kind} ready`}
+                  </Text>
+                  <Text style={{ color: c.muted, fontSize: 10 }} numberOfLines={1}>
+                    {headerMedia.fileName || `id: ${headerMedia.id}`}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setHeaderMedia(null)} hitSlop={8}>
+                  <Ionicons name="close-circle" size={16} color={c.muted} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => pickHeaderMedia(info.headerFormat.toLowerCase())}
+                disabled={uploadingHeader}
+                activeOpacity={0.85}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: 12, borderRadius: 10,
+                  backgroundColor: c.input,
+                  borderWidth: 1, borderStyle: 'dashed', borderColor: c.border,
+                  opacity: uploadingHeader ? 0.6 : 1,
+                }}
+              >
+                {uploadingHeader ? (
+                  <ActivityIndicator size="small" color={c.tint} />
+                ) : (
+                  <Ionicons
+                    name={
+                      info.headerFormat === 'IMAGE' ? 'image-outline'
+                      : info.headerFormat === 'VIDEO' ? 'videocam-outline'
+                      : 'document-text-outline'
+                    }
+                    size={16} color={c.tint}
+                  />
+                )}
+                <Text style={{ color: c.tint, fontSize: 12, fontWeight: '700' }}>
+                  {uploadingHeader ? 'Uploading…' : `Pick header ${info.headerFormat.toLowerCase()}`}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -303,16 +470,29 @@ export default function LiveAgentTemplatePicker({
           </View>
         ))}
 
-        {info.buttonHasParam && (
-          <View style={{
-            padding: 10, marginTop: 4, borderRadius: 10,
-            backgroundColor: '#F59E0B22', borderWidth: 1, borderColor: '#F59E0B',
-          }}>
-            <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '700' }}>
-              This template has a button URL variable — sending without it.
+        {/* URL button parameters — one input per dynamic-suffix URL button.
+            Meta builds the final URL by appending this value to the example
+            URL pattern (so for example "https://example.com/{{1}}", the
+            value here is what {{1}} expands to). */}
+        {findUrlButtonSlots(selected).map((slot) => (
+          <View key={`btn-${slot.index}`} style={{ marginTop: 4, marginBottom: 10 }}>
+            <Text style={{ color: c.muted, fontSize: 11, marginBottom: 4 }}>
+              {`URL BUTTON · ${slot.text}`}
             </Text>
+            <TextInput
+              value={buttonParams[slot.index] || ''}
+              onChangeText={(v) =>
+                setButtonParams((prev) => ({ ...prev, [slot.index]: v }))}
+              placeholder={slot.exampleUrl
+                ? `e.g. ${slot.exampleUrl.replace(/^https?:\/\//, '').slice(0, 36)}`
+                : 'Dynamic suffix value'}
+              placeholderTextColor={c.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={inputStyle}
+            />
           </View>
-        )}
+        ))}
 
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
           <TouchableOpacity
@@ -341,7 +521,7 @@ export default function LiveAgentTemplatePicker({
             )}
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     );
   };
 

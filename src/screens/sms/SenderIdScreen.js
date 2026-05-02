@@ -83,15 +83,9 @@ export default function SenderIdScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.danger} />}
         showsVerticalScrollIndicator={false}
       >
-        <View className={`flex-row rounded-[18px] p-4 mb-3 ${softBg}`} style={{ gap: 12 }}>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Senders</Text>
-            <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`}>{senders.length}</Text>
-          </View>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Source</Text>
-            <Text className={`text-[11px] font-mono mt-1.5 ${textInk}`}>gsauth.com/v1/sms</Text>
-          </View>
+        <View className={`rounded-[18px] p-4 mb-3 ${softBg}`}>
+          <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Senders</Text>
+          <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`}>{senders.length}</Text>
         </View>
 
         {loading ? (
