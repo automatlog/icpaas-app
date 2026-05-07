@@ -2,6 +2,7 @@
 // Screens import these instead of touching the API/slice directly so the
 // fetch-then-dispatch pattern stays in one place.
 import { LiveChatAPI } from './api';
+import * as sender from './liveAgentSender';
 import {
   setChannels,
   setCounts,
@@ -11,6 +12,10 @@ import {
   setThread,
   prependThread,
   threadLoading,
+  optimisticSend,
+  sendResolved,
+  sendFailed,
+  clearUnreadFor,
 } from '../store/slices/liveChatSlice';
 
 // Tolerates both the camelCase JSON the controller emits and the PascalCase
@@ -131,3 +136,177 @@ export const loadOlderMessages = ({ waId, channel, oldestId, chatType = 'active'
       return null;
     }
   };
+
+// ---------- send (any Meta Cloud API kind, with optimistic + reconciliation) ----------
+//
+// Goes through liveAgentSender → gsauth.com proxy → Meta. Optimistic row
+// renders immediately; once Meta returns the wamid we patch the row's
+// MessageId so subsequent DeliveryStatusUpdate events from SignalR can
+// match by id (closes the gap documented in connection.md §8).
+//
+// Args:
+//   waId               recipient (the customer's wa_id)
+//   channel            WABA display number from the chat row
+//   kind               'text' | 'image' | 'video' | 'audio' | 'document' |
+//                      'sticker' | 'location' | 'contacts' |
+//                      'interactiveButtons' | 'interactiveList' |
+//                      'template' | 'reaction' | 'raw'
+//   payload            kind-specific payload (see liveAgentSender.js)
+//   replyToMessageId   optional — quote-reply to an earlier message
+//   previewText        what to render in the optimistic bubble
+//   previewType        what to set as MessageType on the optimistic row
+//
+// Returns: { ok: true, wamid } or { ok: false, error }.
+export const sendLiveChatMessage = ({
+  waId,
+  channel,
+  kind = 'text',
+  payload = {},
+  replyToMessageId,
+  previewText,
+  previewType,
+}) => async (dispatch) => {
+  if (!waId || !channel) {
+    return { ok: false, error: 'Missing waId or channel.' };
+  }
+
+  const tempId = `temp-${Date.now()}`;
+  const previewBody =
+    previewText ??
+    payload.message ??
+    payload.caption ??
+    (kind === 'location' ? '📍 Location' :
+      kind === 'audio' ? '🎵 Audio message' :
+      kind === 'sticker' ? '✨ Sticker' :
+      `[${kind}]`);
+
+  const tempRow = {
+    WAInboxId: tempId,
+    MessageId: null,
+    wa_id: waId,
+    SenderNumber: waId,
+    MessageText: previewBody,
+    MessageType: previewType || kind,
+    ChatType: 'OUT',
+    DeliveryStatus: 'Sending',
+    ReceivedDate: new Date().toISOString(),
+    WABANumber: channel,
+    ReplyToMessageId: replyToMessageId || null,
+  };
+  dispatch(optimisticSend({ waId, row: tempRow }));
+
+  try {
+    const metaResponse = await sender.sendByKind({
+      kind,
+      to: waId,
+      channel,
+      replyToMessageId,
+      payload,
+    });
+    const wamid = sender.extractWamid(metaResponse);
+
+    dispatch(sendResolved({
+      tempId,
+      waId,
+      patch: {
+        MessageId: wamid,         // ← this is what enables status-update reconciliation
+        DeliveryStatus: 'Sent',
+        // Replace the temp inbox id with the canonical wamid so later
+        // DeliveryStatusUpdate matches via the same key.
+        WAInboxId: wamid || tempId,
+      },
+    }));
+    return { ok: true, wamid };
+  } catch (err) {
+    dispatch(sendFailed({
+      tempId,
+      waId,
+      error: err?.message || 'Send failed',
+    }));
+    return { ok: false, error: err?.message || 'Send failed' };
+  }
+};
+
+// Convenience wrappers — same return shape as sendLiveChatMessage.
+export const sendText      = (a) => sendLiveChatMessage({ ...a, kind: 'text',     payload: { message: a.message, previewUrl: a.previewUrl } });
+export const sendImage     = (a) => sendLiveChatMessage({ ...a, kind: 'image',    payload: { link: a.link, id: a.id, caption: a.caption } });
+export const sendVideo     = (a) => sendLiveChatMessage({ ...a, kind: 'video',    payload: { link: a.link, id: a.id, caption: a.caption } });
+export const sendAudio     = (a) => sendLiveChatMessage({ ...a, kind: 'audio',    payload: { link: a.link, id: a.id } });
+export const sendDocument  = (a) => sendLiveChatMessage({ ...a, kind: 'document', payload: { link: a.link, id: a.id, filename: a.filename, caption: a.caption } });
+export const sendSticker   = (a) => sendLiveChatMessage({ ...a, kind: 'sticker',  payload: { link: a.link, id: a.id } });
+export const sendLocation  = (a) => sendLiveChatMessage({ ...a, kind: 'location', payload: { latitude: a.latitude, longitude: a.longitude, name: a.name, address: a.address } });
+export const sendContacts  = (a) => sendLiveChatMessage({ ...a, kind: 'contacts', payload: { contacts: a.contacts } });
+export const sendButtons   = (a) => sendLiveChatMessage({ ...a, kind: 'interactiveButtons', payload: a });
+export const sendList      = (a) => sendLiveChatMessage({ ...a, kind: 'interactiveList',    payload: a });
+export const sendTemplate  = (a) => sendLiveChatMessage({ ...a, kind: 'template', payload: { name: a.name, language: a.language, components: a.components } });
+export const sendReaction  = (a) => sendLiveChatMessage({ ...a, kind: 'reaction', payload: { messageId: a.messageId, emoji: a.emoji } });
+
+// Re-export the media upload so the composer can attach files in two steps:
+//   1) const { id } = await uploadMedia({ channel, file, mimeType });
+//   2) dispatch(sendImage({ waId, channel, id, caption }));
+export const uploadMedia = sender.uploadMedia;
+
+// ---------- mark-as-read ----------
+//
+// POSTs OmniApp's MarkMessagesAsRead and clears the chat-list unread badge
+// optimistically. `messageId` is the wamid of the latest inbound bubble the
+// agent has now seen — server marks every IN message up to and including
+// that id as Read for the (sender, waba) pair.
+//
+// Returns { ok: true } when the server accepts; { ok: false, error } on
+// transport failure (404 / 302 / network). Optimistic clear stays — the UI
+// shouldn't bounce the badge back when the network is just flaky.
+export const markChatRead = ({ waId, channel, messageId }) => async (dispatch) => {
+  if (!waId || !channel || !messageId) return { ok: false, error: 'missing args' };
+
+  // Optimistic: clear the badge before the round-trip.
+  dispatch(clearUnreadFor({ waId }));
+
+  try {
+    await LiveChatAPI.markAsRead({
+      senderNumber: waId,
+      messageId,
+      wabaNumber: channel,
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'mark-as-read failed' };
+  }
+};
+
+// Inbox-level "mark every visible chat as read".
+//
+// For each row with UnReadCount > 0 we always dispatch the local
+// clearUnreadFor (the agent's badge clears instantly), then best-effort
+// POST MarkMessagesAsRead using whatever message id the row carries. Note:
+// chatList rows expose the last message id of either direction — it might
+// be an OUT row, in which case OmniApp may no-op. The local clear is the
+// guaranteed UX win; server-side sync is best-effort.
+export const markAllChatsRead = () => async (dispatch, getState) => {
+  const items = getState()?.liveChat?.chatList?.items || [];
+  const targets = items.filter((row) => (row.UnReadCount || 0) > 0);
+
+  // Optimistic clear for every row first so the UI feels instant.
+  targets.forEach((row) => {
+    const waId = row.WANumber || row.wa_id;
+    if (waId) dispatch(clearUnreadFor({ waId }));
+  });
+
+  // Best-effort server calls in parallel; swallow individual failures so one
+  // 302 doesn't prevent the rest from firing.
+  await Promise.allSettled(
+    targets.map((row) => {
+      const waId = row.WANumber || row.wa_id;
+      const channel = row.WABANumber;
+      const messageId = row.WAInboxId;
+      if (!waId || !channel || !messageId) return Promise.resolve();
+      return LiveChatAPI.markAsRead({
+        senderNumber: waId,
+        messageId,
+        wabaNumber: channel,
+      }).catch(() => {});
+    }),
+  );
+
+  return { ok: true, cleared: targets.length };
+};

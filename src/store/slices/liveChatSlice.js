@@ -195,6 +195,19 @@ const liveChatSlice = createSlice({
         state.chatList.items[i] = { ...state.chatList.items[i], UnReadCount: count };
       }
     },
+    // Local-only — clears the unread badge for a wa_id without waiting for
+    // a SignalR UpdateUnreadCount echo. Dispatched optimistically when the
+    // mark-as-read POST fires so the chat list reacts instantly.
+    clearUnreadFor(state, action) {
+      const { waId } = action.payload || {};
+      if (!waId) return;
+      const i = state.chatList.items.findIndex(
+        (c) => (c.WANumber || c.wa_id) === waId,
+      );
+      if (i >= 0) {
+        state.chatList.items[i] = { ...state.chatList.items[i], UnReadCount: 0 };
+      }
+    },
     updateDeliveryStatus(state, action) {
       // Payload: { messageId, status, timestamp }
       const { messageId: mid, status } = action.payload || {};
@@ -234,6 +247,20 @@ const liveChatSlice = createSlice({
         m.WAInboxId === tempId ? { ...m, DeliveryStatus: 'Failed', ErrorMessage: error || 'Send failed' } : m,
       );
     },
+    // Strip a single bubble from a thread by WAInboxId (or MessageId).
+    // Used by the retry-failed path so the old failed row vanishes before
+    // the new optimistic one appears.
+    removeMessage(state, action) {
+      const { waId, inboxId, messageId } = action.payload || {};
+      if (!waId) return;
+      const thread = state.threads[waId];
+      if (!thread) return;
+      thread.messages = thread.messages.filter((m) => {
+        if (inboxId && m.WAInboxId === inboxId) return false;
+        if (messageId && m.MessageId === messageId) return false;
+        return true;
+      });
+    },
 
     // ---------- reset ----------
     resetLiveChat() {
@@ -258,10 +285,12 @@ export const {
   prependThread,
   receiveLiveMessage,
   updateUnreadCount,
+  clearUnreadFor,
   updateDeliveryStatus,
   optimisticSend,
   sendResolved,
   sendFailed,
+  removeMessage,
   resetLiveChat,
 } = liveChatSlice.actions;
 

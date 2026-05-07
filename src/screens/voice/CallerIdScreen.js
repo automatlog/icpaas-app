@@ -5,16 +5,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Platform, useColorScheme, Alert,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
+import { useBrand } from '../../theme';
+import dialog from '../../services/dialog';
 import InfoRow from '../../components/InfoRow';
-
-const C = {
-  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0' },
-  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', pink: '#E6428A', cyan: '#2FB8C4' },
-};
+import ScreenHeader from '../../components/ScreenHeader';
 
 const TINTS = ['#E8D080', '#8FCFBD', '#D4B3E8', '#F2A8B3', '#E8B799', '#9CB89A'];
 
@@ -24,16 +22,15 @@ const PLACEHOLDER_CALLER_IDS = [
 ];
 
 export default function CallerIdScreen({ navigation }) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
+  const c = useBrand();
+  const dark = c.scheme === 'dark';
 
   const [callers] = useState(PLACEHOLDER_CALLER_IDS);
   const [loading] = useState(false);
 
   const copy = async (value, label) => {
     await Clipboard.setStringAsync(String(value));
-    Alert.alert('Copied', `${label}: ${value}`);
+    dialog.success({ title: 'Copied', message: `${label}: ${value}` });
   };
 
   const rootBg = dark ? 'bg-[#0A0A0D]' : 'bg-white';
@@ -45,34 +42,25 @@ export default function CallerIdScreen({ navigation }) {
 
   return (
     <View className={`flex-1 ${rootBg}`}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="call-outline"
+        title="Caller IDs"
+        badge="Voice"
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 22, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-widest uppercase ${textMuted}`}>Voice</Text>
-            <Text className={`text-[24px] font-bold tracking-tight ${textInk}`}>Caller IDs</Text>
-          </View>
-        </View>
-
-        <View className={`flex-row rounded-[18px] p-4 mb-3 ${softBg}`} style={{ gap: 12 }}>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Numbers</Text>
-            <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`}>{callers.length}</Text>
-          </View>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Source</Text>
-            <Text className={`text-[11px] font-mono mt-1.5 ${textInk}`}>icpaas.in/Voice</Text>
-          </View>
+        <View className={`rounded-[18px] p-4 mb-3 ${softBg}`}>
+          <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Numbers</Text>
+          <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`}>{callers.length}</Text>
         </View>
 
         {loading ? (
           <View className="py-16 items-center" style={{ gap: 10 }}>
-            <ActivityIndicator color={c.pink} />
+            <ActivityIndicator color={c.danger} />
             <Text className={`text-xs tracking-widest uppercase ${textMuted}`}>loading caller ids</Text>
           </View>
         ) : (

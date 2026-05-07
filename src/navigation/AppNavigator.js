@@ -16,9 +16,9 @@ import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import ProfileScreen from '../screens/shared/ProfileScreen';
 import ApiDocsScreen from '../screens/shared/ApiDocsScreen';
 import ContactsScreen from '../screens/shared/ContactsScreen';
+import CreateAgentScreen from '../screens/shared/CreateAgentScreen';
 
 // WhatsApp screens
-import WhatsAppInboxScreen from '../screens/whatsapp/InboxScreen';
 import WhatsAppChatScreen from '../screens/whatsapp/ChatScreen';
 import UserProfileScreen from '../screens/whatsapp/UserProfileScreen';
 import LiveAgentInbox from '../screens/whatsapp/LiveAgentInbox';
@@ -34,7 +34,6 @@ import WhatsAppCampaignStep3 from '../screens/whatsapp/campaigns/CampaignStep3Sc
 import WhatsAppDashboardScreen from '../screens/whatsapp/WhatsAppDashboardScreen';
 
 // RCS screens
-import RcsInboxScreen from '../screens/rcs/InboxScreen';
 import RcsChatScreen from '../screens/rcs/ChatScreen';
 import RcsBotIdScreen from '../screens/rcs/BotIdScreen';
 import RcsTemplatesScreen from '../screens/rcs/TemplatesScreen';
@@ -47,7 +46,6 @@ import RcsCampaignStep2 from '../screens/rcs/campaigns/CampaignStep2Screen';
 import RcsCampaignStep3 from '../screens/rcs/campaigns/CampaignStep3Screen';
 
 // SMS screens
-import SmsInboxScreen from '../screens/sms/InboxScreen';
 import SmsChatScreen from '../screens/sms/ChatScreen';
 import SmsSenderIdScreen from '../screens/sms/SenderIdScreen';
 import SmsTemplatesScreen from '../screens/sms/TemplatesScreen';
@@ -118,9 +116,14 @@ export default function AppNavigator() {
         <Stack.Screen name="You" component={ProfileScreen} />
         <Stack.Screen name="ApiDocs" component={ApiDocsScreen} />
         <Stack.Screen name="Contacts" component={ContactsScreen} />
+        <Stack.Screen name="CreateAgent" component={CreateAgentScreen} />
 
         {/* WhatsApp */}
-        <Stack.Screen name="WhatsAppInbox" component={WhatsAppInboxScreen} />
+        <Stack.Screen
+          name="WhatsAppInbox"
+          component={LiveAgentInbox}
+          initialParams={{ channel: 'whatsapp' }}
+        />
         <Stack.Screen name="WhatsAppChat" component={WhatsAppChatScreen} />
         <Stack.Screen name="UserProfile" component={UserProfileScreen} />
         <Stack.Screen name="WhatsAppTemplates" component={WhatsAppTemplatesScreen} />
@@ -138,7 +141,11 @@ export default function AppNavigator() {
         <Stack.Screen name="LiveAgentChat" component={LiveAgentChat} />
 
         {/* RCS */}
-        <Stack.Screen name="RcsInbox" component={RcsInboxScreen} />
+        <Stack.Screen
+          name="RcsInbox"
+          component={LiveAgentInbox}
+          initialParams={{ channel: 'rcs' }}
+        />
         <Stack.Screen name="RcsChat" component={RcsChatScreen} />
         <Stack.Screen name="RcsBotIds" component={RcsBotIdScreen} />
         <Stack.Screen name="RcsTemplates" component={RcsTemplatesScreen} />
@@ -151,7 +158,11 @@ export default function AppNavigator() {
         <Stack.Screen name="RcsCampaignStep3" component={RcsCampaignStep3} />
 
         {/* SMS */}
-        <Stack.Screen name="SmsInbox" component={SmsInboxScreen} />
+        <Stack.Screen
+          name="SmsInbox"
+          component={LiveAgentInbox}
+          initialParams={{ channel: 'sms' }}
+        />
         <Stack.Screen name="SmsChat" component={SmsChatScreen} />
         <Stack.Screen name="SmsSenderIds" component={SmsSenderIdScreen} />
         <Stack.Screen name="SmsTemplates" component={SmsTemplatesScreen} />

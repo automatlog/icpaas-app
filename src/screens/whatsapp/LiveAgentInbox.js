@@ -21,6 +21,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import ScreenHeader from '../../components/ScreenHeader';
+import { SkeletonRow } from '../../components/Skeleton';
+import EmptyState from '../../components/EmptyState';
 import {
   selectChannels,
   selectSelectedChannel,
@@ -36,7 +38,10 @@ import {
   loadCounts,
   loadChatList,
   loadMoreChatList,
+  markAllChatsRead,
 } from '../../services/liveChatActions';
+import toast from '../../services/toast';
+import LiveAgentNewChatModal from '../../components/LiveAgentNewChatModal';
 
 const FILTERS = [
   { id: 'All',        label: 'All',        countKey: 'AllCount' },
@@ -116,6 +121,7 @@ export default function LiveAgentInbox({ navigation, route }) {
 
   const [searchInput, setSearchInput] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
   const debounceRef = useRef(null);
 
   const filter = chatList.filter;
@@ -190,6 +196,20 @@ export default function LiveAgentInbox({ navigation, route }) {
 
   const totalUnread = counts.UnReadChatCount || 0;
   const isWhatsApp = channelKey === 'whatsapp';
+  // Sum from the rendered list so the button reacts even before the next
+  // GetChatCount lands (badges clear instantly on tap via clearUnreadFor).
+  const visibleUnread = (chatList.items || []).reduce(
+    (sum, row) => sum + (row.UnReadCount || 0),
+    0,
+  );
+
+  const handleMarkAllRead = async () => {
+    if (visibleUnread === 0) return;
+    const res = await dispatch(markAllChatsRead());
+    if (res?.cleared > 0) {
+      toast.success('Marked as read', `Cleared ${res.cleared} conversation${res.cleared === 1 ? '' : 's'}.`);
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -200,7 +220,29 @@ export default function LiveAgentInbox({ navigation, route }) {
         title="Live Agent"
         badge={isWhatsApp ? 'WhatsApp' : 'RCS'}
         subtitle={`${totalUnread} unread · ${selectedChannel === 'All' ? 'all channels' : selectedChannel}`}
-        right={<ConnectionPill status={connection.status} c={c} />}
+        right={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {visibleUnread > 0 && (
+              <TouchableOpacity
+                onPress={handleMarkAllRead}
+                activeOpacity={0.85}
+                hitSlop={8}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 4,
+                  paddingHorizontal: 8, paddingVertical: 4,
+                  borderRadius: 999,
+                  backgroundColor: c.primarySoft,
+                }}
+              >
+                <Ionicons name="checkmark-done" size={13} color={c.primary} />
+                <Text style={{ color: c.primary, fontSize: 10, fontWeight: '700' }}>
+                  Mark all read
+                </Text>
+              </TouchableOpacity>
+            )}
+            <ConnectionPill status={connection.status} c={c} />
+          </View>
+        }
       />
 
       <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
@@ -322,11 +364,10 @@ export default function LiveAgentInbox({ navigation, route }) {
 
       {/* List */}
       {chatList.loading && chatList.items.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          <ActivityIndicator color={c.primary} />
-          <Text style={{ color: c.textMuted, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' }}>
-            loading inbox
-          </Text>
+        <View style={{ flex: 1 }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonRow key={i} c={c} />
+          ))}
         </View>
       ) : (
         <FlatList
@@ -338,6 +379,11 @@ export default function LiveAgentInbox({ navigation, route }) {
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
+          // Each row is a fixed-height card (avatar 44 + paddingVertical 14×2
+          // = 72) plus a 1-px separator between rows. Hard-coding the layout
+          // lets RN skip the measure pass on every scroll tick — meaningful
+          // for inboxes with hundreds of rows.
+          getItemLayout={(_, index) => ({ length: 72, offset: 73 * index, index })}
           ItemSeparatorComponent={() => (
             <View style={{ height: 1, backgroundColor: c.rule, marginLeft: 76 }} />
           )}
@@ -412,18 +458,53 @@ export default function LiveAgentInbox({ navigation, route }) {
             );
           }}
           ListEmptyComponent={
-            <View style={{ alignItems: 'center', paddingVertical: 64, gap: 8 }}>
-              <Ionicons name="mail-outline" size={36} color={c.textDim} />
-              <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>No conversations</Text>
-              <Text style={{ color: c.textDim, fontSize: 12 }}>
-                {connection.status === 'disconnected'
-                  ? 'Offline — pull to retry when connection returns.'
-                  : 'New chats appear here in real time.'}
-              </Text>
-            </View>
+            <EmptyState
+              c={c}
+              icon="chatbubble-ellipses-outline"
+              accentIcons={['logo-whatsapp', 'logo-google']}
+              title="No conversations yet"
+              subtitle={
+                connection.status === 'disconnected'
+                  ? 'Offline — pull to retry when the connection comes back.'
+                  : 'Inbound WhatsApp and RCS messages will appear here in real time.'
+              }
+            />
           }
         />
       )}
+
+      {/* FAB — start a new conversation */}
+      <TouchableOpacity
+        onPress={() => setNewChatOpen(true)}
+        activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityLabel="Start new conversation"
+        style={{
+          position: 'absolute',
+          bottom: 24, right: 20,
+          width: 56, height: 56, borderRadius: 28,
+          alignItems: 'center', justifyContent: 'center',
+          backgroundColor: c.primary,
+          shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.2, shadowRadius: 10, elevation: 8,
+        }}
+      >
+        <Ionicons name="create" size={22} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Modal handles validation; on submit we navigate into the chat
+          with the new waId/channel. Empty thread is normal — composer's
+          "+" → Template covers the no-24h-window first send. */}
+      <LiveAgentNewChatModal
+        visible={newChatOpen}
+        channels={channels}
+        defaultChannel={selectedChannel}
+        onClose={() => setNewChatOpen(false)}
+        onContinue={({ waId, channel, profileName }) => {
+          setNewChatOpen(false);
+          navigation.navigate('LiveAgentChat', { waId, channel, profileName });
+        }}
+      />
     </View>
   );
 }

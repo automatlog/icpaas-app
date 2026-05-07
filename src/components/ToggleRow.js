@@ -3,6 +3,7 @@
 import React from 'react';
 import { View, Text, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import haptics from '../services/haptics';
 
 export default function ToggleRow({ c, label, help, value, onChange, divider = true }) {
   return (
@@ -18,7 +19,7 @@ export default function ToggleRow({ c, label, help, value, onChange, divider = t
     >
       <Switch
         value={value}
-        onValueChange={onChange}
+        onValueChange={(v) => { haptics.select(); onChange?.(v); }}
         trackColor={{ false: c.bgInput, true: c.primary }}
         thumbColor="#FFFFFF"
       />

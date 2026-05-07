@@ -45,7 +45,14 @@ export default function InfoRow({ c, label, value, onCopy }) {
           {value || '—'}
         </Text>
         {value && onCopy ? (
-          <TouchableOpacity onPress={onCopy} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <TouchableOpacity
+            onPress={onCopy}
+            activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Copy ${label}`}
+            accessibilityHint="Copies value to clipboard"
+          >
             <Ionicons name="copy-outline" size={14} color={muted} />
           </TouchableOpacity>
         ) : null}

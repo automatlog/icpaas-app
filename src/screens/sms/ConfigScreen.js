@@ -3,11 +3,12 @@
 //   System Configuration: Manage SenderId, Manage Template, My Routes
 //   Contact Manager:      Manage Group, Blacklist Numbers
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../../theme';
 import SectionHeader from '../../components/SectionHeader';
 import ScreenHeader from '../../components/ScreenHeader';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 
 const SYSTEM_CONFIG = [
   { id: 'senderId', label: 'Manage SenderId',  desc: 'Easily manage your Sender ID here.',     icon: 'megaphone',   tint: '#DBEAFE', fg: '#1D4ED8' },
@@ -22,6 +23,9 @@ const CONTACT_MANAGER = [
 
 export default function ConfigScreen({ navigation }) {
   const c = useBrand();
+  // No async data on this hub — pull-to-refresh just acknowledges the
+  // gesture so the affordance stays consistent across screens.
+  const { refreshing, onRefresh } = usePullToRefresh();
 
   const goTo = (id) => {
     if (id === 'senderId') return navigation.navigate('SmsSenderIds');
@@ -44,6 +48,7 @@ export default function ConfigScreen({ navigation }) {
       <ScrollView
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 130, paddingHorizontal: 18 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
       >
         <SectionHeader c={c} icon="megaphone-outline" title="System Configuration" />
         <View style={{ gap: 10, marginBottom: 24 }}>

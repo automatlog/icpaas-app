@@ -1,49 +1,50 @@
-// Owns the lifecycle of the SignalR connection.
-//
-//   isAuthenticated → true   → realtime.connect()
-//   isAuthenticated → false  → realtime.stop()
-//   app backgrounded         → leave alone (auto-reconnect handles drops)
-//
-// Children render unchanged; this provider only wires effects.
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useSelector } from 'react-redux';
-import * as realtime from '../services/realtime';
+import {
+  startRealtime,
+  stopRealtime,
+  isConnected,
+  refetchAfterReconnect,
+} from '../services/realtime';
 
 export default function RealtimeProvider({ children }) {
-  const isAuthenticated = useSelector((s) => s.auth.isAuthenticated);
-  const wasAuthenticated = useRef(false);
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  const appStateRef = useRef(AppState.currentState);
 
   useEffect(() => {
-    let cancelled = false;
-
-    if (isAuthenticated && !wasAuthenticated.current) {
-      wasAuthenticated.current = true;
-      realtime.connect().catch(() => {
-        // connect() already dispatched disconnected with error; nothing else
-        // to do here. Reconnect attempts happen automatically on next call.
-      });
-    } else if (!isAuthenticated && wasAuthenticated.current) {
-      wasAuthenticated.current = false;
-      realtime.stop().catch(() => {});
+    if (isAuthenticated) {
+      startRealtime();
+    } else {
+      stopRealtime();
     }
 
     return () => {
-      cancelled = true;
+      stopRealtime();
     };
   }, [isAuthenticated]);
 
-  // Foreground returns: nudge a reconnect if we lost the socket while the OS
-  // suspended the JS thread. SignalR's automatic reconnect handles most of
-  // this, but iOS in particular can leave the socket in a half-open state.
+  // App returning to the foreground — SignalR's auto-reconnect handles most
+  // network drops, but iOS in particular can leave the socket half-open
+  // after a long suspend. Two recoveries fire here:
+  //   • If the socket is dead, kick a fresh connect.
+  //   • If the socket is alive, run the same refetch we use post-reconnect
+  //     in case events fired while the JS thread was paused.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active' && wasAuthenticated.current && !realtime.isConnected()) {
-        realtime.connect().catch(() => {});
+      const prev = appStateRef.current;
+      appStateRef.current = next;
+      if (!isAuthenticated) return;
+      if (prev !== 'active' && next === 'active') {
+        if (isConnected()) {
+          refetchAfterReconnect();
+        } else {
+          startRealtime().catch(() => {});
+        }
       }
     });
     return () => sub.remove();
-  }, []);
+  }, [isAuthenticated]);
 
   return children;
 }

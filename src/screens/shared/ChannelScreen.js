@@ -8,7 +8,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../../theme';
 import { BalanceAPI, VoiceAPI, IVRAPI, TemplatesAPI } from '../../services/api';
-import { BottomTabBar } from './DashboardScreen';
+import BottomTabBar from '../../components/BottomTabBar';
 import ScreenHeader from '../../components/ScreenHeader';
 
 const PROFILES = {
