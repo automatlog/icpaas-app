@@ -2,13 +2,14 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Platform,
-  Alert, ActivityIndicator,
+  Alert, ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../../theme';
 import {
   selectGroups,
@@ -20,6 +21,7 @@ import { setContacts as setContactsAction, upsertContact } from '../../store/sli
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
 import FormField from '../../components/FormField';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const TABS = [
   { id: 'add',    label: 'Add Contact',    icon: 'person-add-outline' },
@@ -37,6 +39,7 @@ const parseFileNumbers = (raw) =>
 
 export default function ContactsScreen({ navigation, route }) {
   const c = useBrand();
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const groups = useSelector(selectGroups);
   const contacts = useSelector((s) => s.contacts);
@@ -44,23 +47,17 @@ export default function ContactsScreen({ navigation, route }) {
   const [tab, setTab] = useState(route?.params?.tab || 'add');
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? 56 : 36,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: c.rule,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>Contacts</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: c.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        title="Contacts"
+        icon="people"
+      />
 
       {/* Tab toggle */}
       <View className="flex-row mx-4 mt-3" style={{ gap: 4, borderBottomWidth: 1, borderBottomColor: c.rule }}>
@@ -92,7 +89,7 @@ export default function ContactsScreen({ navigation, route }) {
       )}
 
       <BottomTabBar c={c} navigation={navigation} active="campaign" />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

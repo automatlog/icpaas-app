@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthAPI, DEFAULT_API_TOKEN } from '../../services/api';
 import { OMNI_HOST, OMNI_AUTH_LOGIN_PATH } from '../../config';
 import { resetLiveChat } from './liveChatSlice';
+import { sha256 } from '../../utils/crypto';
 
 const initialState = {
   isAuthenticated: false,
@@ -18,13 +19,16 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       state.user = action.payload;
     },
+    updateUser(state, action) {
+      state.user = { ...state.user, ...action.payload };
+    },
     logout() {
       return initialState;
     },
   },
 });
 
-export const { loginSuccess, logout } = authSlice.actions;
+export const { loginSuccess, updateUser, logout } = authSlice.actions;
 
 // ---------------------------------------------------------------------------
 // Real auth path. Tries OMNI_HOST + OMNI_AUTH_LOGIN_PATH expecting
@@ -36,22 +40,30 @@ const tryRemoteLogin = async (username, password) => {
   if (!OMNI_AUTH_LOGIN_PATH) return null;
 
   try {
+    const hashedPassword = sha256(password);
+    console.log('Attempting login with:', { UserName: username, Password: hashedPassword });
+    
     const res = await axios.post(
       `${OMNI_HOST}${OMNI_AUTH_LOGIN_PATH}`,
-      { username, password },
+      { UserName: username, Password: hashedPassword },
       { timeout: 15000, headers: { Accept: 'application/json' } },
     );
     const data = res?.data || {};
-    const token = data.token || data.accessToken || data.access_token;
+    const token = data.token || data.accessToken || data.access_token || data.Token || data.Data?.Token;
     if (!token) {
-      return { ok: false, error: data.message || 'Login response missing token.' };
+      return { ok: false, error: data.message || data.Message || 'Login response missing token.' };
     }
     return {
       ok: true,
       token,
-      user: data.user || { username, name: username, role: 'Agent' },
+      user: data.user || data.User || data.Data?.User || { username, name: username, role: 'Agent' },
     };
   } catch (error) {
+    // If the endpoint doesn't exist yet (404) or there's a network error (like CORS in dev),
+    // return null to fall back to demo mode.
+    if (error?.response?.status === 404 || error?.message === 'Network Error' || !error?.response) {
+      return null;
+    }
     return {
       ok: false,
       error:
@@ -74,7 +86,7 @@ export const login = ({ username, password }) => async (dispatch) => {
   const remote = await tryRemoteLogin(username, password);
   if (remote) {
     if (!remote.ok) return { ok: false, error: remote.error };
-    await AsyncStorage.setItem('icpaas_token', remote.token);
+    await AuthAPI.saveCredentials(remote.token);
     dispatch(loginSuccess(remote.user));
     return { ok: true };
   }

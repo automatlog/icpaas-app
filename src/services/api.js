@@ -298,6 +298,20 @@ export const AuthAPI = {
   getToken: async () => AsyncStorage.getItem(STORAGE_KEYS.token),
 };
 
+export const UserAPI = {
+  // Mock upload for demo purposes
+  uploadAvatar: async (file) => {
+    // In a real app, you'd POST to /user/avatar with FormData
+    console.log('Uploading avatar...', file.uri);
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ ok: true, avatarUrl: file.uri });
+      }, 1500);
+    });
+  },
+};
+
+
 export const ChannelsAPI = {
   list: () => api.get(`/${META_VERSION}/channels`),
 
@@ -592,6 +606,9 @@ export const WhatsAppAPI = {
 
   getConversations: () => unsupported('WhatsApp conversations'),
   getMessages: () => unsupported('WhatsApp conversation messages'),
+
+  // Product-wise Centralized Dashboard
+  getDashboardData: (params = {}) => omniApi.get('whatsapp/dashboard', { params }),
 };
 
 export const WhatsAppDlrAPI = {
@@ -1149,7 +1166,7 @@ export const MissedCallAPI = {
 };
 
 export const BalanceAPI = {
-  getBalance: () => icpaasApi.get(`/api/${REST_VERSION}/user/balance`),
+  getBalance: () => omniApi.get('user/balance'),
 };
 
 export const isSuccess = (response) => {
@@ -1169,12 +1186,12 @@ export const getStatusMessage = (response) => response?.statusMessage || respons
 export const LiveChatAPI = {
   // GET /WAMessage/UserLiveChat/GetChannels
   // → list of WABAChannels the logged-in user is authorised on.
-  getChannels: () => omniApi.get('/WAMessage/UserLiveChat/GetChannels'),
+  getChannels: () => omniApi.get('WAMessage/UserLiveChat/GetChannels'),
 
   // POST /WAMessage/UserLiveChat/GetChatCount?channel=&chatType=
   // → ChatCountRequestModel (badge counts for the filter chips).
   getCounts: (channel = 'All', chatType = 'All') =>
-    omniApi.post('/WAMessage/UserLiveChat/GetChatCount', null, {
+    omniApi.post('WAMessage/UserLiveChat/GetChatCount', null, {
       params: { channel, chatType },
     }),
 
@@ -1189,7 +1206,7 @@ export const LiveChatAPI = {
     pageSize = LIVE_CHAT_PAGE_SIZE,
   } = {}) =>
     omniApi.post(
-      '/WAMessage/UserLiveChat/GetChatList',
+      'WAMessage/UserLiveChat/GetChatList',
       { Search: search || '' },
       { params: { channel, chatType, pageIndex, pageSize } },
     ),
@@ -1204,27 +1221,27 @@ export const LiveChatAPI = {
     beforeId,
     pageSize = LIVE_CHAT_MESSAGE_PAGE_SIZE,
   }) =>
-    omniApi.get('/WAMessage/UserLiveChat/GetUserChatMessages', {
+    omniApi.get('WAMessage/UserLiveChat/GetUserChatMessages', {
       params: { senderNumber, channelNumber, chatType, beforeId, pageSize },
     }),
 
   // POST /WAMessage/UserLiveChat/SendChatMessage (multipart/form-data)
   // Caller builds the FormData; helper below covers the common path.
   sendMessage: (formData) =>
-    omniApi.post('/WAMessage/UserLiveChat/SendChatMessage', formData, {
+    omniApi.post('WAMessage/UserLiveChat/SendChatMessage', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
   // GET /WAMessage/UserLiveChat/getAllStatus?messageId=...
   // → per-message delivery status timeline.
   getAllStatus: (messageId) =>
-    omniApi.get('/WAMessage/UserLiveChat/getAllStatus', { params: { messageId } }),
+    omniApi.get('WAMessage/UserLiveChat/getAllStatus', { params: { messageId } }),
 
   // POST /WAMessage/UserLiveChat/AssignAgent
   // force=false returns { confirmNeeded, existingAgentId } when the chat is
   // already owned by another agent; force=true reassigns unconditionally.
   assignAgent: ({ agentId, waNumber, channel, force = false }) =>
-    omniApi.post('/WAMessage/UserLiveChat/AssignAgent', null, {
+    omniApi.post('WAMessage/UserLiveChat/AssignAgent', null, {
       params: { agentId, waNumber, channel, force },
     }),
 };

@@ -2,9 +2,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Platform, Alert, useColorScheme,
+  ActivityIndicator, Platform, Alert, useColorScheme, KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   WhatsAppAPI, SMSAPI, RCSAPI, VoiceAPI, TemplatesAPI,
 } from '../../services/api';
@@ -58,6 +59,7 @@ const waToTemplateVariables = (values, spec) => {
 
 export default function SendMessageScreen({ navigation, route }) {
   const scheme = useColorScheme();
+  const insets = useSafeAreaInsets();
   const dark = scheme === 'dark';
   const c = dark ? C.dark : C.light;
 
@@ -188,10 +190,15 @@ export default function SendMessageScreen({ navigation, route }) {
   const textDim = dark ? 'text-[#5C5C63]' : 'text-[#9A9AA2]';
 
   return (
-    <View className={`flex-1 ${rootBg}`}>
+    <KeyboardAvoidingView 
+      className={`flex-1 ${rootBg}`}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <ScrollView
         contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
         <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
@@ -392,7 +399,7 @@ export default function SendMessageScreen({ navigation, route }) {
           Variables are substituted server-side. Preview is the exact JSON body.
         </Text>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

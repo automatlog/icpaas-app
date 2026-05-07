@@ -8,6 +8,8 @@ import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { SMSAPI } from '../../services/api';
 import InfoRow from '../../components/InfoRow';
+import { useBrand } from '../../theme';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const C = {
   dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0' },
@@ -17,9 +19,9 @@ const C = {
 const TINTS = ['#F2A8B3', '#8FCFBD', '#D4B3E8', '#E8D080', '#E8B799', '#9CB89A'];
 
 export default function SenderIdScreen({ navigation }) {
+  const c = useBrand();
   const scheme = useColorScheme();
   const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
 
   const [senders, setSenders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,24 +58,24 @@ export default function SenderIdScreen({ navigation }) {
   const textDim = dark ? 'text-[#5C5C63]' : 'text-[#9A9AA2]';
 
   return (
-    <View className={`flex-1 ${rootBg}`}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        title="Sender IDs"
+        badge="SMS"
+        icon="chatbubble-outline"
+        right={
+          <TouchableOpacity onPress={load} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
+            <Ionicons name="refresh" size={20} color={c.text} />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 120 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.pink} />}
+        contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 120 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-widest uppercase ${textMuted}`}>SMS</Text>
-            <Text className={`text-[24px] font-bold tracking-tight ${textInk}`}>Sender IDs</Text>
-          </View>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={load} activeOpacity={0.7}>
-            <Ionicons name="refresh" size={18} color={c.ink} />
-          </TouchableOpacity>
-        </View>
 
         <View className={`flex-row rounded-[18px] p-4 mb-3 ${softBg}`} style={{ gap: 12 }}>
           <View className="flex-1">

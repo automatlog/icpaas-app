@@ -1,8 +1,6 @@
 {
-  "name": "icpaasOmniApp",
-  "displayName": "icpaas Omni App",
   "expo": {
-    "name": "icpaas Omni App",
+    "name": "Omni App",
     "slug": "icpaas-omni-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -29,7 +27,24 @@
       }
     },
     "ios": {
-      "bundleIdentifier": "com.icpaas.omniapp"
-    }
+      "bundleIdentifier": "com.icpaas.omniapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c1924c73-03a7-4416-b30e-92182fe74660"
+      }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./logo-icon.png",
+          "color": "#ffffff"
+        }
+      ]
+    ]
   }
 }

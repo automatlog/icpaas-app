@@ -1,25 +1,19 @@
-// src/screens/WabaChannelScreen.js — WhatsApp Business channels (NativeWind)
+// src/screens/whatsapp/WabaChannelScreen.js — WhatsApp Business channels
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Platform, RefreshControl, Alert, useColorScheme,
+  Platform, RefreshControl,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
+import { useBrand } from '../../theme';
 import { WhatsAppAPI } from '../../services/api';
 import InfoRow from '../../components/InfoRow';
-
-const C = {
-  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', pink: '#FF4D7E', cyan: '#5CD4E0' },
-  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', pink: '#E6428A', cyan: '#2FB8C4' },
-};
-
-const TINTS = ['#8FCFBD', '#D4B3E8', '#E8D080', '#E8B799', '#F2A8B3', '#9CB89A'];
+import ScreenHeader from '../../components/ScreenHeader';
+import toast from '../../services/toast';
 
 export default function WabaChannelScreen({ navigation }) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
+  const c = useBrand();
 
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,100 +38,153 @@ export default function WabaChannelScreen({ navigation }) {
 
   const copy = async (value, label) => {
     await Clipboard.setStringAsync(String(value));
-    Alert.alert('Copied', `${label}: ${value}`);
+    toast.success('Copied', `${label} copied to clipboard.`);
   };
 
-  const rootBg = dark ? 'bg-[#0A0A0D]' : 'bg-white';
-  const softBg = dark ? 'bg-[#141418]' : 'bg-[#F2F2F5]';
-  const inputBg = dark ? 'bg-[#1C1C22]' : 'bg-[#ECECEF]';
-  const textInk = dark ? 'text-white' : 'text-[#0A0A0D]';
-  const textMuted = dark ? 'text-[#9A9AA2]' : 'text-[#5C5C63]';
-  const textDim = dark ? 'text-[#5C5C63]' : 'text-[#9A9AA2]';
-
   return (
-    <View className={`flex-1 ${rootBg}`}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        icon="logo-whatsapp"
+        title="Business Channels"
+        badge="WhatsApp"
+        subtitle={{ text: 'WABA Managed Numbers', dotColor: c.success }}
+        right={
+          <TouchableOpacity
+            onPress={load}
+            activeOpacity={0.7}
+            style={{
+              width: 36, height: 36, borderRadius: 18,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: c.bgInput,
+            }}
+          >
+            <Ionicons name="refresh" size={18} color={c.text} />
+          </TouchableOpacity>
+        }
+      />
+
       <ScrollView
-        contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 22, paddingBottom: 120 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.pink} />}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 130 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center mb-5" style={{ gap: 10 }}>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-widest uppercase ${textMuted}`}>WhatsApp</Text>
-            <Text className={`text-[24px] font-bold tracking-tight ${textInk}`}>Business channels</Text>
+        {/* Summary Card */}
+        <View
+          className="mx-4 rounded-[20px] p-5 mb-4 flex-row items-center justify-between"
+          style={{ backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.primaryMint + '33' }}
+        >
+          <View>
+            <Text className="text-[11px] font-bold tracking-widest uppercase mb-1" style={{ color: c.primaryDeep, opacity: 0.7 }}>
+              Total Channels
+            </Text>
+            <Text className="text-[32px] font-extrabold" style={{ color: c.primaryDeep }}>
+              {channels.length}
+            </Text>
           </View>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={load} activeOpacity={0.7}>
-            <Ionicons name="refresh" size={18} color={c.ink} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Summary */}
-        <View className={`flex-row rounded-[18px] p-4 mb-3 ${softBg}`} style={{ gap: 12 }}>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Channels</Text>
-            <Text className={`text-[22px] font-bold mt-0.5 ${textInk}`}>{channels.length}</Text>
-          </View>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-semibold tracking-wider uppercase ${textMuted}`}>Source</Text>
-            <Text className={`text-[11px] font-mono mt-1.5 ${textInk}`}>gsauth.com/v23.0</Text>
+          <View className="w-14 h-14 rounded-2xl items-center justify-center" style={{ backgroundColor: c.primary }}>
+            <Ionicons name="apps" size={28} color="#FFFFFF" />
           </View>
         </View>
 
         {loading ? (
-          <View className="py-16 items-center" style={{ gap: 10 }}>
-            <ActivityIndicator color={c.pink} />
-            <Text className={`text-xs tracking-widest uppercase ${textMuted}`}>loading channels</Text>
+          <View className="py-20 items-center">
+            <ActivityIndicator color={c.primary} size="large" />
+            <Text className="text-[12px] font-bold tracking-widest uppercase mt-4" style={{ color: c.textMuted }}>
+              Fetching channels...
+            </Text>
           </View>
         ) : err ? (
-          <View className={`rounded-[16px] p-4 border-l-[3px] ${softBg}`} style={{ borderLeftColor: c.pink }}>
-            <Text className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: c.pink }}>Fetch error</Text>
-            <Text className={`text-[13px] ${textInk}`}>{err}</Text>
+          <View className="mx-4 rounded-[20px] p-5" style={{ backgroundColor: c.danger + '12', borderWidth: 1, borderColor: c.danger + '33' }}>
+            <View className="flex-row items-center mb-2" style={{ gap: 8 }}>
+              <Ionicons name="alert-circle" size={18} color={c.danger} />
+              <Text className="text-[13px] font-bold uppercase tracking-widest" style={{ color: c.danger }}>Fetch error</Text>
+            </View>
+            <Text className="text-[14px]" style={{ color: c.text }}>{err}</Text>
+            <TouchableOpacity
+              onPress={load}
+              className="mt-4 self-start px-4 py-2 rounded-[10px]"
+              style={{ backgroundColor: c.danger }}
+            >
+              <Text className="text-[12px] font-bold text-white">Retry</Text>
+            </TouchableOpacity>
           </View>
         ) : channels.length === 0 ? (
-          <View className="py-16 items-center" style={{ gap: 8 }}>
-            <Ionicons name="logo-whatsapp" size={44} color={c.dim} />
-            <Text className={`text-[15px] font-semibold ${textInk}`}>No WhatsApp channels</Text>
-            <Text className={`text-xs ${textDim}`}>Save a gsauth token in Config.</Text>
+          <View className="py-24 items-center px-10">
+            <View className="w-20 h-20 rounded-full items-center justify-center mb-4" style={{ backgroundColor: c.bgInput }}>
+              <Ionicons name="logo-whatsapp" size={40} color={c.textDim} />
+            </View>
+            <Text className="text-[18px] font-bold text-center" style={{ color: c.text }}>No Channels Found</Text>
+            <Text className="text-[13px] text-center mt-2" style={{ color: c.textMuted }}>
+              We couldn't find any WhatsApp Business channels linked to this token. Please check your gsauth credentials.
+            </Text>
           </View>
         ) : (
-          channels.map((ch, i) => {
-            const tint = TINTS[i % TINTS.length];
-            return (
-              <View key={ch.phoneNumberId || i} className={`rounded-[20px] p-4 mb-3 ${softBg}`} style={{ borderWidth: 1, borderColor: c.bgInput }}>
-                <View className="flex-row items-center mb-3" style={{ gap: 12 }}>
-                  <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: tint }}>
-                    <Ionicons name="logo-whatsapp" size={22} color="#0A0A0D" />
+          <View className="px-4">
+            <Text className="text-[11px] font-bold uppercase tracking-widest mb-3 ml-1" style={{ color: c.textMuted }}>
+              Linked Phone Numbers ({channels.length})
+            </Text>
+            {channels.map((ch, i) => (
+              <View
+                key={ch.phoneNumberId || i}
+                className="rounded-[24px] p-5 mb-4"
+                style={{
+                  backgroundColor: c.bgCard,
+                  borderWidth: 1,
+                  borderColor: c.border,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 10,
+                  elevation: 2,
+                }}
+              >
+                <View className="flex-row items-center mb-5" style={{ gap: 14 }}>
+                  <View
+                    className="w-14 h-14 rounded-full items-center justify-center"
+                    style={{ backgroundColor: c.primarySoft }}
+                  >
+                    <Ionicons name="logo-whatsapp" size={26} color={c.primary} />
                   </View>
                   <View className="flex-1">
-                    <Text className={`text-[15px] font-semibold ${textInk}`} numberOfLines={1}>
-                      {ch.label || ch.wabaNumber || ch.phoneNumberId || 'Channel'}
+                    <Text className="text-[17px] font-bold" style={{ color: c.text }} numberOfLines={1}>
+                      {ch.label || ch.wabaNumber || 'Channel ' + (i + 1)}
                     </Text>
-                    <Text className={`text-[11px] mt-0.5 ${textMuted}`}>
-                      {ch.wabaNumber ? `+${ch.wabaNumber}` : 'WhatsApp Business'}
-                    </Text>
+                    <View className="flex-row items-center mt-0.5" style={{ gap: 5 }}>
+                      <View className="w-2 h-2 rounded-full" style={{ backgroundColor: c.success }} />
+                      <Text className="text-[12px] font-medium" style={{ color: c.textMuted }}>
+                        {ch.wabaNumber ? `+${ch.wabaNumber}` : 'Active'}
+                      </Text>
+                    </View>
                   </View>
                   <TouchableOpacity
                     onPress={() => navigation.navigate('Templates')}
-                    activeOpacity={0.85}
-                    className="rounded-[14px] px-3 py-2 flex-row items-center"
-                    style={{ backgroundColor: c.ink, gap: 6 }}
+                    activeOpacity={0.8}
+                    className="w-10 h-10 rounded-full items-center justify-center"
+                    style={{ backgroundColor: c.bgInput }}
                   >
-                    <Ionicons name="document-text-outline" size={12} color={c.bg} />
-                    <Text className="text-[11px] font-semibold" style={{ color: c.bg }}>Templates</Text>
+                    <Ionicons name="document-text" size={18} color={c.primary} />
                   </TouchableOpacity>
                 </View>
 
-                <InfoRow c={c} label="Phone Number ID"  value={ch.phoneNumberId}   onCopy={() => copy(ch.phoneNumberId, 'Phone Number ID')} />
-                <InfoRow c={c} label="WABA Business ID" value={ch.wabaBusinessId}  onCopy={() => copy(ch.wabaBusinessId, 'WABA Business ID')} />
-                {ch.wabaNumber ? (
-                  <InfoRow c={c} label="WABA Number" value={ch.wabaNumber} onCopy={() => copy(ch.wabaNumber, 'WABA Number')} />
-                ) : null}
+                <View style={{ gap: 4 }}>
+                  <InfoRow c={c} label="Phone Number ID" value={ch.phoneNumberId} onCopy={() => copy(ch.phoneNumberId, 'Phone Number ID')} />
+                  <InfoRow c={c} label="WABA Account ID" value={ch.wabaBusinessId} onCopy={() => copy(ch.wabaBusinessId, 'WABA Business ID')} />
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('WhatsAppTemplates', { phoneNumberId: ch.phoneNumberId, wabaId: ch.wabaBusinessId })}
+                  activeOpacity={0.85}
+                  className="flex-row items-center justify-center rounded-[14px] py-3 mt-4"
+                  style={{ backgroundColor: c.primary }}
+                >
+                  <Text className="text-[13px] font-bold text-white mr-2">Manage Templates</Text>
+                  <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
-            );
-          })
+            ))}
+          </View>
         )}
       </ScrollView>
     </View>

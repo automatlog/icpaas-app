@@ -12,6 +12,7 @@ import { useBrand } from '../../theme';
 import { TemplatesAPI } from '../../services/api';
 import { BottomTabBar } from '../shared/DashboardScreen';
 import toast from '../../services/toast';
+import ScreenHeader from '../../components/ScreenHeader';
 
 // Category filters per WhatsApp template taxonomy.
 const CATEGORY_FILTERS = [
@@ -114,33 +115,30 @@ export default function TemplatesScreen({ navigation, route }) {
   };
 
   const Header = (
-    <View style={{ paddingHorizontal: 18, paddingTop: Platform.OS === 'ios' ? 56 : 36, backgroundColor: c.bg }}>
-      {/* Top bar */}
-      <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-9 h-9 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <View className="flex-row items-center" style={{ gap: 8, flex: 1 }}>
-          <Text className="text-[18px] font-extrabold" style={{ color: c.text }}>
-            {channel === 'whatsapp' ? 'Templates' : `${channel.toUpperCase()} Templates`}
-          </Text>
-          <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.primarySoft }}>
-            <Text className="text-[10px] font-bold" style={{ color: c.primaryDeep }}>Active</Text>
+    <View style={{ backgroundColor: c.bg }}>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        title={channel === 'whatsapp' ? 'Templates' : `${channel.toUpperCase()} Templates`}
+        badge="Active"
+        right={
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity onPress={fetchTemplates} activeOpacity={0.7} className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: c.bgInput }}>
+              <Ionicons name="refresh" size={16} color={c.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('CreateTemplate', { channel })}
+              activeOpacity={0.85}
+              className="rounded-[10px] flex-row items-center px-3 h-9"
+              style={{ backgroundColor: c.primary, gap: 4 }}
+            >
+              <Ionicons name="add" size={14} color="#FFFFFF" />
+              <Text className="text-[12px] font-bold text-white">New</Text>
+            </TouchableOpacity>
           </View>
-        </View>
-        <TouchableOpacity onPress={fetchTemplates} activeOpacity={0.7} className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: c.bgInput }}>
-          <Ionicons name="refresh" size={16} color={c.text} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('CreateTemplate', { channel })}
-          activeOpacity={0.85}
-          className="rounded-[10px] flex-row items-center px-3 py-2 ml-2"
-          style={{ backgroundColor: c.primary, gap: 4 }}
-        >
-          <Ionicons name="add" size={14} color="#FFFFFF" />
-          <Text className="text-[12px] font-bold text-white">New</Text>
-        </TouchableOpacity>
-      </View>
+        }
+      />
+      <View style={{ paddingHorizontal: 18, paddingTop: 16 }}>
 
       <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
         <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.success }} />
@@ -200,6 +198,7 @@ export default function TemplatesScreen({ navigation, route }) {
           <Text className="text-[12px]" style={{ color: c.text }}>{err}</Text>
         </View>
       ) : null}
+      </View>
     </View>
   );
 

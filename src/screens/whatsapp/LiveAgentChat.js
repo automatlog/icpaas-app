@@ -86,7 +86,7 @@ const formatRemaining = (ms) => {
 
 export default function LiveAgentChat({ route, navigation }) {
   const scheme = useColorScheme();
-  const dark = scheme === 'dark';
+  const dark = false;
   const c = dark ? C.dark : C.light;
 
   const { waId, channel, profileName } = route?.params || {};

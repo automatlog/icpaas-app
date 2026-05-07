@@ -13,6 +13,7 @@ import {
   markAllRead,
   clearNotifications,
 } from '../../store/slices/notificationsSlice';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const KIND_STYLES = (c) => ({
   'balance': {
@@ -68,28 +69,19 @@ export default function NotificationsScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? 56 : 36,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: c.rule,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>Notifications</Text>
-        {list.length > 0 ? (
-          <TouchableOpacity onPress={() => dispatch(clearNotifications())} activeOpacity={0.7}>
-            <Text className="text-[12px] font-bold" style={{ color: c.danger }}>Clear all</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
-      </View>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        title="Notifications"
+        icon="notifications"
+        right={
+          list.length > 0 ? (
+            <TouchableOpacity onPress={() => dispatch(clearNotifications())} activeOpacity={0.7}>
+              <Text className="text-[12px] font-bold" style={{ color: c.danger }}>Clear all</Text>
+            </TouchableOpacity>
+          ) : null
+        }
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}

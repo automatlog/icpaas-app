@@ -41,11 +41,11 @@ const FILTER_OPTIONS = [
 const AVATAR_TINTS = ['#0BB783', '#D4B500', '#5BA0E5', '#EF4444', '#10B981', '#A855F7', '#F59E0B'];
 
 const MOCK_CONVERSATIONS = [
-  { id: '1', name: 'Yogeshwar R Sharma',     channel: 'whatsapp', lastMsg: 'Welcome to the RDS Group Of...',  time: '46 min ago', unread: 2, online: true  },
-  { id: '2', name: 'talent',                 channel: 'whatsapp', lastMsg: 'Hello',                            time: '12:43 PM',   unread: 0, online: false },
-  { id: '3', name: 'CSC Computer Education', channel: 'whatsapp', lastMsg: 'Thank you for contacting...',     time: '08:49 AM',   unread: 1, online: false },
-  { id: '4', name: 'Supportybs',             channel: 'whatsapp', lastMsg: 'Hi',                               time: 'Yesterday',  unread: 1, online: false },
-  { id: '5', name: 'Amit',                   channel: 'whatsapp', lastMsg: 'https://icpaas.in',                time: 'Yesterday',  unread: 2, online: false },
+  { id: '1', name: 'Yogeshwar R Sharma',     channel: 'whatsapp', lastMsg: 'Welcome to the RDS Group Of...',time: '46 min ago', unread: 2, online: true  },
+  { id: '2', name: 'talent',                 channel: 'whatsapp', lastMsg: 'Hello',time: '12:43 PM',   unread: 0, online: false },
+  { id: '3', name: 'CSC Computer Education', channel: 'whatsapp', lastMsg: 'Thank you for contacting...',time: '08:49 AM',   unread: 1, online: false },
+  { id: '4', name: 'Supportybs',             channel: 'whatsapp', lastMsg: 'Hi',time: 'Yesterday',  unread: 1, online: false },
+  { id: '5', name: 'Amit',                   channel: 'whatsapp', lastMsg: 'https://icpaas.in',time: 'Yesterday',  unread: 2, online: false },
 ];
 
 const initialsOf = (name = '') =>

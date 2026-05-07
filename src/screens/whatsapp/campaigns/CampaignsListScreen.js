@@ -17,6 +17,7 @@ import {
 import { pushNotification } from '../../../store/slices/notificationsSlice';
 import { BottomTabBar } from '../../shared/DashboardScreen';
 import toast from '../../../services/toast';
+import ScreenHeader from '../../../components/ScreenHeader';
 
 const FILTERS = ['All', 'Live', 'Scheduled', 'Completed', 'Stuck', 'Failed'];
 
@@ -113,30 +114,23 @@ export default function CampaignsListScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? 56 : 36,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: c.rule,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>Campaigns</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('CampaignStep1')}
-          activeOpacity={0.85}
-          className="rounded-[10px] px-3 py-1.5 flex-row items-center"
-          style={{ backgroundColor: c.primary, gap: 4 }}
-        >
-          <Ionicons name="add" size={14} color="#FFFFFF" />
-          <Text className="text-[12px] font-bold text-white">New</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        title="Campaigns"
+        icon="megaphone"
+        right={
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CampaignStep1')}
+            activeOpacity={0.85}
+            className="rounded-[10px] px-3 py-1.5 flex-row items-center"
+            style={{ backgroundColor: c.primary, gap: 4 }}
+          >
+            <Ionicons name="add" size={14} color="#FFFFFF" />
+            <Text className="text-[12px] font-bold text-white">New</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 130 }}

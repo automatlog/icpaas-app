@@ -21,6 +21,7 @@ export const Brand = {
   primaryDeep: '#0B8A6F',
   primaryMint: '#34D399',
   primarySoft: 'rgba(16,185,129,0.18)',
+  primaryDark: '#16697a',
 
   chWa: '#10B981',
   chSms: '#0B8A6F',

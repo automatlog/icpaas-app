@@ -12,6 +12,7 @@ import { selectGroups } from '../../../store/slices/groupsSlice';
 import AddRecipientsModal from '../../shared/AddRecipientsModal';
 import ScheduleModal from '../../shared/ScheduleModal';
 import Select from '../../../components/Select';
+import ScreenHeader from '../../../components/ScreenHeader';
 
 const fmtNow = () => {
   const d = new Date();
@@ -198,22 +199,12 @@ export default function CampaignStep1Screen({ navigation, route }) {
 
 function Header({ c, navigation, title }) {
   return (
-    <View
-      className="flex-row items-center px-4"
-      style={{
-        paddingTop: Platform.OS === 'ios' ? 56 : 36,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: c.rule,
-        backgroundColor: c.bg,
-      }}
-    >
-      <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-        <Ionicons name="arrow-back" size={22} color={c.text} />
-      </TouchableOpacity>
-      <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>{title}</Text>
-      <View style={{ width: 40 }} />
-    </View>
+    <ScreenHeader
+      c={c}
+      onBack={() => navigation.goBack()}
+      title={title}
+      icon="megaphone"
+    />
   );
 }
 

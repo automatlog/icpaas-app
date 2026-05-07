@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useBrand } from '../../theme';
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const PRODUCTS = [
   {
@@ -86,22 +87,12 @@ export default function ApiDocsScreen({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? 56 : 36,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: c.rule,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>API Docs</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        title="API Docs"
+        icon="code-slash"
+      />
 
       {/* Product pills */}
       <ScrollView
@@ -117,11 +108,26 @@ export default function ApiDocsScreen({ navigation, route }) {
               key={p.id}
               onPress={() => setActive(p.id)}
               activeOpacity={0.85}
-              className="flex-row items-center rounded-[14px] py-2 px-3"
-              style={{ backgroundColor: isActive ? p.tint : c.bgInput, gap: 6 }}
+              style={{
+                backgroundColor: isActive ? p.tint : c.bgInput,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 14,
+                width: 105,   // Fixed width for all tabs
+                height: 38,  // Fixed height for all tabs
+                gap: 6,
+              }}
             >
-              <Ionicons name={p.icon} size={13} color={isActive ? '#FFFFFF' : c.textMuted} />
-              <Text className="text-[12px]" style={{ color: isActive ? '#FFFFFF' : c.textMuted, fontWeight: isActive ? '700' : '500' }}>
+              <Ionicons name={p.icon} size={15} color={isActive ? '#FFFFFF' : c.textMuted} />
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: isActive ? '#FFFFFF' : c.textMuted,
+                  fontSize: 12,
+                  fontWeight: '700', // Constant weight to prevent width shift
+                }}
+              >
                 {p.label}
               </Text>
             </TouchableOpacity>

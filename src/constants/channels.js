@@ -12,10 +12,10 @@
 //   count — placeholder activity count for the Dashboard grid (replace with
 //           a live selector when per-channel counts are wired up)
 export const CHANNELS = [
-  { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp',      tint: '#10B981', route: 'WhatsAppCampaignStep1', count: 32 },
-  { id: 'rcs',      label: 'RCS',      icon: 'logo-google',        tint: '#8B5CF6', route: 'RcsCampaign',           count: 14 },
-  { id: 'voice',    label: 'Voice',    icon: 'mic-outline',        tint: '#F59E0B', route: 'VoiceCampaign',         count: 8  },
-  { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline', tint: '#0B8A6F', route: 'SmsCampaign',           count: 21 },
+  { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp',      tint: '#22C55E', route: 'WhatsAppCampaignStep1', count: 32 },
+  { id: 'rcs',      label: 'RCS',      icon: 'logo-google',        tint: '#3B82F6', route: 'RcsCampaign',           count: 14 },
+  { id: 'sms',      label: 'SMS',      icon: 'chatbubble-outline', tint: '#A855F7', route: 'SmsCampaign',           count: 21 },
+  { id: 'voice',    label: 'Voice',    icon: 'mic-outline',        tint: '#F97316', route: 'VoiceCampaign',         count: 8  },
 ];
 
 /** Look up a channel by id (returns undefined if not found). */

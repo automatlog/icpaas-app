@@ -1,12 +1,12 @@
-// src/screens/ChatScreen.js — Single-conversation chat (NativeWind)
+// src/screens/whatsapp/ChatScreen.js — Single-conversation chat (NativeWind)
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, useColorScheme,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Modal, ScrollView, useWindowDimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { WhatsAppAPI } from '../../services/api';
+import { WhatsAppAPI, LiveChatAPI, TemplatesAPI } from '../../services/api';
 import {
   setConversationMessages,
   appendConversationMessage,
@@ -14,6 +14,7 @@ import {
 } from '../../store/slices/messagesSlice';
 import { upsertConversation } from '../../store/slices/conversationsSlice';
 import moment from 'moment';
+import EmojiPicker from 'rn-emoji-keyboard';
 
 const MOCK_MESSAGES = [
   { id: '1', text: 'Hi! We want to upgrade our WhatsApp Business API plan to the Enterprise tier.', fromMe: false, time: '2025-03-29T09:14:00Z', status: 'read' },
@@ -23,16 +24,19 @@ const MOCK_MESSAGES = [
   { id: '5', text: 'Hi, we need to renew our WhatsApp API plan and also check on missed-call alerts for Gujarat.', fromMe: false, time: '2025-03-29T09:32:00Z', status: 'delivered' },
 ];
 
-const QUICK_TEMPLATES = [
-  { id: '1', label: 'Send Proposal', text: 'Hi! Here is our proposal document for your review.' },
-  { id: '2', label: 'Pricing',       text: 'Here are our latest pricing details. Can I schedule a call?' },
-  { id: '3', label: 'Schedule Demo', text: "I'd love to schedule a demo. Are you free for 30 min this week?" },
-  { id: '4', label: 'Confirm Order', text: 'Your order has been confirmed. Team will reach out in 24 hours.' },
+const ATTACHMENT_OPTIONS = [
+  { id: 'image', label: 'Image', icon: 'image-outline', color: '#10B981' },
+  { id: 'doc', label: 'Doc', icon: 'document-text-outline', color: '#3B82F6' },
+  { id: 'video', label: 'Video', icon: 'videocam-outline', color: '#EF4444' },
+  { id: 'audio', label: 'Audio', icon: 'volume-medium-outline', color: '#10B981' },
+  { id: 'location', label: 'Location', icon: 'location-outline', color: '#EF4444' },
+  { id: 'media', label: 'Media Library', icon: 'images-outline', color: '#10B981' },
 ];
 
+const EMOJIS = ['👍', '😀', '😘', '😍', '😂', '😜', '😅', '🤣', '😭', '😎', '🥺', '😡', '🤔', '🙌', '👏', '🔥', '🎉', '✨', '💯', '❤️'];
+
 const C = {
-  dark:  { bg: '#0A0A0D', bgSoft: '#141418', bgInput: '#1C1C22', ink: '#FFFFFF', muted: '#9A9AA2', dim: '#5C5C63', green: '#4BD08D', pink: '#FF4D7E', cyan: '#5CD4E0', bubbleMe: '#8FCFBD' },
-  light: { bg: '#FAFAFB', bgSoft: '#F2F2F5', bgInput: '#ECECEF', ink: '#0A0A0D', muted: '#5C5C63', dim: '#9A9AA2', green: '#22C55E', pink: '#E6428A', cyan: '#2FB8C4', bubbleMe: '#8FCFBD' },
+  light: { bg: '#EFEAE2', bgSoft: '#F0F2F5', bgInput: '#FFFFFF', ink: '#111B21', muted: '#667781', dim: '#8696A0', green: '#00A884', pink: '#E6428A', cyan: '#53BDEB', bubbleMe: '#A0D8B3', bubbleOther: '#FFFFFF', panelBg: '#F0F2F5', primary: '#005C4B' },
 };
 
 const CHANNEL_ICON = {
@@ -48,11 +52,11 @@ const initialsOf = (name = '') =>
 const EMPTY_MESSAGES = [];
 
 export default function ChatScreen({ route, navigation }) {
-  const scheme = useColorScheme();
-  const dark = scheme === 'dark';
-  const c = dark ? C.dark : C.light;
+  const { width } = useWindowDimensions();
+  const c = C.light;
+  const isLargeScreen = width > 768;
 
-  const conversation = route?.params?.conversation || { id: 'new', name: 'New Chat', channel: 'whatsapp', online: false };
+  const conversation = route?.params?.conversation || { id: 'new', name: '919654297000', channel: 'whatsapp', online: false };
   const dispatch = useDispatch();
   const messages = useSelector((s) => s.messages[conversation.id]) || EMPTY_MESSAGES;
 
@@ -64,21 +68,52 @@ export default function ChatScreen({ route, navigation }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(messages.length === 0);
-  const [showTemplates, setShowTemplates] = useState(false);
+  
+  // UI toggles
+  const [showAttachment, setShowAttachment] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showInfoPanel, setShowInfoPanel] = useState(isLargeScreen);
+  const [templateTab, setTemplateTab] = useState('Marketing');
+  const [realTemplates, setRealTemplates] = useState([]);
+  const [templateSearch, setTemplateSearch] = useState('');
+
   const flatRef = useRef(null);
 
   const loadMessages = useCallback(async () => {
     try {
-      const res = await WhatsAppAPI.getMessages(conversation.id);
-      setConvMessages(conversation.id, res?.data || MOCK_MESSAGES);
+      const res = await LiveChatAPI.getMessages({
+        senderNumber: conversation.id || conversation.phone,
+        channelNumber: conversation.channelNumber || '919081234314'
+      });
+      const realMsgs = (res?.chatList || []).map(m => ({
+        id: m.waInboxId || m.messageId || Math.random().toString(),
+        text: m.messageText,
+        fromMe: m.chatType === 'OUT',
+        time: m.receivedDate || new Date().toISOString(),
+        status: m.deliveryStatus?.toLowerCase() || 'sent'
+      }));
+      setConvMessages(conversation.id, realMsgs.length ? realMsgs.reverse() : MOCK_MESSAGES);
     } catch {
       setConvMessages(conversation.id, MOCK_MESSAGES);
     } finally {
       setLoading(false);
     }
-  }, [conversation.id]);
+  }, [conversation.id, conversation.phone, conversation.channelNumber]);
 
-  useEffect(() => { loadMessages(); }, [loadMessages]);
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await TemplatesAPI.getWhatsApp();
+      setRealTemplates(res?.data || []);
+    } catch (e) {
+      console.log('Failed to load templates', e);
+    }
+  }, []);
+
+  useEffect(() => { 
+    loadMessages(); 
+    loadTemplates();
+  }, [loadMessages, loadTemplates]);
 
   const sendMessage = async (msgText) => {
     const msg = msgText || text.trim();
@@ -88,24 +123,19 @@ export default function ChatScreen({ route, navigation }) {
     appendMessage(conversation.id, tempMsg);
     upsertConv({ ...conversation, lastMsg: msg, time: 'Just now' });
     setText('');
-    setShowTemplates(false);
+    setShowTemplateModal(false);
+    setShowEmoji(false);
+    setShowAttachment(false);
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
     try {
       await WhatsAppAPI.sendReply({ to: conversation.phone, message: msg, type: 'text' });
       updateMessage(conversation.id, tempMsg.id, { status: 'delivered' });
     } catch (e) {
-      Alert.alert('Send failed', e?.message || 'Please try again');
+      // alert or log error
     } finally {
       setSending(false);
     }
   };
-
-  const rootBg = dark ? 'bg-[#0A0A0D]' : 'bg-white';
-  const softBg = dark ? 'bg-[#141418]' : 'bg-[#F2F2F5]';
-  const inputBg = dark ? 'bg-[#1C1C22]' : 'bg-[#ECECEF]';
-  const textInk = dark ? 'text-white' : 'text-[#0A0A0D]';
-  const textMuted = dark ? 'text-[#9A9AA2]' : 'text-[#5C5C63]';
-  const chIcon = CHANNEL_ICON[String(conversation.channel || 'whatsapp').toLowerCase()] || 'chatbubble-outline';
 
   const grouped = useMemo(() => {
     const out = [];
@@ -121,159 +151,244 @@ export default function ChatScreen({ route, navigation }) {
     return out;
   }, [messages]);
 
-  return (
-    <KeyboardAvoidingView className={`flex-1 ${rootBg}`} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* Header */}
-      <View style={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: 18 }}>
-        <View className="flex-row items-center pb-3" style={{ gap: 10 }}>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={c.ink} />
-          </TouchableOpacity>
-          <View className="relative">
-            <View className="w-11 h-11 rounded-full items-center justify-center" style={{ backgroundColor: c.bubbleMe }}>
-              <Text className="text-sm font-bold" style={{ color: '#0A0A0D' }}>{initialsOf(conversation.name)}</Text>
+  const renderTemplateModal = () => (
+    <Modal visible={showTemplateModal} transparent animationType="fade">
+      <View className="flex-1 justify-center items-center bg-black/50">
+        <View className="bg-white rounded-lg w-[90%] max-w-[600px] h-[70%] overflow-hidden shadow-xl">
+          <View className="flex-row items-center justify-between p-4 border-b border-gray-200">
+            <Text className="text-lg font-semibold text-gray-800">Template</Text>
+            <TouchableOpacity onPress={() => setShowTemplateModal(false)}>
+              <Ionicons name="close" size={24} color={c.muted} />
+            </TouchableOpacity>
+          </View>
+          <View className="p-4 flex-row items-center justify-between border-b border-gray-100">
+            <View className="flex-row space-x-2">
+              {['Marketing', 'Utility', 'Authentication'].map(tab => {
+                const active = templateTab === tab;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => setTemplateTab(tab)}
+                    className={`px-3 py-1.5 rounded border ${active ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}
+                  >
+                    <Text className={`text-sm font-medium ${active ? 'text-white' : 'text-blue-600'}`}>{tab}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-            {conversation.online && (
-              <View
-                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full"
-                style={{ backgroundColor: c.green, borderWidth: 2, borderColor: c.bg }}
-              />
+            <View className="border border-gray-300 rounded px-3 py-1.5 w-40">
+              <TextInput value={templateSearch} onChangeText={setTemplateSearch} placeholder="Search template" className="text-sm p-0 m-0" style={Platform.select({ web: { outlineStyle: 'none' } })} />
+            </View>
+          </View>
+          <ScrollView className="flex-1 p-4 bg-gray-50">
+            {realTemplates
+              .filter(t => (t.category || '').toUpperCase() === templateTab.toUpperCase() && (t.name || '').toLowerCase().includes(templateSearch.toLowerCase()))
+              .length === 0 ? (
+              <Text className="text-center text-gray-500 mt-10">No templates found.</Text>
+            ) : (
+              realTemplates
+                .filter(t => (t.category || '').toUpperCase() === templateTab.toUpperCase() && (t.name || '').toLowerCase().includes(templateSearch.toLowerCase()))
+                .map(item => (
+                <TouchableOpacity
+                  key={item.id || item.name}
+                  onPress={() => sendMessage(item.body || item.name)}
+                  className="bg-white p-3 rounded-lg mb-2 border border-gray-200 shadow-sm"
+                >
+                  <Text className="font-semibold text-gray-800 mb-1" numberOfLines={1}>{item.name}</Text>
+                  <Text className="text-gray-600 text-sm" numberOfLines={3}>{item.body}</Text>
+                </TouchableOpacity>
+              ))
             )}
-          </View>
-          <View className="flex-1">
-            <Text className={`text-[16px] font-semibold ${textInk}`} numberOfLines={1}>{conversation.name}</Text>
-            <View className="flex-row items-center mt-0.5" style={{ gap: 6 }}>
-              <Ionicons name={chIcon} size={11} color={c.muted} />
-              <Text className={`text-[11px] ${textMuted}`}>
-                {conversation.online ? 'Online · ' : 'Offline · '}
-                {String(conversation.channel || 'WhatsApp').toUpperCase()}
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} activeOpacity={0.7}>
-            <Ionicons name="call-outline" size={18} color={c.ink} />
-          </TouchableOpacity>
-          <TouchableOpacity className={`w-[42px] h-[42px] rounded-full items-center justify-center ${softBg}`} activeOpacity={0.7}>
-            <Ionicons name="ellipsis-horizontal" size={18} color={c.ink} />
-          </TouchableOpacity>
+          </ScrollView>
         </View>
       </View>
+    </Modal>
+  );
 
-      {/* Messages */}
-      {loading ? (
-        <View className="flex-1 items-center justify-center" style={{ gap: 10 }}>
-          <ActivityIndicator color={c.pink} />
-          <Text className={`text-xs tracking-widest uppercase ${textMuted}`}>loading thread</Text>
+  const renderInfoPanel = () => (
+    <View className="w-80 bg-[#F0F2F5] border-l border-gray-200 h-full">
+      <View className="bg-[#005C4B] p-5 pb-8 rounded-bl-3xl">
+        <View className="flex-row justify-between items-start">
+          <View className="bg-yellow-500 w-12 h-12 rounded-lg items-center justify-center">
+            <Text className="text-white font-bold text-lg">91</Text>
+          </View>
+          <TouchableOpacity className="flex-row items-center space-x-1">
+            <Ionicons name="open-outline" size={14} color="#fff" />
+            <Text className="text-white text-xs font-medium">Export Chat</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          ref={flatRef}
-          data={grouped}
-          keyExtractor={(i) => i.id}
-          contentContainerStyle={{ padding: 18, paddingBottom: 12 }}
-          renderItem={({ item }) => {
-            if (item.type === 'sep') {
-              return (
-                <View className="flex-row items-center my-3" style={{ gap: 10 }}>
-                  <View className="flex-1 h-px" style={{ backgroundColor: c.bgInput }} />
-                  <View className={`rounded-full px-3 py-1 ${softBg}`}>
-                    <Text className={`text-[10px] font-semibold tracking-wider uppercase ${textMuted}`}>{item.label}</Text>
+        <Text className="text-white font-bold text-xl mt-3">{conversation.name}</Text>
+        <Text className="text-emerald-100 text-sm">{conversation.name}</Text>
+      </View>
+      
+      <ScrollView className="flex-1 p-4">
+        <View className="bg-white rounded-lg p-4 mb-4 shadow-sm">
+          <View className="flex-row justify-between py-2 border-b border-gray-100">
+            <Text className="text-gray-500 text-sm">Last Message On</Text>
+            <View className="items-end">
+              <Text className="text-gray-800 text-sm font-medium">2026-05-05</Text>
+              <Text className="text-gray-800 text-sm font-medium">14:02:00</Text>
+            </View>
+          </View>
+          <View className="flex-row justify-between py-2 border-b border-gray-100">
+            <Text className="text-gray-500 text-sm">Last Active</Text>
+            <Text className="text-gray-800 text-sm font-medium">02:02 PM</Text>
+          </View>
+          <View className="flex-row justify-between py-2 border-b border-gray-100">
+            <Text className="text-gray-500 text-sm">Last Message</Text>
+            <View className="flex-row items-center space-x-1">
+              <Ionicons name="warning" size={12} color="#F59E0B" />
+              <Text className="text-gray-800 text-sm font-medium">Unsupported message</Text>
+            </View>
+          </View>
+          <View className="flex-row justify-between py-2">
+            <Text className="text-gray-500 text-sm">Channel Number</Text>
+            <Text className="text-gray-800 text-sm font-medium">919081234314</Text>
+          </View>
+        </View>
+
+        <Text className="text-gray-800 font-bold mb-2">Actions <Ionicons name="filter" size={14} /></Text>
+        <TouchableOpacity className="bg-red-500 rounded-lg p-3 items-center mb-3 flex-row justify-center space-x-2">
+          <Ionicons name="ban" size={18} color="#fff" />
+          <Text className="text-white font-semibold">Block {conversation.name}</Text>
+        </TouchableOpacity>
+        
+        {['Assign Agent', 'Notes', 'Customer Journey'].map(menu => (
+          <TouchableOpacity key={menu} className="bg-white rounded-lg p-3 flex-row justify-between items-center mb-2 shadow-sm border border-gray-100">
+            <Text className="text-gray-700 font-medium">{menu}</Text>
+            <Ionicons name="chevron-down" size={16} color={c.muted} />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  return (
+    <KeyboardAvoidingView className="flex-1 flex-row bg-white" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View className="flex-1 flex-col relative" style={{ backgroundColor: c.bg }}>
+        {/* Header */}
+        <View className="bg-[#F0F2F5] border-b border-gray-200 px-4 py-2 flex-row items-center justify-between" style={{ paddingTop: Platform.OS === 'ios' ? 56 : 10 }}>
+          <View className="flex-row items-center space-x-3">
+            <TouchableOpacity onPress={() => navigation.goBack()} className="mr-1">
+              <Ionicons name="chevron-back" size={24} color={c.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { conversation })} className="flex-row items-center space-x-3">
+              <View className="w-10 h-10 rounded-full bg-gray-300 items-center justify-center relative">
+                <Text className="text-white font-bold">{initialsOf(conversation.name)}</Text>
+                {conversation.online && <View className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />}
+              </View>
+              <View>
+                <Text className="text-base font-semibold text-gray-800">{conversation.name}</Text>
+                <Text className="text-xs text-gray-500">Click here for contact info</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+          <View className="flex-row space-x-4 items-center">
+            <TouchableOpacity><Ionicons name="search" size={20} color={c.muted} /></TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowInfoPanel(!showInfoPanel)}><Ionicons name="ellipsis-vertical" size={20} color={c.muted} /></TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Messages */}
+        {loading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator color={c.green} />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatRef}
+            data={grouped}
+            keyExtractor={(i) => i.id}
+            contentContainerStyle={{ padding: 18, paddingBottom: 12 }}
+            renderItem={({ item }) => {
+              if (item.type === 'sep') {
+                return (
+                  <View className="items-center my-3">
+                    <View className="bg-white rounded-lg px-3 py-1 shadow-sm">
+                      <Text className="text-xs text-gray-500 uppercase">{item.label}</Text>
+                    </View>
                   </View>
-                  <View className="flex-1 h-px" style={{ backgroundColor: c.bgInput }} />
+                );
+              }
+              const me = item.fromMe;
+              return (
+                <View className={`mb-2 flex-row ${me ? 'justify-end' : 'justify-start'}`}>
+                  <View className="rounded-lg px-3 py-2 max-w-[75%] shadow-sm" style={{ backgroundColor: me ? c.bubbleMe : c.bubbleOther }}>
+                    <Text className="text-sm text-[#111B21]">{item.text}</Text>
+                    <View className="flex-row items-center justify-end mt-1 space-x-1">
+                      <Text className="text-[10px] text-gray-500">{moment(item.time).format('h:mm A')}</Text>
+                      {me && (
+                        <Ionicons
+                          name={item.status === 'read' ? 'checkmark-done' : item.status === 'delivered' ? 'checkmark-done' : 'checkmark'}
+                          size={14}
+                          color={item.status === 'read' ? c.cyan : c.muted}
+                        />
+                      )}
+                    </View>
+                  </View>
                 </View>
               );
-            }
-            const me = item.fromMe;
-            return (
-              <View className={`mb-2 ${me ? 'items-end' : 'items-start'}`}>
-                <View
-                  className="rounded-[18px] px-3.5 py-2.5 max-w-[82%]"
-                  style={{ backgroundColor: me ? c.bubbleMe : (dark ? '#141418' : '#F2F2F5') }}
-                >
-                  <Text
-                    className="text-[14px] leading-5"
-                    style={{ color: me ? '#0A0A0D' : c.ink }}
-                  >
-                    {item.text}
-                  </Text>
-                </View>
-                <View className={`flex-row mt-1 px-1 items-center ${me ? 'flex-row-reverse' : ''}`} style={{ gap: 4 }}>
-                  <Text className={`text-[10px] ${textMuted}`}>{moment(item.time).format('h:mm A')}</Text>
-                  {me && (
-                    <Ionicons
-                      name={item.status === 'read' ? 'checkmark-done' : item.status === 'delivered' ? 'checkmark-done' : 'checkmark'}
-                      size={12}
-                      color={item.status === 'read' ? c.cyan : c.muted}
-                    />
-                  )}
-                </View>
-              </View>
-            );
-          }}
+            }}
+          />
+        )}
+
+        {/* Real Emoji Picker Popup */}
+        <EmojiPicker
+          open={showEmoji}
+          onClose={() => setShowEmoji(false)}
+          onEmojiSelected={(emojiObject) => setText(prev => prev + emojiObject.emoji)}
         />
-      )}
 
-      {/* Quick templates */}
-      {showTemplates && (
-        <View className={`px-4 pb-2 ${rootBg}`}>
-          <FlatList
-            data={QUICK_TEMPLATES}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(i) => i.id}
-            contentContainerStyle={{ gap: 8 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => sendMessage(item.text)}
-                activeOpacity={0.8}
-                className={`rounded-[14px] px-3 py-2 flex-row items-center ${softBg}`}
-                style={{ gap: 6, borderWidth: 1, borderColor: c.bgInput }}
-              >
-                <Ionicons name="flash-outline" size={12} color={c.muted} />
-                <Text className={`text-xs font-medium ${textInk}`}>{item.label}</Text>
+        {/* Attachment Menu Popup */}
+        {showAttachment && (
+          <View className="absolute bottom-[70px] left-4 bg-white w-48 rounded-xl shadow-2xl z-50 py-2 border border-gray-100">
+            {ATTACHMENT_OPTIONS.map(opt => (
+              <TouchableOpacity key={opt.id} className="flex-row items-center px-4 py-2 hover:bg-gray-50">
+                <Ionicons name={opt.icon} size={20} color={opt.color} className="mr-3" />
+                <Text className="text-gray-700 text-sm font-medium">{opt.label}</Text>
               </TouchableOpacity>
-            )}
-          />
-        </View>
-      )}
+            ))}
+          </View>
+        )}
 
-      {/* Composer */}
-      <View className={`flex-row items-end px-3 py-2 ${rootBg}`} style={{ gap: 8, borderTopWidth: 1, borderTopColor: c.bgInput }}>
-        <TouchableOpacity
-          onPress={() => setShowTemplates((v) => !v)}
-          activeOpacity={0.75}
-          className={`w-10 h-10 rounded-full items-center justify-center ${softBg}`}
-        >
-          <Ionicons name={showTemplates ? 'close' : 'add'} size={20} color={c.ink} />
-        </TouchableOpacity>
-        <View className={`flex-1 flex-row items-end rounded-[22px] px-3 ${inputBg}`} style={{ gap: 8 }}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder="Type a message"
-            placeholderTextColor={c.muted}
-            multiline
-            className={`flex-1 py-2.5 text-[14px] leading-5 ${textInk}`}
-            style={[{ maxHeight: 110 }, Platform.select({ web: { outlineStyle: 'none' } })]}
-          />
-          <TouchableOpacity className="py-2" activeOpacity={0.7}>
-            <Ionicons name="happy-outline" size={20} color={c.muted} />
+        {/* Composer */}
+        <View className="bg-[#F0F2F5] flex-row items-center px-3 py-2 space-x-2 min-h-[60px]">
+          <TouchableOpacity onPress={() => { setShowAttachment(!showAttachment); setShowEmoji(false); }} className={`w-8 h-8 rounded-full items-center justify-center ${showAttachment ? 'bg-blue-100' : ''}`}>
+            <Ionicons name="add" size={24} color={showAttachment ? '#3B82F6' : c.muted} />
           </TouchableOpacity>
-        </View>
-        <TouchableOpacity
-          onPress={() => sendMessage()}
-          disabled={sending || !text.trim()}
-          activeOpacity={0.85}
-          className="w-11 h-11 rounded-full items-center justify-center"
-          style={{ backgroundColor: text.trim() ? c.bubbleMe : (dark ? '#141418' : '#F2F2F5'), opacity: sending ? 0.6 : 1 }}
-        >
-          {sending ? (
-            <ActivityIndicator color="#0A0A0D" size="small" />
+          <TouchableOpacity onPress={() => { setShowEmoji(!showEmoji); setShowAttachment(false); }} className={`w-8 h-8 rounded-full items-center justify-center ${showEmoji ? 'bg-blue-100' : ''}`}>
+            <Ionicons name="happy" size={24} color={showEmoji ? '#3B82F6' : c.muted} />
+          </TouchableOpacity>
+          
+          <View className="flex-1 bg-white rounded-full px-4 py-2 border border-gray-200">
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder="Type your message..."
+              placeholderTextColor={c.muted}
+              multiline
+              className="max-h-24 text-base text-gray-800 p-0 m-0"
+              style={Platform.select({ web: { outlineStyle: 'none' } })}
+            />
+          </View>
+
+          {text.trim() ? (
+            <TouchableOpacity onPress={() => sendMessage()} className="w-10 h-10 rounded-full bg-[#00A884] items-center justify-center">
+              <Ionicons name="send" size={18} color="#fff" style={{ marginLeft: 3 }} />
+            </TouchableOpacity>
           ) : (
-            <Ionicons name="send" size={17} color={text.trim() ? '#0A0A0D' : c.muted} />
+            <TouchableOpacity onPress={() => setShowTemplateModal(true)} className="w-10 h-10 rounded-full bg-gray-800 items-center justify-center">
+              <Ionicons name="albums" size={18} color="#fff" />
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+        </View>
+
       </View>
+
+      {/* Right Side Panel */}
+      {showInfoPanel && renderInfoPanel()}
+      
+      {renderTemplateModal()}
     </KeyboardAvoidingView>
   );
 }

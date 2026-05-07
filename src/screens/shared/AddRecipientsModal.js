@@ -13,6 +13,7 @@ import * as Contacts from 'expo-contacts';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBrand } from '../../theme';
 import { selectGroups, addGroup } from '../../store/slices/groupsSlice';
@@ -37,6 +38,7 @@ const parseFileNumbers = (raw) =>
 
 export default function AddRecipientsModal({ visible, onClose, onAdd }) {
   const c = useBrand();
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const groups = useSelector(selectGroups);
   const [tab, setTab] = useState('manual');
@@ -68,7 +70,7 @@ export default function AddRecipientsModal({ visible, onClose, onAdd }) {
             backgroundColor: c.bg,
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
-            paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+            paddingBottom: Math.max(insets.bottom, 16) + 8,
           }}
         >
           {/* Drag handle (tap to toggle expand / collapse) */}

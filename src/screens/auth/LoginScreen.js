@@ -17,17 +17,18 @@ const FloatingIcon = ({ name, size, top, left, right, bottom, rotate, opacity = 
   const translateY = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
+    const useNativeDriver = Platform.OS !== 'web';
     Animated.loop(
       Animated.sequence([
         Animated.timing(translateY, {
           toValue: -20,
           duration,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(translateY, {
           toValue: 0,
           duration,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     ).start();
@@ -35,12 +36,12 @@ const FloatingIcon = ({ name, size, top, left, right, bottom, rotate, opacity = 
 
   return (
     <Animated.View
-      pointerEvents="none"
       style={{
         position: 'absolute',
         top, left, right, bottom,
         transform: [{ rotate: rotate || '0deg' }, { translateY }],
         opacity,
+        pointerEvents: 'none',
       }}
     >
       <Ionicons 
@@ -97,7 +98,21 @@ const ErrorModal = ({ visible, title, message, onClose, dark }) => {
                 colors={['#2094ab', '#175a6e']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={{ borderRadius: 20, paddingVertical: 16, alignItems: 'center', shadowColor: '#2094ab', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
+                style={{ 
+                  borderRadius: 20, 
+                  paddingVertical: 16, 
+                  alignItems: 'center', 
+                  elevation: 5,
+                  ...Platform.select({
+                    web: { boxShadow: '0px 4px 8px rgba(32, 148, 171, 0.3)' },
+                    default: {
+                      shadowColor: '#2094ab', 
+                      shadowOffset: { width: 0, height: 4 }, 
+                      shadowOpacity: 0.3, 
+                      shadowRadius: 8,
+                    }
+                  })
+                }}
               >
                 <Text className="text-white font-bold text-[17px]">Got it</Text>
               </LinearGradient>
@@ -114,8 +129,8 @@ export default function LoginScreen({ navigation }) {
   const dark = c.scheme === 'dark';
   const dispatch = useDispatch();
 
-  const [username, setUsername] = useState('omniuser');
-  const [password, setPassword] = useState('Omni@1234');
+  const [username, setUsername] = useState('smppvadadmin');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', message: '' });
@@ -142,7 +157,8 @@ export default function LoginScreen({ navigation }) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 40}
     >
       <LinearGradient
         colors={[dark ? '#000000' : '#f0f4f5', dark ? '#0f171a' : '#ffffff']}
@@ -187,13 +203,18 @@ export default function LoginScreen({ navigation }) {
             className="mx-6 mt-12 p-8 rounded-[40px] bg-white shadow-2xl"
             style={{
               backgroundColor: dark ? '#17171b' : '#ffffff',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 15 },
-              shadowOpacity: 0.08,
-              shadowRadius: 30,
               elevation: 10,
               borderWidth: dark ? 1 : 0,
-              borderColor: 'rgba(255,255,255,0.1)'
+              borderColor: 'rgba(255,255,255,0.1)',
+              ...Platform.select({
+                web: { boxShadow: '0px 15px 30px rgba(0, 0, 0, 0.08)' },
+                default: {
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 15 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 30,
+                }
+              })
             }}
           >
             <View className="mb-8">

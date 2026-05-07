@@ -14,6 +14,7 @@ import { addMedia, updateMedia, removeMedia } from '../../store/slices/mediaSlic
 import { pushNotification } from '../../store/slices/notificationsSlice';
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
+import ScreenHeader from '../../components/ScreenHeader';
 import {
   validateForWhatsApp, MEDIA_KINDS, STICKER_ANIMATED_MAX, formatBytes, ALL_MIMES,
 } from '../../services/whatsappMediaSpec';
@@ -187,22 +188,12 @@ export default function MediaLibraryScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? 56 : 36,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: c.rule,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>Media Library</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader
+        c={c}
+        onBack={() => navigation.goBack()}
+        title="Media Library"
+        icon="images"
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 130 }}

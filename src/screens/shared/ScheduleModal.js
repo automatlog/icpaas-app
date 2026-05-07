@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../../theme';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -35,6 +36,7 @@ const QUICK_PICKS = [
 
 export default function ScheduleModal({ visible, initialValue, onConfirm, onClose }) {
   const c = useBrand();
+  const insets = useSafeAreaInsets();
   const [date, setDate] = useState(() => initialValue ? new Date(initialValue) : new Date(Date.now() + 60 * 60 * 1000));
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
@@ -83,7 +85,7 @@ export default function ScheduleModal({ visible, initialValue, onConfirm, onClos
             backgroundColor: c.bg,
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
-            paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+            paddingBottom: Math.max(insets.bottom, 16) + 8,
           }}
         >
           {/* Drag handle */}

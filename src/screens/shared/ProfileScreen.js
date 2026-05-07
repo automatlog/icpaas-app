@@ -2,14 +2,16 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Image,
-  Alert, Platform, ActivityIndicator, Switch,
+  Alert, Platform, ActivityIndicator, Switch, KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBrand } from '../../theme';
-import { AuthAPI } from '../../services/api';
-import { logoutAndCleanup } from '../../store/slices/authSlice';
+import { AuthAPI, UserAPI } from '../../services/api';
+import { logoutAndCleanup, updateUser } from '../../store/slices/authSlice';
 import { selectThemeMode, setThemeMode } from '../../store/slices/themeSlice';
 import { BottomTabBar } from './DashboardScreen';
 import toast from '../../services/toast';
@@ -26,6 +28,7 @@ const TABS = [
 
 export default function ProfileScreen({ navigation }) {
   const c = useBrand();
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const user = useSelector((s) => s.auth.user) || {};
   const themeMode = useSelector(selectThemeMode);
@@ -47,10 +50,46 @@ export default function ProfileScreen({ navigation }) {
   const [apiKeyDirty, setApiKeyDirty] = useState(false);
   const [testingKey, setTestingKey]   = useState(false);
   const [keyScopes, setKeyScopes]     = useState(null); // { whatsapp, sms, rcs }
+  const [uploading, setUploading]     = useState(false);
 
   useEffect(() => {
     AuthAPI.getToken().then((t) => setApiKey(t || ''));
   }, []);
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      toast.error('Permission denied', 'We need access to your gallery to upload a photo.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      const selected = result.assets[0];
+      handleUpload(selected);
+    }
+  };
+
+  const handleUpload = async (fileAsset) => {
+    setUploading(true);
+    try {
+      const res = await UserAPI.uploadAvatar(fileAsset);
+      if (res.ok) {
+        dispatch(updateUser({ avatarUrl: res.avatarUrl }));
+        toast.success('Photo updated', 'Your profile picture has been changed.');
+      }
+    } catch (e) {
+      toast.error('Upload failed', e.message || 'Could not upload photo.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const copyKey = async () => {
     if (!apiKey) { toast.warning('No API key', 'Save one in Config first.'); return; }
@@ -107,7 +146,11 @@ export default function ProfileScreen({ navigation }) {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: c.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <ScreenHeader
         c={c}
         onBack={() => navigation.goBack()}
@@ -138,17 +181,28 @@ export default function ProfileScreen({ navigation }) {
         >
           <View className="relative mb-3">
             <View
-              className="w-24 h-24 rounded-full items-center justify-center"
+              className="w-24 h-24 rounded-full items-center justify-center overflow-hidden"
               style={{ backgroundColor: c.primarySoft, borderWidth: 3, borderColor: c.primary }}
             >
-              <Ionicons name="person" size={48} color={c.primary} />
+              {user.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} className="w-full h-full" resizeMode="cover" />
+              ) : (
+                <Ionicons name="person" size={48} color={c.primary} />
+              )}
+              {uploading && (
+                <View className="absolute inset-0 items-center justify-center bg-black/30">
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                </View>
+              )}
             </View>
             <TouchableOpacity
+              onPress={pickImage}
+              disabled={uploading}
               activeOpacity={0.85}
-              className="absolute bottom-0 right-0 w-7 h-7 rounded-full items-center justify-center"
+              className="absolute bottom-0 right-0 w-8 h-8 rounded-full items-center justify-center shadow-sm"
               style={{ backgroundColor: c.info, borderWidth: 2, borderColor: c.bgCard }}
             >
-              <Ionicons name="camera" size={13} color="#FFFFFF" />
+              <Ionicons name="camera" size={14} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
           <Text className="text-[20px] font-extrabold" style={{ color: c.text }}>
@@ -446,7 +500,7 @@ export default function ProfileScreen({ navigation }) {
       </ScrollView>
 
       <BottomTabBar c={c} navigation={navigation} active="you" />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

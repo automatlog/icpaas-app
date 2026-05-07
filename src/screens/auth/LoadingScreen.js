@@ -11,17 +11,18 @@ const FloatingIcon = ({ name, size, top, left, right, bottom, rotate, opacity = 
   const translateY = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
+    const useNativeDriver = Platform.OS !== 'web';
     Animated.loop(
       Animated.sequence([
         Animated.timing(translateY, {
           toValue: -20,
           duration,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(translateY, {
           toValue: 0,
           duration,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     ).start();
@@ -29,12 +30,12 @@ const FloatingIcon = ({ name, size, top, left, right, bottom, rotate, opacity = 
 
   return (
     <Animated.View
-      pointerEvents="none"
       style={{
         position: 'absolute',
         top, left, right, bottom,
         transform: [{ rotate: rotate || '0deg' }, { translateY }],
         opacity,
+        pointerEvents: 'none',
       }}
     >
       <Ionicons 
@@ -56,9 +57,10 @@ export default function LoadingScreen({ onFinish }) {
   const [barW, setBarW] = useState(0);
 
   useEffect(() => {
+    const useNativeDriver = Platform.OS !== 'web';
     Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 600, useNativeDriver }),
+      Animated.spring(scale, { toValue: 1, friction: 8, tension: 40, useNativeDriver }),
       Animated.timing(progress, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
     ]).start();
 

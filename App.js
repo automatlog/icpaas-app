@@ -21,6 +21,7 @@ import RealtimeProvider from './src/components/RealtimeProvider';
 import { store, persistor } from './src/store';
 import { setHydrated } from './src/store/slices/hydratedSlice';
 import { useFeed } from './src/theme';
+import { registerForPushNotificationsAsync } from './src/services/pushNotifications';
 
 function AppInner() {
   const c = useFeed(); // honours theme.mode override (default light)
@@ -38,6 +39,11 @@ function AppInner() {
     }, 4000);
     return () => clearTimeout(t);
   }, [dispatch]);
+
+  // Request push notification permissions on boot
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+  }, []);
 
   // The OS status bar (Android) and the area behind it (iOS) match the
   // inset bands so transitions are seamless.

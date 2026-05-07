@@ -8,7 +8,7 @@
 // route param so the screen can adapt header / data source).
 import React, { useEffect, useRef } from 'react';
 import {
-  Modal, View, TouchableOpacity, Animated, Easing, Pressable, StyleSheet,
+  Modal, View, TouchableOpacity, Animated, Easing, Pressable, StyleSheet, Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,28 +19,52 @@ import { getChannel } from '../constants/channels';
 // stay in sync with the Dashboard tiles + CampaignPicker. SMS / Voice
 // don't have live chat — omitted.
 const CHATS_CHANNELS = [
-  { ...getChannel('whatsapp'), route: 'Inbox',    routeParams: { channel: 'whatsapp' } },
-  { ...getChannel('rcs'),      route: 'RcsInbox', routeParams: { channel: 'rcs' } },
+  { ...getChannel('whatsapp'), route: 'Inbox', routeParams: { channel: 'whatsapp' } },
+  { ...getChannel('rcs'), route: 'RcsInbox', routeParams: { channel: 'rcs' } },
 ];
 
-const RADIUS = 88;
+const RADIUS = 100;
 // Two icons, slightly tighter spread than the 4-channel campaign arc.
 const ANGLES = [-130, -50];
-const CIRCLE_SIZE = 52;
-const ICON_SIZE   = 24;
+const CIRCLE_SIZE = 56;
+const ICON_SIZE   = 26;
 
 export default function ChatsPicker({ visible, onClose, onPick }) {
   const c = useBrand();
   const insets = useSafeAreaInsets();
-  const anim = useRef(new Animated.Value(0)).current;
+  
+  // Master opacity for the backdrop
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+  // Individual anims for the icons to support staggered entry
+  const anims = useRef(CHATS_CHANNELS.map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: visible ? 1 : 0,
-      duration: visible ? 240 : 160,
-      easing: visible ? Easing.out(Easing.back(1.4)) : Easing.in(Easing.quad),
-      useNativeDriver: true,
-    }).start();
+    if (visible) {
+      // Explicitly reset to 0 before starting
+      overlayAnim.setValue(0);
+      anims.forEach(a => a.setValue(0));
+
+      Animated.timing(overlayAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+
+      // Increased stagger for a clear sequential "one by one" effect
+      Animated.stagger(120, anims.map((a) => 
+        Animated.spring(a, {
+          toValue: 1,
+          friction: 7,
+          tension: 35,
+          useNativeDriver: true,
+        })
+      )).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(overlayAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+        ...anims.map((a) => Animated.timing(a, { toValue: 0, duration: 150, useNativeDriver: true })),
+      ]).start();
+    }
   }, [visible]);
 
   // Anchor at the Chats tab — that's the second of five tabs, ~30% from
@@ -57,16 +81,17 @@ export default function ChatsPicker({ visible, onClose, onPick }) {
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}>
         <Pressable
           onPress={onClose}
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,23,42,0.18)' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]}
         />
 
         {CHATS_CHANNELS.map((ch, i) => {
           const ang = (ANGLES[i] * Math.PI) / 180;
           const dx = RADIUS * Math.cos(ang);
           const dy = RADIUS * Math.sin(ang);
+          const iconAnim = anims[i];
 
           return (
             <Animated.View
@@ -77,12 +102,13 @@ export default function ChatsPicker({ visible, onClose, onPick }) {
                 bottom: anchorBottom - CIRCLE_SIZE / 2,
                 left: anchorLeftPercent,
                 marginLeft: -CIRCLE_SIZE / 2,
-                opacity: anim,
+                opacity: iconAnim,
                 transform: [
-                  { translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [0, dx] }) },
-                  { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, dy] }) },
-                  { scale: anim },
+                  { translateX: iconAnim.interpolate({ inputRange: [0, 1], outputRange: [0, dx] }) },
+                  { translateY: iconAnim.interpolate({ inputRange: [0, 1], outputRange: [0, dy] }) },
+                  { scale: iconAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) },
                 ],
+                alignItems: 'center',
               }}
             >
               <TouchableOpacity
@@ -95,18 +121,42 @@ export default function ChatsPicker({ visible, onClose, onPick }) {
                     width: CIRCLE_SIZE,
                     height: CIRCLE_SIZE,
                     borderRadius: CIRCLE_SIZE / 2,
-                    backgroundColor: c.primarySoft,
+                    backgroundColor: '#FFFFFF',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    shadowColor: c.primary,
-                    shadowOffset: { width: 0, height: 6 },
-                    shadowOpacity: 0.22,
-                    shadowRadius: 10,
-                    elevation: 6,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 12,
+                    elevation: 10,
+                    borderWidth: 1.5,
+                    borderColor: ch.tint + '33',
                   }}
                 >
-                  <Ionicons name={ch.icon} size={ICON_SIZE} color={c.primary} />
+                  <Ionicons name={ch.icon} size={ICON_SIZE} color={ch.tint} />
                 </View>
+                <Animated.View 
+                  style={{ 
+                    marginTop: 6,
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 8,
+                    opacity: iconAnim,
+                  }}
+                >
+                  <Text 
+                    style={{ 
+                      fontSize: 10, 
+                      fontWeight: '800', 
+                      color: '#000',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {ch.label}
+                  </Text>
+                </Animated.View>
               </TouchableOpacity>
             </Animated.View>
           );

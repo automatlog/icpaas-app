@@ -25,6 +25,8 @@ import {
   updateUnreadCount,
   updateDeliveryStatus,
 } from '../store/slices/liveChatSlice';
+import { AppState } from 'react-native';
+import { scheduleLocalNotification } from './pushNotifications';
 
 const TOKEN_KEY = 'icpaas_token';
 
@@ -54,6 +56,13 @@ const buildConnection = () =>
 const wireHandlers = (conn) => {
   conn.on('ReceivedMessage', (chat) => {
     store.dispatch(receiveLiveMessage(chat));
+    
+    // If the app is in the background, trigger a system notification
+    if (AppState.currentState === 'background' || AppState.currentState === 'inactive') {
+      const title = chat.senderName || chat.senderNumber || 'New Message';
+      const body = chat.text || (chat.type === 'image' ? '📷 Image' : (chat.type === 'document' ? '📄 Document' : 'New incoming message'));
+      scheduleLocalNotification(title, body, { chatId: chat.id, senderNumber: chat.senderNumber });
+    }
   });
   conn.on('UpdateUnreadCount', (waId, count) => {
     store.dispatch(updateUnreadCount({ waId, count }));

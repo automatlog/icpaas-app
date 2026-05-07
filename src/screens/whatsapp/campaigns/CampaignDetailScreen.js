@@ -15,6 +15,7 @@ import {
 import { pushNotification } from '../../../store/slices/notificationsSlice';
 import { BottomTabBar } from '../../shared/DashboardScreen';
 import toast from '../../../services/toast';
+import ScreenHeader from '../../../components/ScreenHeader';
 
 const STATUS_TINT = {
   live:      { bg: '#D1FAE5', fg: '#047857', label: 'Live',      icon: 'pulse' },
@@ -320,25 +321,19 @@ export default function CampaignDetailScreen({ navigation, route }) {
 
 function Header({ c, navigation, title, onMore }) {
   return (
-    <View
-      className="flex-row items-center px-4"
-      style={{
-        paddingTop: Platform.OS === 'ios' ? 56 : 36,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: c.rule,
-      }}
-    >
-      <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-        <Ionicons name="arrow-back" size={22} color={c.text} />
-      </TouchableOpacity>
-      <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>{title}</Text>
-      {onMore ? (
-        <TouchableOpacity onPress={onMore} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="trash-outline" size={20} color={c.danger} />
-        </TouchableOpacity>
-      ) : <View style={{ width: 40 }} />}
-    </View>
+    <ScreenHeader
+      c={c}
+      onBack={() => navigation.goBack()}
+      title={title}
+      icon="megaphone"
+      right={
+        onMore ? (
+          <TouchableOpacity onPress={onMore} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
+            <Ionicons name="trash-outline" size={20} color={c.danger} />
+          </TouchableOpacity>
+        ) : null
+      }
+    />
   );
 }
 

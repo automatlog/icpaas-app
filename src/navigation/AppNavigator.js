@@ -20,6 +20,7 @@ import ContactsScreen from '../screens/shared/ContactsScreen';
 // WhatsApp screens
 import WhatsAppInboxScreen from '../screens/whatsapp/InboxScreen';
 import WhatsAppChatScreen from '../screens/whatsapp/ChatScreen';
+import UserProfileScreen from '../screens/whatsapp/UserProfileScreen';
 import LiveAgentInbox from '../screens/whatsapp/LiveAgentInbox';
 import LiveAgentChat from '../screens/whatsapp/LiveAgentChat';
 import WhatsAppTemplatesScreen from '../screens/whatsapp/TemplatesScreen';
@@ -30,6 +31,7 @@ import WhatsAppCampaignDetail from '../screens/whatsapp/campaigns/CampaignDetail
 import WhatsAppCampaignStep1 from '../screens/whatsapp/campaigns/CampaignStep1Screen';
 import WhatsAppCampaignStep2 from '../screens/whatsapp/campaigns/CampaignStep2Screen';
 import WhatsAppCampaignStep3 from '../screens/whatsapp/campaigns/CampaignStep3Screen';
+import WhatsAppDashboardScreen from '../screens/whatsapp/WhatsAppDashboardScreen';
 
 // RCS screens
 import RcsInboxScreen from '../screens/rcs/InboxScreen';
@@ -120,6 +122,7 @@ export default function AppNavigator() {
         {/* WhatsApp */}
         <Stack.Screen name="WhatsAppInbox" component={WhatsAppInboxScreen} />
         <Stack.Screen name="WhatsAppChat" component={WhatsAppChatScreen} />
+        <Stack.Screen name="UserProfile" component={UserProfileScreen} />
         <Stack.Screen name="WhatsAppTemplates" component={WhatsAppTemplatesScreen} />
         <Stack.Screen name="WhatsAppCreateTemplate" component={WhatsAppCreateTemplateScreen} />
         <Stack.Screen name="WabaChannels" component={WabaChannelScreen} />
@@ -128,6 +131,7 @@ export default function AppNavigator() {
         <Stack.Screen name="WhatsAppCampaignStep1" component={WhatsAppCampaignStep1} />
         <Stack.Screen name="WhatsAppCampaignStep2" component={WhatsAppCampaignStep2} />
         <Stack.Screen name="WhatsAppCampaignStep3" component={WhatsAppCampaignStep3} />
+        <Stack.Screen name="WhatsAppDashboard" component={WhatsAppDashboardScreen} />
 
         {/* WhatsApp Live Agent (server-driven, real-time) */}
         <Stack.Screen name="LiveAgentInbox" component={LiveAgentInbox} />

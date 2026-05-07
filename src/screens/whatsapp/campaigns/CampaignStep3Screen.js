@@ -10,6 +10,7 @@ import { upsertCampaign } from '../../../store/slices/campaignsSlice';
 import { pushNotification } from '../../../store/slices/notificationsSlice';
 import { WhatsAppAPI } from '../../../services/api';
 import toast from '../../../services/toast';
+import ScreenHeader from '../../../components/ScreenHeader';
 import {
   Stepper, Card, SectionTitle, PrimaryButton, SecondaryButton,
 } from './CampaignStep1Screen';
@@ -162,22 +163,12 @@ export default function CampaignStep3Screen({ navigation, route }) {
 
 function Header({ c, navigation, title }) {
   return (
-    <View
-      className="flex-row items-center px-4"
-      style={{
-        paddingTop: Platform.OS === 'ios' ? 56 : 36,
-        paddingBottom: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: c.rule,
-        backgroundColor: c.bg,
-      }}
-    >
-      <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} className="w-10 h-10 items-center justify-center">
-        <Ionicons name="arrow-back" size={22} color={c.text} />
-      </TouchableOpacity>
-      <Text className="flex-1 text-[18px] font-bold text-center" style={{ color: c.text }}>{title}</Text>
-      <View style={{ width: 40 }} />
-    </View>
+    <ScreenHeader
+      c={c}
+      onBack={() => navigation.goBack()}
+      title={title}
+      icon="megaphone"
+    />
   );
 }
 
